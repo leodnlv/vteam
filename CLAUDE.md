@@ -133,11 +133,17 @@ Maximum 30 lines — drop oldest entries first.
 
 Supported frontmatter fields: `model`, `allowedTools`, `disallowedTools`. The markdown body becomes the curation agent's system prompt. Memory data is stored in `vteam/.memory/<agent-name>/store.md` (gitignored). The curation agent runs after each agent run and its failure does not affect the agent run's exit status.
 
-## Claude Code skill: `/create-vteam-agent`
+## Claude Code skills
 
-A user-scoped Claude Code skill (`skills/create-vteam-agent/SKILL.md`) that interactively scaffolds new vteam agents. It walks through clarifying questions (input mode, output mode, worktree, tools, memory, hooks, model, cron) and generates the `AGENT.md` + optional `MEMORY.md` / `ON_FINISH.md` files.
+Skills live in `skills/` and are symlinked into `~/.claude/skills/` via `vteam skill install`. See `skills/SETUP.md` for setup.
 
-The skill lives in this repo but is symlinked into `~/.claude/skills/` so it's available from any project. See `skills/SETUP.md` for setup instructions.
+### `/vteam` — context injection
+
+A non-interactive skill (`skills/vteam/SKILL.md`) that injects full vteam knowledge into the current Claude Code session. No questions, no output — it loads background context so Claude can assist with vteam configuration, agent authoring, and troubleshooting from any project.
+
+### `/create-vteam-agent` — agent scaffolding
+
+An interactive skill (`skills/create-vteam-agent/SKILL.md`) that scaffolds new vteam agents. It walks through clarifying questions (input mode, output mode, worktree, tools, memory, hooks, model, cron) and generates the `AGENT.md` + optional `MEMORY.md` / `ON_FINISH.md` files.
 
 **The skill must stay in sync with the codebase.** When any of the following change, update the skill accordingly:
 - Agent frontmatter fields (added, removed, renamed, new validation rules) in `src/config/schema.ts`
@@ -150,8 +156,10 @@ The skill lives in this repo but is symlinked into `~/.claude/skills/` so it's a
 
 ```
 skills/
+├── vteam/
+│   └── SKILL.md                  Context injection skill — loads vteam knowledge into any session
 └── create-vteam-agent/
-    └── SKILL.md                  Claude Code skill for scaffolding agents (user-scoped via symlink)
+    └── SKILL.md                  Interactive skill for scaffolding agents
 src/
 ├── bin.ts                        CLI entry point (commander)
 ├── types.ts                      All shared TypeScript types
@@ -255,7 +263,7 @@ This file is the primary source of truth for how Claude understands vteam. `READ
 - **New integrations or platform support** — update v1 scope and constraints
 - **Added, moved, or deleted source files** — update Project structure tree
 
-- **Changes to agent frontmatter, output schema, or orchestrator behavior** — update the `create-vteam-agent` skill (`skills/create-vteam-agent/SKILL.md`) so it generates correct agents
+- **Changes to agent frontmatter, output schema, or orchestrator behavior** — update the `create-vteam-agent` skill (`skills/create-vteam-agent/SKILL.md`) so it generates correct agents, and the `vteam` knowledge skill (`skills/vteam/SKILL.md`) so its context stays accurate
 
 Do not update CLAUDE.md or README.md for internal refactors that don't change external behavior, test additions, or bug fixes that don't alter documented behavior.
 

@@ -432,17 +432,25 @@ vteam uses advisory file locking via atomic `mkdir` (POSIX guarantees this is at
 - **No rollback**: If the refactorer's changes break something, you close the PR. There's no automatic revert mechanism.
 - **Title-based dedup only**: Duplicate detection relies on Claude reading existing task titles in its prompt. Similar but differently-worded findings may slip through.
 
-## Claude Code skill: `/create-vteam-agent`
+## Claude Code skills
 
-A user-scoped Claude Code skill that interactively scaffolds new vteam agents. It asks clarifying questions about the agent's purpose, input/output modes, worktree needs, tool permissions, memory, and hooks — then generates the `AGENT.md` (and optionally `MEMORY.md` / `ON_FINISH.md`) files.
-
-The skill source lives in this repo at `skills/create-vteam-agent/SKILL.md`. To make it available globally, run:
+Skills live in `skills/` and are symlinked into `~/.claude/skills/` so they work from any project. Install with:
 
 ```bash
 vteam skill install
 ```
 
-Then invoke it from any project with `/create-vteam-agent`. See `skills/SETUP.md` for details.
+See `skills/SETUP.md` for details.
+
+### `/vteam` — context injection
+
+A non-interactive skill that injects full vteam knowledge into the current Claude Code session. Invoke it with `/vteam` when working in a project that uses vteam — Claude will understand the framework's architecture, CLI commands, agent configuration, and design principles without needing to read the docs.
+
+### `/create-vteam-agent` — agent scaffolding
+
+An interactive skill that scaffolds new vteam agents. It asks clarifying questions about the agent's purpose, input/output modes, worktree needs, tool permissions, memory, and hooks — then generates the `AGENT.md` (and optionally `MEMORY.md` / `ON_FINISH.md`) files.
+
+Invoke from any project with `/create-vteam-agent`.
 
 ## Development
 
