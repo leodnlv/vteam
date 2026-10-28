@@ -1,28 +1,35 @@
-export type TaskStatus = "todo" | "done";
+export type TaskStatus =
+  | "inbox"
+  | "backlog"
+  | "todo"
+  | "active"
+  | "done"
+  | "canceled";
 
 export type Severity = "critical" | "high" | "medium" | "low";
 
 export type Platform = "github" | "gitlab";
 
-export interface TaskFrontmatter {
+export interface Task {
+  ref: string;
   title: string;
-  created: string;
   status: TaskStatus;
   severity: Severity;
-  "found-by": string;
   files: string[];
-  "retry-count"?: number;
+  retryCount: number;
+  actor?: string;
+  description: string;
+  createdAt: string;
+}
+
+export interface TaskMetadata {
+  "found-by"?: string;
+  actor?: string;
+  files?: string;
+  "retry-count"?: string;
   completed?: string;
   branch?: string;
   "pr-url"?: string;
-}
-
-export interface TaskFile {
-  id: string;
-  filename: string;
-  path: string;
-  frontmatter: TaskFrontmatter;
-  body: string;
 }
 
 export interface OnFinishConfig {
@@ -47,6 +54,7 @@ export interface AgentConfig {
   worktree?: boolean;
   readOnly?: boolean;
   output?: "task";
+  assignTo?: string;
   input?: "task" | "pr";
   prTriggerLabel?: string;
   autoPR?: boolean;
@@ -94,20 +102,19 @@ export interface PRReviewContext {
   repoSlug: string;
 }
 
-export interface FilesystemTaskManagerConfig {
-  provider: "filesystem";
+export interface TasksConfig {
+  maxRetries: number;
+  project: string;
+  label: string;
+  defaultActor: string;
+  workspace?: string;
 }
-
-export type TaskManagerConfig = FilesystemTaskManagerConfig;
 
 export interface VteamConfig {
   baseBranch: string;
   platform: Platform;
   worktreeDir: string;
-  tasks: {
-    maxRetries: number;
-  };
-  taskManager: TaskManagerConfig;
+  tasks: TasksConfig;
 }
 
 export interface CommitMessage {
@@ -158,7 +165,7 @@ export interface RunState {
   completedAt?: string;
   worktreePath?: string;
   branchName?: string;
-  taskFile?: string;
+  taskRef?: string;
   error?: string;
   claudeOutput?: AgentOutput;
   tasksCreated?: string[];

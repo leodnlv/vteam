@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { parse } from "../frontmatter.js";
 import type { TaskManager } from "../tasks/task-manager.js";
-import type { AgentConfig, TaskFile, PRReviewContext, OnFinishConfig, MemoryConfig, RunOutcome } from "../types.js";
+import type { AgentConfig, Task, PRReviewContext, OnFinishConfig, MemoryConfig, RunOutcome } from "../types.js";
 
 interface PromptParts {
   systemPrompt: string;
@@ -11,7 +11,7 @@ interface PromptParts {
 export async function buildPrompt(
   agent: AgentConfig,
   taskManager: TaskManager,
-  task?: TaskFile,
+  task?: Task,
   review?: PRReviewContext,
   focus?: string,
   memoryContent?: string,
@@ -38,8 +38,8 @@ export async function buildPrompt(
   const index = await taskManager.getIndex();
   if (index.all.length > 0) {
     const lines = index.all.map((t) => {
-      const files = t.frontmatter.files.join(", ");
-      return `- [${t.frontmatter.status}] ${t.frontmatter.severity} | ${t.frontmatter.title} | ${files}`;
+      const files = t.files.join(", ");
+      return `- [${t.status}] ${t.severity} | ${t.title} | ${files}`;
     });
     sections.push(
       `## Existing Tasks\n\nDo not report issues that already appear in this list.\n\n${lines.join("\n")}`,
@@ -48,7 +48,7 @@ export async function buildPrompt(
 
   if (task) {
     sections.push(
-      `## Your Task\n\nTitle: ${task.frontmatter.title}\nSeverity: ${task.frontmatter.severity}\nFiles: ${task.frontmatter.files.join(", ")}\n\n${task.body}`,
+      `## Your Task\n\nTitle: ${task.title}\nSeverity: ${task.severity}\nFiles: ${task.files.join(", ")}\n\n${task.description}`,
     );
   }
 
@@ -178,7 +178,7 @@ function buildOutputInstruction(agent: AgentConfig): string {
   }`;
 
   const preamble = agent.output === "task"
-    ? "Return your finding as a JSON object. Do NOT write any task files — the orchestrator creates them from your output. Output ONLY valid JSON with no markdown fencing."
+    ? "Return your finding as a JSON object. Do NOT create or modify tasks yourself (no aven commands) — the orchestrator creates them from your output. Output ONLY valid JSON with no markdown fencing."
     : "After completing your work, output a JSON object as the LAST thing you produce. Do NOT run git add or git commit — the orchestrator handles committing and pushing. Output ONLY valid JSON with no markdown fencing.";
 
   return `## Output Format

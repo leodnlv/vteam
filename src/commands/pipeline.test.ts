@@ -4,16 +4,49 @@ import {
   mkdirSync,
   writeFileSync,
   readFileSync,
-  readdirSync,
   existsSync,
   rmSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import type { AgentRunResult } from "../orchestrator/agent-runner.js";
+import type { TaskManager, TaskUpdate } from "../tasks/task-manager.js";
+import type { Task, TaskContentBody } from "../types.js";
 
 vi.mock("../orchestrator/agent-runner.js", () => ({
   runClaudeAgent: vi.fn(),
+}));
+
+const taskStore = vi.hoisted(() => ({
+  tasks: [] as Task[],
+  created: [] as { body: TaskContentBody; foundBy: string; actor?: string }[],
+  updates: [] as { ref: string; changes: TaskUpdate }[],
+}));
+
+vi.mock("../tasks/aven-manager.js", () => ({
+  AvenTaskManager: class implements TaskManager {
+    async listReady(actor: string) {
+      return taskStore.tasks.filter(
+        (t) => t.status === "todo" && (t.actor ?? "test-agent") === actor,
+      );
+    }
+    async getIndex() {
+      return {
+        all: taskStore.tasks,
+        byStatus: new Map(),
+        titles: taskStore.tasks.map((t) => t.title),
+      };
+    }
+    async create(body: TaskContentBody, foundBy: string, actor?: string) {
+      taskStore.created.push({ body, foundBy, actor });
+      return `VTM-${taskStore.created.length}`;
+    }
+    async update(ref: string, changes: TaskUpdate) {
+      taskStore.updates.push({ ref, changes });
+      const task = taskStore.tasks.find((t) => t.ref === ref);
+      if (task && changes.status) task.status = changes.status;
+    }
+  },
 }));
 
 import { runClaudeAgent } from "../orchestrator/agent-runner.js";
@@ -58,7 +91,7 @@ function setupProject(opts: {
       baseBranch: "main",
       platform: "github",
       worktreeDir: ".worktrees",
-      tasks: { maxRetries: 3 },
+      tasks: { maxRetries: 3, project: "test", defaultActor: "test-agent" },
     }),
   );
 
@@ -88,9 +121,6 @@ function setupProject(opts: {
     mkdirSync(memDir, { recursive: true });
     writeFileSync(resolve(memDir, "store.md"), existingMemory);
   }
-
-  mkdirSync(resolve(vteamDir, "tasks", "todo"), { recursive: true });
-  mkdirSync(resolve(vteamDir, "tasks", "done"), { recursive: true });
 }
 
 beforeEach(() => {
@@ -100,6 +130,9 @@ beforeEach(() => {
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
   mockRunClaude.mockReset();
+  taskStore.tasks = [];
+  taskStore.created = [];
+  taskStore.updates = [];
 });
 
 afterEach(() => {
@@ -328,8 +361,8 @@ describe("pipeline: agent output → MEMORY curation", () => {
   });
 });
 
-describe("pipeline: agent output → task file creation", () => {
-  it("creates task file when agent returns task content", async () => {
+describe("pipeline: agent output → task creation", () => {
+  it("creates a task when agent returns task content", async () => {
     setupProject({
       agentFrontmatter: "---\nmodel: sonnet\noutput: task\n---",
     });
@@ -354,16 +387,44 @@ describe("pipeline: agent output → task file creation", () => {
 
     await runCommand("test-agent", {});
 
-    const todoDir = resolve(tmp, "vteam", "tasks", "todo");
-    const files = readdirSync(todoDir).filter((f) => f.endsWith(".md"));
-    expect(files.length).toBe(1);
-
-    const content = readFileSync(resolve(todoDir, files[0]), "utf-8");
-    expect(content).toContain("Missing error handling");
-    expect(content).toContain("medium");
+    expect(taskStore.created).toEqual([
+      {
+        body: {
+          title: "Missing error handling",
+          severity: "medium",
+          description: "No try-catch around DB call",
+          files: ["src/db.ts:20"],
+        },
+        foundBy: "test-agent",
+        actor: undefined,
+      },
+    ]);
   });
 
-  it("does not create task file for generic content", async () => {
+  it("routes created tasks to the assignTo actor", async () => {
+    setupProject({
+      agentFrontmatter: "---\nmodel: sonnet\noutput: task\nassignTo: fixer\n---",
+    });
+
+    mockRunClaude.mockResolvedValueOnce(
+      makeResult(
+        JSON.stringify({
+          status: "completed",
+          summary: "Found issue.",
+          content: {
+            type: "task",
+            body: { title: "T", severity: "low", description: "D", files: ["a.ts"] },
+          },
+        }),
+      ),
+    );
+
+    await runCommand("test-agent", {});
+
+    expect(taskStore.created[0].actor).toBe("fixer");
+  });
+
+  it("does not create a task for generic content", async () => {
     setupProject();
 
     mockRunClaude.mockResolvedValueOnce(
@@ -378,9 +439,88 @@ describe("pipeline: agent output → task file creation", () => {
 
     await runCommand("test-agent", {});
 
-    const todoDir = resolve(tmp, "vteam", "tasks", "todo");
-    const files = readdirSync(todoDir).filter((f) => f.endsWith(".md"));
-    expect(files.length).toBe(0);
+    expect(taskStore.created).toEqual([]);
+  });
+});
+
+describe("pipeline: task input lifecycle", () => {
+  function seedTask(overrides: Partial<Task> = {}): Task {
+    const task: Task = {
+      ref: "VTM-ABCD",
+      title: "Fix the thing",
+      status: "todo",
+      severity: "high",
+      files: ["src/thing.ts"],
+      retryCount: 0,
+      description: "It is broken.",
+      createdAt: "2026-10-01T00:00:00Z",
+      ...overrides,
+    };
+    taskStore.tasks.push(task);
+    return task;
+  }
+
+  it("marks the picked task active, then returns it to todo when not settled", async () => {
+    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    seedTask();
+
+    mockRunClaude.mockResolvedValueOnce(
+      makeResult(JSON.stringify({ status: "completed", summary: "Looked." })),
+    );
+
+    await runCommand("test-agent", {});
+
+    expect(taskStore.updates.map((u) => u.changes.status)).toEqual(["active", "todo"]);
+    expect(mockRunClaude.mock.calls[0][0].userPrompt).toContain("It is broken.");
+  });
+
+  it("returns the task to todo when the agent fails", async () => {
+    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    seedTask();
+
+    mockRunClaude.mockResolvedValueOnce(makeResult(null, 1));
+
+    await runCommand("test-agent", {});
+
+    expect(taskStore.updates.map((u) => u.changes.status)).toEqual(["active", "todo"]);
+  });
+
+  it("picks the highest severity task and skips tasks over the retry limit", async () => {
+    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    seedTask({ ref: "VTM-LOW1", severity: "low" });
+    seedTask({ ref: "VTM-CRIT", severity: "critical", retryCount: 3 });
+    seedTask({ ref: "VTM-HIGH", severity: "high" });
+
+    mockRunClaude.mockResolvedValueOnce(
+      makeResult(JSON.stringify({ status: "completed", summary: "Done." })),
+    );
+
+    await runCommand("test-agent", {});
+
+    expect(taskStore.updates[0]).toEqual({ ref: "VTM-HIGH", changes: { status: "active" } });
+  });
+
+  it("ignores tasks routed to another actor", async () => {
+    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    seedTask({ ref: "VTM-OTHR", severity: "critical", actor: "someone-else" });
+    seedTask({ ref: "VTM-MINE", severity: "low", actor: "test-agent" });
+
+    mockRunClaude.mockResolvedValueOnce(
+      makeResult(JSON.stringify({ status: "completed", summary: "Done." })),
+    );
+
+    await runCommand("test-agent", {});
+
+    expect(taskStore.updates[0]).toEqual({ ref: "VTM-MINE", changes: { status: "active" } });
+  });
+
+  it("does nothing when no task is ready", async () => {
+    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+
+    await runCommand("test-agent", {});
+
+    expect(mockRunClaude).not.toHaveBeenCalled();
+    expect(taskStore.updates).toEqual([]);
   });
 });
 
