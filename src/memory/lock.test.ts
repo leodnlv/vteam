@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
-import { acquireLock, breakLock } from "./lock.js";
+import { acquireLock, breakLock, breakStaleLock } from "./lock.js";
 
 vi.mock("node:fs", async (importOriginal) => {
   const actual = await importOriginal();
@@ -17,6 +17,34 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tmp, { recursive: true, force: true });
+});
+
+describe("breakStaleLock", () => {
+  it("leaves a lock held by a live process", async () => {
+    const resource = resolve(tmp, "my-agent");
+    const lock = await acquireLock(resource, "holder");
+
+    expect(breakStaleLock(resource)).toBe(false);
+    expect(existsSync(resource + ".lock")).toBe(true);
+
+    lock.release();
+  });
+
+  it("breaks a lock held by a dead process", () => {
+    const resource = resolve(tmp, "my-agent");
+    mkdirSync(resource + ".lock");
+    writeFileSync(
+      resolve(resource + ".lock", "info.json"),
+      JSON.stringify({ pid: 999999, timestamp: Date.now(), agent: "dead" }),
+    );
+
+    expect(breakStaleLock(resource)).toBe(true);
+    expect(existsSync(resource + ".lock")).toBe(false);
+  });
+
+  it("returns false when there is no lock", () => {
+    expect(breakStaleLock(resolve(tmp, "missing"))).toBe(false);
+  });
 });
 
 describe("acquireLock", () => {

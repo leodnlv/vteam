@@ -16,6 +16,7 @@ export interface TaskIndex {
 export interface TaskUpdate {
   status?: TaskStatus;
   metadata?: TaskMetadata;
+  removeMetadata?: (keyof TaskMetadata)[];
 }
 
 export interface TaskManager {

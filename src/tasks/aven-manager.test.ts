@@ -162,6 +162,20 @@ describe("AvenTaskManager", () => {
     ]);
   });
 
+  it("removes metadata keys", async () => {
+    const { exec, calls } = fakeExec(() => "");
+
+    await new AvenTaskManager(config, exec).update("APP-0001", {
+      status: "todo",
+      removeMetadata: ["claimed-by", "claimed-pid"],
+    });
+
+    expect(calls[0].args).toEqual([
+      "edit", "APP-0001", "--status", "todo",
+      "--remove-metadata", "claimed-by", "--remove-metadata", "claimed-pid",
+    ]);
+  });
+
   it("prefixes every command with the configured workspace", async () => {
     const { exec, calls } = fakeExec(() => "");
 
@@ -219,11 +233,17 @@ describe.skipIf(!avenInstalled())("AvenTaskManager against real aven", () => {
     });
     expect(ready.description).toContain("Crashes on empty input.");
 
-    await manager.update(ref, { status: "active" });
+    await manager.update(ref, { status: "active", metadata: { "claimed-by": "run-1" } });
     expect(await manager.listReady()).toEqual([]);
 
-    await manager.update(ref, { status: "todo", metadata: { "retry-count": "1" } });
-    expect((await manager.listReady())[0].retryCount).toBe(1);
+    await manager.update(ref, {
+      status: "todo",
+      metadata: { "retry-count": "1" },
+      removeMetadata: ["claimed-by"],
+    });
+    const [retried] = await manager.listReady();
+    expect(retried.retryCount).toBe(1);
+    expect(retried.metadata).not.toHaveProperty("claimed-by");
 
     await manager.update(ref, { status: "done", metadata: { branch: "vteam/fix" } });
     const index = await manager.getIndex();

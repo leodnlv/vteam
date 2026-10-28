@@ -139,7 +139,7 @@ Claude is read-only — it scans and reports. The orchestrator owns all file cre
 ### `vteam run coder`
 
 1. Acquires an advisory lock (`vteam/.locks/coder.lock`)
-2. Picks the highest-severity ready task routed to it from aven (`aven list --status todo --ready` filtered by its `taskFilter`, see [Routing tasks to agents](#routing-tasks-to-agents); oldest first within a severity; skips tasks that have failed `maxRetries` times) and sets it to `active`
+2. Under a short-lived claim lock shared by all agents (`vteam/.locks/task-claim.lock`), picks the highest-severity ready task routed to it from aven (`aven list --status todo --ready` filtered by its `taskFilter`, see [Routing tasks to agents](#routing-tasks-to-agents); oldest first within a severity; skips tasks that have failed `maxRetries` times) and sets it to `active` with `claimed-*` metadata
 3. Creates a git worktree at `.vteam-worktrees/vteam/<task-title-slug>-<runId>` branched from the base branch
 4. Builds the prompt with the task description, existing task titles, and agent instructions
 5. Spawns `claude -p` in the worktree — Claude implements the fix and returns a commit message as structured JSON
@@ -175,7 +175,7 @@ Displays the aven project and label, task counts per aven status, lists active a
 
 ### `vteam clean`
 
-Removes orphaned worktrees and breaks stale locks. Run this after a crash or if a lock is stuck.
+Removes orphaned worktrees, breaks stale locks (held by a dead process or older than 30 minutes), and returns orphaned tasks to `todo`: tasks that are `active` with a claim from this machine whose process is no longer running. Tasks claimed on another machine and `active` tasks without a vteam claim are listed but left alone. Run this after a crash or if a lock is stuck.
 
 ### `vteam skill install`
 
@@ -309,11 +309,11 @@ taskFilter:
 
 - Different keys must all match (AND). A list of values matches any of them (OR). `null` matches a key that is missing or empty, so `found-by: [improver, null]` also covers tasks you create yourself in aven.
 - An agent without `taskFilter` matches every task.
-- Filters may overlap. The first agent to run sets the task to `active`, which takes it off the others' lists.
+- Filters may overlap. Picking happens under a claim lock shared by all agents, so only one agent gets a task. Once it is `active`, it is off every other agent's list.
 - vteam writes `found-by` (the creating agent) on every task. Any other key, like `actor`, is yours to set: `aven edit <ref> --metadata actor=mr-reviewer`.
 - A task that no agent's filter matches is never picked. `vteam status` shows which agents each open task routes to and warns about `todo` tasks no agent will pick.
 
-Agents only pick tasks returned by `aven list --status todo --ready`, so aven's dependency blocking and deferral (`available_at`) are respected. If the vteam process is killed hard mid-run, the task may stay `active` — reset it manually with `aven edit <ref> --status todo`.
+Agents only pick tasks returned by `aven list --status todo --ready`, so aven's dependency blocking and deferral (`available_at`) are respected. If the vteam process is killed hard mid-run, the task may stay `active`. Run `vteam clean` to return it to `todo`, or reset it manually with `aven edit <ref> --status todo`.
 
 Because tasks live in aven, you can triage them with `aven tui` or the `aven` CLI: move findings to `backlog` or `canceled`, change priority, add dependencies, or add the `vteam` label to your own tasks to queue them for the coder.
 
@@ -330,6 +330,7 @@ Because tasks live in aven, you can triage them with `aven tui` or the `aven` CL
 | metadata `files`       | Comma-separated affected files                                                  |
 | metadata `retry-count` | Incremented each time the coder finishes with no changes                        |
 | metadata `completed`, `branch`, `pr-url` | Added when the task is set to `done` (`pr-url` only if a PR was created) |
+| metadata `claimed-by`, `claimed-pid`, `claimed-host` | Run ID, process ID and hostname of the run working the task. Set with `active`, removed when the task leaves `active` |
 
 Tasks are referenced by their aven ref (e.g. `APP-7KQ9`); run state files in `vteam/.runs/` record it as `taskRef`. Refs are local to aven, so vteam keeps them out of branch names and PRs.
 
@@ -425,6 +426,7 @@ vteam uses advisory file locking via atomic `mkdir` (POSIX guarantees this is at
 - **Not distributed**: Locks are local to the filesystem. If you run vteam from multiple machines against the same repo (e.g., via NFS), locks won't protect against concurrent runs.
 - **Crash recovery**: If vteam crashes while holding a lock, the lock may persist. Run `vteam clean` to break stale locks, or wait 30 minutes for automatic stale detection.
 - **Same agent concurrency**: Two runs of the same agent are serialized by the lock. Different agents (improver + coder) can run concurrently.
+- **Task claiming**: Picking a task (list → select → set `active`) runs under `vteam/.locks/task-claim.lock`, shared by all agents, so two agents with overlapping `taskFilter`s never get the same task. The lock is held only while picking, not for the whole run. Like every lock it is local: agents on different machines syncing one aven database can still race.
 
 ### Worktrees
 
@@ -446,7 +448,7 @@ vteam uses advisory file locking via atomic `mkdir` (POSIX guarantees this is at
 - **No rollback**: If the coder's changes break something, you close the PR. There's no automatic revert mechanism.
 - **Title-based dedup only**: Duplicate detection relies on Claude reading existing task titles in its prompt. Similar but differently-worded findings may slip through.
 - **One `aven show` per task**: `aven list --json` doesn't include metadata or descriptions, so building the task index runs `aven show --full --json` for every labelled task (8 at a time). Large projects make prompt building slower.
-- **Stuck `active` tasks**: If the vteam process is killed hard, the picked task stays `active` and won't be retried until reset with `aven edit <ref> --status todo`.
+- **Stuck `active` tasks**: If the vteam process is killed hard, the picked task stays `active` and won't be retried until `vteam clean` (on the same machine) or `aven edit <ref> --status todo` resets it.
 
 ## Claude Code skills
 

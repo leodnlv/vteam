@@ -154,6 +154,9 @@ export class AvenTaskManager implements TaskManager {
     for (const [key, value] of Object.entries(changes.metadata ?? {})) {
       if (value !== undefined) args.push("--metadata", `${key}=${value}`);
     }
+    for (const key of changes.removeMetadata ?? []) {
+      args.push("--remove-metadata", key);
+    }
     await this.aven(args);
   }
 

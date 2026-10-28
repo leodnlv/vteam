@@ -12,6 +12,7 @@ import { runClaudeAgent } from "../orchestrator/agent-runner.js";
 import { parseAgentOutput } from "../orchestrator/output-schema.js";
 import { AvenTaskManager } from "../tasks/aven-manager.js";
 import { matchesTaskFilter, severityPriority, type TaskManager } from "../tasks/task-manager.js";
+import { CLAIM_KEYS, claimMetadata } from "../tasks/claim.js";
 import {
   createWorktree,
   checkoutWorktree,
@@ -141,22 +142,11 @@ async function runAgent(
     );
 
     if (agent.input === "task") {
-      const readyTasks = await taskManager.listReady();
-      const eligible = readyTasks
-        .filter((t) => matchesTaskFilter(t, agent.taskFilter ?? {}))
-        .filter((t) => t.retryCount < config.tasks.maxRetries)
-        .sort(
-          (a, b) =>
-            severityPriority(a.severity) - severityPriority(b.severity) ||
-            a.createdAt.localeCompare(b.createdAt),
-        );
-
-      if (eligible.length === 0) {
+      task = await claimTask(taskManager, config, agent, runId, locksDir);
+      if (!task) {
         console.log("No eligible tasks. Nothing to do.");
         return;
       }
-      task = eligible[0];
-      await taskManager.update(task.ref, { status: "active" });
       console.log(`Picked task: ${task.ref} ${task.title} (${task.severity})`);
     }
 
@@ -357,6 +347,7 @@ async function runAgent(
             branch: branchName,
             "pr-url": prUrl,
           },
+          removeMetadata: [...CLAIM_KEYS],
         });
         taskSettled = true;
         console.log("Task completed.");
@@ -371,6 +362,7 @@ async function runAgent(
         await taskManager.update(task.ref, {
           status: "todo",
           metadata: { "retry-count": String(retryCount) },
+          removeMetadata: [...CLAIM_KEYS],
         });
         taskSettled = true;
         console.log(`Retry count: ${retryCount}/${config.tasks.maxRetries}`);
@@ -441,9 +433,36 @@ async function runAgent(
   }
 }
 
+async function claimTask(
+  taskManager: TaskManager,
+  config: VteamConfig,
+  agent: AgentConfig,
+  runId: string,
+  locksDir: string,
+): Promise<Task | undefined> {
+  const claimLock = await acquireLock(resolve(locksDir, "task-claim"), agent.name);
+  try {
+    const readyTasks = await taskManager.listReady();
+    const [task] = readyTasks
+      .filter((t) => matchesTaskFilter(t, agent.taskFilter ?? {}))
+      .filter((t) => t.retryCount < config.tasks.maxRetries)
+      .sort(
+        (a, b) =>
+          severityPriority(a.severity) - severityPriority(b.severity) ||
+          a.createdAt.localeCompare(b.createdAt),
+      );
+    if (task) {
+      await taskManager.update(task.ref, { status: "active", metadata: claimMetadata(runId) });
+    }
+    return task;
+  } finally {
+    claimLock.release();
+  }
+}
+
 async function releaseTask(taskManager: TaskManager, task: Task): Promise<void> {
   try {
-    await taskManager.update(task.ref, { status: "todo" });
+    await taskManager.update(task.ref, { status: "todo", removeMetadata: [...CLAIM_KEYS] });
   } catch (err) {
     console.error(
       `Failed to return task ${task.ref} to todo:`,

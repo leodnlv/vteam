@@ -14,7 +14,7 @@ export interface FileLock {
   release: () => void;
 }
 
-function isProcessAlive(pid: number): boolean {
+export function isProcessAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
@@ -86,6 +86,15 @@ export async function acquireLock(
   }
 
   throw new Error(`Timeout acquiring lock on ${resourcePath}`);
+}
+
+export function breakStaleLock(resourcePath: string): boolean {
+  const lockDir = resourcePath + ".lock";
+  if (existsSync(lockDir) && isLockStale(lockDir)) {
+    rmSync(lockDir, { recursive: true, force: true });
+    return true;
+  }
+  return false;
 }
 
 export function breakLock(resourcePath: string): boolean {
