@@ -5,7 +5,6 @@
   "tasks": {
     "maxRetries": 3,
     "project": "vteam",
-    "label": "vteam",
-    "defaultActor": "coder"
+    "label": "vteam"
   }
 }

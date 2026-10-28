@@ -73,7 +73,6 @@ function isAvenError(err: unknown, code: RegExp): boolean {
 }
 
 const MISSING_SCOPE = /unknown-(project|label)/;
-const MISSING_METADATA_FIELD = /unknown-metadata-field/;
 
 function toTask(detail: AvenTaskDetail): Task {
   const { task, description, metadata } = detail;
@@ -84,7 +83,7 @@ function toTask(detail: AvenTaskDetail): Task {
     severity: SEVERITY_BY_PRIORITY[task.priority] ?? "low",
     files: (metadata.files ?? "").split(/,\s*/).filter(Boolean),
     retryCount: Number.parseInt(metadata["retry-count"] ?? "", 10) || 0,
-    actor: metadata.actor || undefined,
+    metadata,
     description,
     createdAt: task.created_at,
   };
@@ -113,14 +112,8 @@ export class AvenTaskManager implements TaskManager {
     private readonly exec: AvenExec = runAven,
   ) {}
 
-  async listReady(actor: string): Promise<Task[]> {
-    const ready = ["--status", "todo", "--ready"];
-    const assigned = await this.listOrElse([...ready, "--metadata", `actor=${actor}`], () => []);
-    if (actor !== this.config.defaultActor) return assigned;
-    const unassigned = await this.listOrElse([...ready, "--missing-metadata", "actor"], () =>
-      this.list(ready),
-    );
-    return [...assigned, ...unassigned];
+  listReady(): Promise<Task[]> {
+    return this.list(["--status", "todo", "--ready"]);
   }
 
   async getIndex(): Promise<TaskIndex> {
@@ -132,7 +125,7 @@ export class AvenTaskManager implements TaskManager {
     return { all, byStatus, titles: all.map((t) => t.title) };
   }
 
-  async create(body: TaskContentBody, foundBy: string, actor?: string): Promise<string> {
+  async create(body: TaskContentBody, foundBy: string): Promise<string> {
     await this.aven(["label", "create", this.config.label]);
     const output = await this.aven(
       [
@@ -143,7 +136,6 @@ export class AvenTaskManager implements TaskManager {
         "--priority", PRIORITY_BY_SEVERITY[body.severity],
         "--label", this.config.label,
         "--metadata", `found-by=${foundBy}`,
-        ...(actor ? ["--metadata", `actor=${actor}`] : []),
         "--metadata", `files=${body.files.join(", ")}`,
         "--description-stdin",
       ],
@@ -185,18 +177,6 @@ export class AvenTaskManager implements TaskManager {
       const output = await this.aven(["show", ref, "--full", "--json"]);
       return toTask(JSON.parse(output) as AvenTaskDetail);
     });
-  }
-
-  private async listOrElse(
-    filters: string[],
-    whenFieldUnknown: () => Promise<Task[]> | Task[],
-  ): Promise<Task[]> {
-    try {
-      return await this.list(filters);
-    } catch (err) {
-      if (isAvenError(err, MISSING_METADATA_FIELD)) return whenFieldUnknown();
-      throw err;
-    }
   }
 
   private aven(args: string[], stdin?: string): Promise<string> {

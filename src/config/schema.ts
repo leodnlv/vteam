@@ -13,6 +13,8 @@ export function isValidCronExpression(expr: string): boolean {
   }
 }
 
+const taskFilterValueSchema = z.string().min(1).nullable();
+
 export const agentFrontmatterSchema = z
   .object({
     model: z.string().optional(),
@@ -26,8 +28,13 @@ export const agentFrontmatterSchema = z
     worktree: z.boolean().optional(),
     readOnly: z.boolean().optional(),
     output: z.enum(["task"]).optional(),
-    assignTo: z.string().min(1).optional(),
     input: z.enum(["task", "pr"]).optional(),
+    taskFilter: z
+      .record(
+        z.string().min(1),
+        z.union([taskFilterValueSchema, z.array(taskFilterValueSchema).min(1)]),
+      )
+      .optional(),
     prTriggerLabel: z.string().optional(),
     autoPR: z.boolean().optional(),
     prCreateLabels: z.array(z.string()).optional(),
@@ -49,8 +56,8 @@ export const agentFrontmatterSchema = z
   .refine((agent) => agent.output !== "task" || !agent.readOnly, {
     message: 'output: "task" is incompatible with readOnly: true',
   })
-  .refine((agent) => !agent.assignTo || agent.output === "task", {
-    message: 'assignTo requires output: "task"',
+  .refine((agent) => !agent.taskFilter || agent.input === "task", {
+    message: 'taskFilter requires input: "task"',
   });
 
 export const onFinishFrontmatterSchema = z.object({
@@ -73,7 +80,6 @@ export const vteamConfigSchema = z.object({
     maxRetries: z.number().int().nonnegative(),
     project: z.string().min(1),
     label: z.string().min(1).default("vteam"),
-    defaultActor: z.string().min(1),
     workspace: z.string().min(1).optional(),
   }),
 });

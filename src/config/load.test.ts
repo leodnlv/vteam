@@ -34,7 +34,7 @@ describe("loadConfig", () => {
       baseBranch: "main",
       platform: "github",
       worktreeDir: ".vteam-worktrees",
-      tasks: { maxRetries: 3, project: "app", defaultActor: "coder" },
+      tasks: { maxRetries: 3, project: "app" },
     });
 
     const config = loadConfig(tmp);
@@ -47,7 +47,7 @@ describe("loadConfig", () => {
     writeConfig({
       platform: "github",
       worktreeDir: ".vteam-worktrees",
-      tasks: { maxRetries: 3, project: "app", defaultActor: "coder" },
+      tasks: { maxRetries: 3, project: "app" },
     });
 
     expect(() => loadConfig(tmp)).toThrow("Invalid vteam.config.json");
@@ -59,7 +59,7 @@ describe("loadConfig", () => {
       baseBranch: "main",
       platform: "bitbucket",
       worktreeDir: ".vteam-worktrees",
-      tasks: { maxRetries: 3, project: "app", defaultActor: "coder" },
+      tasks: { maxRetries: 3, project: "app" },
     });
 
     expect(() => loadConfig(tmp)).toThrow("platform");
@@ -76,7 +76,7 @@ describe("loadConfig", () => {
   it("reports multiple errors at once", () => {
     writeConfig({
       worktreeDir: ".vteam-worktrees",
-      tasks: { maxRetries: 3, project: "app", defaultActor: "coder" },
+      tasks: { maxRetries: 3, project: "app" },
     });
 
     try {

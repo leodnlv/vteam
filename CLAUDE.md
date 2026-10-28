@@ -76,8 +76,8 @@ prCreateLabels: [vteam]
 - `worktree` (default: `false`) — run in an isolated git worktree, push branch on commit
 - `readOnly` (default: `false`) — run in a worktree but skip commit/push/PR (requires `worktree: true`, incompatible with `autoPR: true`). The agent runs freely in the worktree — `readOnly` only prevents the orchestrator from committing and pushing afterward.
 - `output` (optional, `"task"`) — controls the `content` type in the unified `AgentOutput` schema. When `"task"`, the prompt instructs Claude to return `content: { type: "task", body: { title, severity, ... } }` and the orchestrator creates an aven task. When omitted, the prompt instructs `content: { type: "generic", body: "string" }`. Independent of `worktree`. Incompatible with `autoPR: true` and `readOnly: true`.
-- `assignTo` (optional, requires `output: "task"`) — name of the agent that should work on the tasks this agent creates; stored as aven metadata `actor`. When omitted, tasks get no `actor` and go to `tasks.defaultActor`. A warning is logged if no agent with that name exists.
 - `input` (optional, `"task"` or `"pr"`) — `"task"`: pick a ready task routed to this agent (see Task manager → routing), manage task lifecycle; `"pr"`: pick a PR with pending review feedback, check out its branch (requires `worktree: true`)
+- `taskFilter` (optional, requires `input: "task"`) — map of aven metadata key → string, `null` (key missing/empty), or a non-empty list of those. Keys AND, list values OR. E.g. `found-by: [improver, security-analyst]` or `actor: mr-reviewer`. Omitted = matches every task.
 - `prTriggerLabel` — label that signals "this PR needs work" (e.g. `vteam:changes-requested`); the orchestrator discovers PRs by this label and removes it after the agent pushes
 - `autoPR` (default: `false`) — create a pull request after pushing
 - `cron` — cron expression (5 fields: minute hour day month weekday) for scheduling via `vteam loop start`
@@ -94,26 +94,25 @@ All task operations go through the `TaskManager` interface (`src/tasks/task-mana
 
 ```json
 {
-  "tasks": { "maxRetries": 3, "project": "my-app", "label": "vteam", "defaultActor": "coder", "workspace": "optional" }
+  "tasks": { "maxRetries": 3, "project": "my-app", "label": "vteam", "workspace": "optional" }
 }
 ```
 
 - `tasks.project` (required) — aven project; aven creates it on the first `add`. `vteam init` defaults it to the directory name.
 - `tasks.label` (default `"vteam"`) — opt-in label. vteam only lists, picks, and dedups against tasks with this label, and creates the label on demand. Humans can queue their own aven tasks for the coder by adding the label.
-- `tasks.defaultActor` (required) — agent that works on tasks with no `actor` metadata (tasks from agents without `assignTo`, and tasks humans create). `vteam init` sets it to `coder`.
 - `tasks.workspace` (optional) — passed as `--workspace` to every aven call.
 
-Routing: each task's aven metadata `actor` names the agent that should work on it. The creating agent sets it from its `assignTo` frontmatter; humans can reassign with `aven edit <ref> --metadata actor=<agent>` or send a task back to the default actor with `--remove-metadata actor`. An `input: "task"` agent picks tasks where `actor` equals its own name; the `tasks.defaultActor` agent additionally picks tasks with no `actor`. `found-by` is provenance only and never used for routing. `vteam status` shows each open task's actor and warns about actors with no matching agent directory.
+Routing (`matchesTaskFilter` in `task-manager.ts`): `listReady()` returns every ready labelled task with its metadata; `run` keeps the tasks matching the running agent's `taskFilter` (no filter = all). There is no fallback agent — a task no filter matches is never picked. Overlaps are allowed — the first run to set a task `active` wins. vteam only writes `found-by`; humans set other keys such as `actor` via `aven edit <ref> --metadata actor=<agent>`. `vteam status` loads every `input: "task"` agent (`listTaskWorkers`), shows each open task's matching agents, and warns about `todo` tasks no agent matches. The AGENT.md frontmatter parser (`src/frontmatter.ts`) supports one level of indented nested maps for `taskFilter`.
 
-Mapping: severity `critical/high/medium/low` ↔ aven priority `urgent/high/medium/low` (priority `none` reads as `low`). `files`, `found-by`, `actor`, `retry-count`, `completed`, `branch`, `pr-url` are aven metadata (string values; `files` is comma-separated). The finding's description, suggested fix, and affected files become the aven description.
+Mapping: severity `critical/high/medium/low` ↔ aven priority `urgent/high/medium/low` (priority `none` reads as `low`). `files`, `found-by`, `retry-count`, `completed`, `branch`, `pr-url` are aven metadata (string values; `files` is comma-separated). The finding's description, suggested fix, and affected files become the aven description.
 
 Lifecycle for `input: "task"` agents:
-1. `aven list --status todo --ready --metadata actor=<agent>` — plus `--missing-metadata actor` for the default actor (respects aven dependencies and `available_at`; if aven has never seen an `actor` field, every task counts as unassigned) — drop tasks with `retry-count >= maxRetries`, sort by severity then oldest — pick the first and set it `active`.
+1. `aven list --status todo --ready` (respects aven dependencies and `available_at`), keep tasks routed to this agent, drop tasks with `retry-count >= maxRetries`, sort by severity then oldest — pick the first and set it `active`.
 2. Commit pushed → `done` with `completed`/`branch`/`pr-url` metadata.
 3. Worktree agent produced no changes → back to `todo` with `retry-count` incremented.
 4. Any other ending (error, crash, readOnly or non-worktree agent) → back to `todo` in `finally`, retries unchanged. A hard-killed process can leave a task `active`; reset it in aven.
 
-`getIndex` costs one `aven show --full --json` per task (8 concurrent), because `aven list --json` omits description and metadata. `unknown-project`/`unknown-label` errors from `aven list` are treated as an empty list.
+`getIndex` and `listReady` cost one `aven show --full --json` per task (8 concurrent), because `aven list --json` omits description and metadata. `unknown-project`/`unknown-label` errors from `aven list` are treated as an empty list.
 
 ### On-finish hooks
 

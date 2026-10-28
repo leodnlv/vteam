@@ -6,7 +6,7 @@ describe("vteamConfigSchema", () => {
     baseBranch: "main",
     platform: "github",
     worktreeDir: ".vteam-worktrees",
-    tasks: { maxRetries: 3, project: "app", defaultActor: "coder" },
+    tasks: { maxRetries: 3, project: "app" },
   };
 
   it("accepts a valid config", () => {
@@ -55,15 +55,7 @@ describe("vteamConfigSchema", () => {
   it("rejects missing project", () => {
     const result = vteamConfigSchema.safeParse({
       ...validConfig,
-      tasks: { maxRetries: 3, defaultActor: "coder" },
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects missing defaultActor", () => {
-    const result = vteamConfigSchema.safeParse({
-      ...validConfig,
-      tasks: { maxRetries: 3, project: "app" },
+      tasks: { maxRetries: 3 },
     });
     expect(result.success).toBe(false);
   });
@@ -78,14 +70,22 @@ describe("vteamConfigSchema", () => {
 });
 
 describe("agentFrontmatterSchema", () => {
-  it("accepts assignTo with output: task", () => {
-    const result = agentFrontmatterSchema.safeParse({ output: "task", assignTo: "coder" });
+  it("accepts taskFilter with strings, lists and null", () => {
+    const result = agentFrontmatterSchema.safeParse({
+      input: "task",
+      taskFilter: { "found-by": ["improver", "security-analyst", null], actor: "coder", owner: null },
+    });
     expect(result.success).toBe(true);
   });
 
-  it("rejects assignTo without output: task", () => {
-    const result = agentFrontmatterSchema.safeParse({ assignTo: "coder" });
+  it("rejects taskFilter without input: task", () => {
+    const result = agentFrontmatterSchema.safeParse({ taskFilter: { actor: "coder" } });
     expect(result.success).toBe(false);
+  });
+
+  it("rejects non-string taskFilter values and empty lists", () => {
+    expect(agentFrontmatterSchema.safeParse({ input: "task", taskFilter: { n: 1 } }).success).toBe(false);
+    expect(agentFrontmatterSchema.safeParse({ input: "task", taskFilter: { n: [] } }).success).toBe(false);
   });
 
   it("accepts empty frontmatter (bare AGENT.md)", () => {

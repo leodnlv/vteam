@@ -1,4 +1,11 @@
-import type { Task, TaskContentBody, TaskMetadata, TaskStatus, Severity } from "../types.js";
+import type {
+  Task,
+  TaskContentBody,
+  TaskFilter,
+  TaskMetadata,
+  TaskStatus,
+  Severity,
+} from "../types.js";
 
 export interface TaskIndex {
   all: Task[];
@@ -12,10 +19,17 @@ export interface TaskUpdate {
 }
 
 export interface TaskManager {
-  listReady(actor: string): Promise<Task[]>;
+  listReady(): Promise<Task[]>;
   getIndex(): Promise<TaskIndex>;
-  create(body: TaskContentBody, foundBy: string, actor?: string): Promise<string>;
+  create(body: TaskContentBody, foundBy: string): Promise<string>;
   update(ref: string, changes: TaskUpdate): Promise<void>;
+}
+
+export function matchesTaskFilter(task: Task, filter: TaskFilter): boolean {
+  return Object.entries(filter).every(([key, expected]) => {
+    const accepted = Array.isArray(expected) ? expected : [expected];
+    return accepted.includes(task.metadata[key] || null);
+  });
 }
 
 export function severityPriority(severity: Severity): number {
