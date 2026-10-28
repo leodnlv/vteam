@@ -75,13 +75,13 @@ prCreateLabels: [vteam]
 
 - `worktree` (default: `false`) — run in an isolated git worktree, push branch on commit
 - `readOnly` (default: `false`) — run in a worktree but skip commit/push/PR (requires `worktree: true`, incompatible with `autoPR: true`). The agent runs freely in the worktree — `readOnly` only prevents the orchestrator from committing and pushing afterward.
-- `output` (optional, `"task"`) — controls the `content` type in the unified `AgentOutput` schema. When `"task"`, the prompt instructs Claude to return `content: { type: "task", body: { title, severity, ... } }` and the orchestrator creates an aven task. When omitted, the prompt instructs `content: { type: "generic", body: "string" }`. Independent of `worktree`.
+- `output` (optional, `"task"`) — controls the `content` type in the unified `AgentOutput` schema. When `"task"`, the prompt instructs Claude to return `content: { type: "task", body: { title, severity, ... } }` and the orchestrator creates an aven task. When omitted, the prompt instructs `content: { type: "generic", body: "string" }`. Independent of `worktree`. Incompatible with `autoPR: true` and `readOnly: true`.
 - `assignTo` (optional, requires `output: "task"`) — name of the agent that should work on the tasks this agent creates; stored as aven metadata `actor`. When omitted, tasks get no `actor` and go to `tasks.defaultActor`. A warning is logged if no agent with that name exists.
 - `input` (optional, `"task"` or `"pr"`) — `"task"`: pick a ready task routed to this agent (see Task manager → routing), manage task lifecycle; `"pr"`: pick a PR with pending review feedback, check out its branch (requires `worktree: true`)
 - `prTriggerLabel` — label that signals "this PR needs work" (e.g. `vteam:changes-requested`); the orchestrator discovers PRs by this label and removes it after the agent pushes
 - `autoPR` (default: `false`) — create a pull request after pushing
 - `cron` — cron expression (5 fields: minute hour day month weekday) for scheduling via `vteam loop start`
-- `model` — Claude model override
+- `model` — Claude model override passed to `claude --model` (alias or full model ID); omit to use Claude Code's default
 - `prCreateLabels` — labels applied to created PRs
 - `allowedTools` — Claude Code tools the agent may use (same syntax as the `--allowedTools` CLI flag, e.g. `["Read", "Bash(git *)"]`)
 - `disallowedTools` — Claude Code tools the agent may NOT use (same syntax as `--disallowedTools`)

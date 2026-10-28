@@ -225,6 +225,7 @@ Agent behavior is configured via YAML frontmatter in each agent's `AGENT.md`. Th
 ```yaml
 ---
 model: sonnet
+cron: "0 */6 * * *"
 worktree: true
 input: task
 autoPR: true
@@ -234,10 +235,11 @@ prCreateLabels: [vteam]
 
 | Field             | Default    | Description                                                                                                      |
 | ----------------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
-| `model`           | `"sonnet"` | Claude model (`"sonnet"`, `"opus"`, `"haiku"`)                                                                   |
+| `model`           | —          | Claude model passed to `claude --model` (e.g. `"sonnet"`, `"opus"`, `"haiku"`, or a full model ID). Omit to use Claude Code's default. |
+| `cron`            | —          | Cron expression (5 fields: minute hour day month weekday) for scheduling via `vteam loop start`. Validated on load. |
 | `worktree`        | `false`    | Run in an isolated git worktree; push branch on commit                                                           |
 | `readOnly`        | `false`    | Run in a worktree but skip commit/push/PR (requires `worktree: true`, incompatible with `autoPR`). Agent runs freely — `readOnly` only prevents the orchestrator from committing/pushing afterward. |
-| `output`          | —          | `"task"` to produce findings that the orchestrator creates as aven tasks. When omitted, the agent uses generic content output. All agents share a unified output schema — `output` controls only the `content` field type. |
+| `output`          | —          | `"task"` to produce findings that the orchestrator creates as aven tasks (incompatible with `autoPR` and `readOnly`). When omitted, the agent uses generic content output. All agents share a unified output schema — `output` controls only the `content` field type. |
 | `assignTo`        | —          | Requires `output: "task"`. Agent that should work on the created tasks (sets aven metadata `actor`). Omit to route to `tasks.defaultActor`. |
 | `input`           | —          | `"task"` to pick from the aven `todo` queue; `"pr"` to respond to PR review comments (requires `worktree: true`)         |
 | `prTriggerLabel`  | —          | Label signalling "this PR needs work" (e.g. `vteam:changes-requested`); the orchestrator discovers PRs by this label and removes it after the agent pushes |

@@ -100,7 +100,7 @@ Agents are defined at `vteam/agents/<name>/AGENT.md`. The YAML frontmatter decla
 
 ```yaml
 ---
-model: sonnet # Claude model: "sonnet", "opus", "haiku"
+model: sonnet # Optional: alias ("sonnet", "opus", "haiku") or full model ID; omit for Claude Code's default
 cron: "0 */6 * * *" # Optional: cron schedule (5 fields)
 worktree: true # Run in an isolated git worktree
 readOnly: true # Worktree but no commit/push/PR (requires worktree: true)

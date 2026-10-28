@@ -63,7 +63,7 @@ Let the user choose a preset and customize.
 Map the user's answers to YAML frontmatter fields:
 
 ```yaml
-model: <model>                    # default: sonnet
+model: <model>                    # omit to use Claude Code's default
 cron: "<expr>"                    # only if scheduled
 worktree: true                    # if the agent edits files OR uses readOnly
 readOnly: true                    # if worktree but no commit/push (analysis only)
