@@ -26,6 +26,7 @@ export const agentFrontmatterSchema = z
     worktree: z.boolean().optional(),
     readOnly: z.boolean().optional(),
     output: z.enum(["task"]).optional(),
+    assignTo: z.string().min(1).optional(),
     input: z.enum(["task", "pr"]).optional(),
     prTriggerLabel: z.string().optional(),
     autoPR: z.boolean().optional(),
@@ -47,6 +48,9 @@ export const agentFrontmatterSchema = z
   })
   .refine((agent) => agent.output !== "task" || !agent.readOnly, {
     message: 'output: "task" is incompatible with readOnly: true',
+  })
+  .refine((agent) => !agent.assignTo || agent.output === "task", {
+    message: 'assignTo requires output: "task"',
   });
 
 export const onFinishFrontmatterSchema = z.object({
@@ -61,20 +65,15 @@ export const memoryFrontmatterSchema = z.object({
   disallowedTools: z.array(z.string()).optional(),
 });
 
-const filesystemTaskManagerSchema = z.object({
-  provider: z.literal("filesystem"),
-});
-
-const taskManagerConfigSchema = z.discriminatedUnion("provider", [
-  filesystemTaskManagerSchema,
-]);
-
 export const vteamConfigSchema = z.object({
   baseBranch: z.string(),
   platform: z.enum(["github", "gitlab"]),
   worktreeDir: z.string(),
   tasks: z.object({
     maxRetries: z.number().int().nonnegative(),
+    project: z.string().min(1),
+    label: z.string().min(1).default("vteam"),
+    defaultActor: z.string().min(1),
+    workspace: z.string().min(1).optional(),
   }),
-  taskManager: taskManagerConfigSchema.default({ provider: "filesystem" }),
 });

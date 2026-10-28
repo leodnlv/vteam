@@ -3,9 +3,9 @@
   "platform": "github",
   "worktreeDir": ".vteam-worktrees",
   "tasks": {
-    "maxRetries": 3
-  },
-  "taskManager": {
-    "provider": "filesystem"
+    "maxRetries": 3,
+    "project": "",
+    "label": "vteam",
+    "defaultActor": "refactorer"
   }
 }

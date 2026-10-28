@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { resolve, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -34,8 +34,6 @@ export async function initCommand(): Promise<void> {
     resolve(vteamDir, "agents", "refactorer"),
     resolve(vteamDir, "agents", "review-responder"),
     resolve(vteamDir, "agents", "test-writer"),
-    resolve(vteamDir, "tasks", "todo"),
-    resolve(vteamDir, "tasks", "done"),
   ];
 
   for (const dir of dirs) {
@@ -52,10 +50,12 @@ export async function initCommand(): Promise<void> {
   copyTemplate("review-responder.memory.md", resolve(vteamDir, "agents", "review-responder", "MEMORY.md"));
   copyTemplate("test-writer.memory.md", resolve(vteamDir, "agents", "test-writer", "MEMORY.md"));
 
-  copyTemplate("vteam.config.json", resolve(vteamDir, "vteam.config.json"));
+  const config = JSON.parse(readFileSync(resolve(templateDir(), "vteam.config.json"), "utf-8"));
+  config.tasks.project = basename(cwd);
+  writeFileSync(resolve(vteamDir, "vteam.config.json"), `${JSON.stringify(config, null, 2)}\n`, "utf-8");
 
   const gitignorePath = resolve(cwd, ".gitignore");
-  const entries = [".vteam-worktrees/", "vteam/tasks/", "vteam/.locks/", "vteam/.logs/", "vteam/.runs/", "vteam/.memory/"];
+  const entries = [".vteam-worktrees/", "vteam/.locks/", "vteam/.logs/", "vteam/.runs/", "vteam/.memory/"];
   if (existsSync(gitignorePath)) {
     const content = readFileSync(gitignorePath, "utf-8");
     const missing = entries.filter((e) => !content.includes(e));
@@ -73,6 +73,6 @@ export async function initCommand(): Promise<void> {
   console.log("  Created vteam/agents/review-responder/AGENT.md");
   console.log("  Created vteam/agents/test-writer/AGENT.md");
   console.log("  Created MEMORY.md for each agent");
-  console.log("  Created vteam/vteam.config.json");
+  console.log(`  Created vteam/vteam.config.json (aven project: ${config.tasks.project})`);
   console.log("\nDone. Edit the AGENT.md and MEMORY.md files and vteam.config.json to customize.");
 }

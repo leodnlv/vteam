@@ -2,18 +2,18 @@
 
 ## What this project is
 
-An npm package (`vteam`) that orchestrates AI agents powered by `claude -p` (Claude Code's headless mode) to autonomously review codebases and implement fixes. The framework manages a task lifecycle (todo → done), runs agents in isolated git worktrees, and maintains a shared memory file so stateless agent invocations don't duplicate work.
+An npm package (`vteam`) that orchestrates AI agents powered by `claude -p` (Claude Code's headless mode) to autonomously review codebases and implement fixes. The framework manages a task lifecycle (todo → active → done) in the `aven` task manager, runs agents in isolated git worktrees, and maintains a shared memory file so stateless agent invocations don't duplicate work.
 
 The end user's workflow:
 1. Define agent prompts in `AGENT.md` files
 2. Run code-reviewer — it scans the codebase and writes findings straight to todo
-3. Run refactorer (on a cron) — it picks up a task, implements it in a worktree, creates a branch + PR, moves the task to done
+3. Run refactorer (on a cron) — it picks up a task, marks it active, implements it in a worktree, creates a branch + PR, marks the task done
 
 ## Architecture
 
 **Core principle: the orchestrator owns all state, Claude owns all intelligence.**
 
-The TypeScript orchestrator handles state transitions — creating worktrees, moving task files, creating PRs. Claude (`-p` mode) handles reasoning — reading code, finding issues, implementing fixes. If Claude crashes mid-run, no state is corrupted because the orchestrator applies changes atomically after Claude finishes.
+The TypeScript orchestrator handles state transitions — creating worktrees, updating aven tasks, creating PRs. Claude (`-p` mode) handles reasoning — reading code, finding issues, implementing fixes. If Claude crashes mid-run, no state is corrupted because the orchestrator applies changes atomically after Claude finishes.
 
 ### How agents run
 
@@ -23,7 +23,7 @@ Each agent is invoked as a `claude -p` subprocess with:
 - `--allowedTools` / `--disallowedTools` — per-agent tool permissions from frontmatter (uses the same syntax as native Claude Code CLI flags)
 - `--no-session-persistence` — no session clutter
 
-The orchestrator assembles a layered prompt: AGENT.md (role) → optional `--focus` context (priority section) → existing task titles (from task file frontmatter) → task content or PR review comments → output format instructions. The prompt is passed via stdin. Claude returns structured JSON as its final output — the orchestrator parses this to create task files, git commits, and PRs.
+The orchestrator assembles a layered prompt: AGENT.md (role) → optional `--focus` context (priority section) → existing task titles (from aven) → task content or PR review comments → output format instructions. The prompt is passed via stdin. Claude returns structured JSON as its final output — the orchestrator parses this to create aven tasks, git commits, and PRs.
 
 ### Structured output contract
 
@@ -35,7 +35,7 @@ Claude's text output (extracted from the `result` field of the JSON envelope) mu
 
 All fields except `status` and `summary` are optional. The `content` field is a discriminated union controlled by the `output` frontmatter field:
 
-- **`output: "task"`** → `content: { type: "task", body: { title, severity, description, suggestedFix?, files } }` — the orchestrator creates a task file from the finding.
+- **`output: "task"`** → `content: { type: "task", body: { title, severity, description, suggestedFix?, files } }` — the orchestrator creates an aven task from the finding.
 - **Default (no `output` field)** → `content: { type: "generic", body: "string" }` — a freeform deliverable (review, analysis, report). The orchestrator passes it through to the ON_FINISH hook via `RunOutcome.content`.
 
 The `filesChanged` and `commitMessage` fields are present only when the agent modified files. The orchestrator commits when `commitMessage` is present and `readOnly` is false.
@@ -48,13 +48,13 @@ The output format instructions are injected into every agent's user prompt by th
 
 Each `claude -p` call is stateless. Memory is external:
 
-- **Task files** — individual markdown files with YAML frontmatter in `todo/` or `done/`. Local-only and gitignored — they are workflow state, not source code. The orchestrator reads tasks via the `TaskManager` interface at prompt-build time and injects a summary of existing task titles, severities, and statuses into every agent's prompt.
-- **Deduplication** — The prompt builder calls `taskManager.getIndex()` and includes all task titles in the "Existing Tasks" section. Claude avoids reporting duplicates. No hashing. No separate overview file — task files are the single source of truth.
+- **Tasks** — stored in aven (local-first SQLite task manager, `aven` CLI must be on PATH). Scoped to the configured `tasks.project` and `tasks.label`; tasks without the label are invisible to vteam. The orchestrator reads tasks via the `TaskManager` interface at prompt-build time and injects a summary of existing task titles, severities, statuses, and files into every agent's prompt.
+- **Deduplication** — The prompt builder calls `taskManager.getIndex()` and includes every non-deleted labelled task, of every aven status (including `canceled`), in the "Existing Tasks" section. Claude avoids reporting duplicates, so canceling a task in aven acts as "rejected — don't report again". No hashing. aven is the single source of truth.
 - **Per-agent memory** — agents can optionally have a `MEMORY.md` strategy file at `vteam/agents/<name>/MEMORY.md`. When present, the orchestrator injects the agent's accumulated memory (from `vteam/.memory/<agent-name>/store.md`) into the prompt. After the main run, if the agent returned a `memoryUpdate` in its structured output, the orchestrator spawns a small curation agent. The curation agent receives the MEMORY.md instructions (system prompt), the current memory content, and the new update — it returns the complete replacement memory content. The orchestrator writes the result to `.memory/<agent-name>.memory.md`. Memory files are local-only and gitignored. Curation failure is non-fatal.
 
 ### Worktrees
 
-Agents with `worktree: true` get an isolated git worktree (`git worktree add`). Claude edits files in the worktree but does not commit — it returns a structured JSON output with a commit message. The orchestrator then runs `git add -A` + `git commit`, pushes the branch, optionally creates a PR (if `autoPR: true`), and cleans up the worktree.
+Agents with `worktree: true` get an isolated git worktree (`git worktree add`). Task runs use the branch `vteam/<slugified-title>-<runId>` — aven refs are local and never appear in branch names, commits, or PRs. Claude edits files in the worktree but does not commit — it returns a structured JSON output with a commit message. The orchestrator then runs `git add -A` + `git commit`, pushes the branch, optionally creates a PR (if `autoPR: true`), and cleans up the worktree.
 
 Agents with `input: "pr"` use `checkoutWorktree` to check out an existing PR branch (via `git fetch` + `git worktree add` from the remote tracking branch). Claude edits files and returns a commit message. The orchestrator commits, pushes to the same branch, posts a summary comment on the PR, and removes the `prTriggerLabel`. Discovery is label-based: the orchestrator searches for open PRs matching the `prTriggerLabel`. The user adds the trigger label when they want changes; the orchestrator removes it after the agent pushes. This avoids GitHub's limitation where PR authors cannot submit "Request changes" reviews on their own PRs.
 
@@ -75,8 +75,9 @@ prCreateLabels: [vteam]
 
 - `worktree` (default: `false`) — run in an isolated git worktree, push branch on commit
 - `readOnly` (default: `false`) — run in a worktree but skip commit/push/PR (requires `worktree: true`, incompatible with `autoPR: true`). The agent runs freely in the worktree — `readOnly` only prevents the orchestrator from committing and pushing afterward.
-- `output` (optional, `"task"`) — controls the `content` type in the unified `AgentOutput` schema. When `"task"`, the prompt instructs Claude to return `content: { type: "task", body: { title, severity, ... } }` and the orchestrator creates a task file. When omitted, the prompt instructs `content: { type: "generic", body: "string" }`. Independent of `worktree`.
-- `input` (optional, `"task"` or `"pr"`) — `"task"`: pick a task from `todo/` queue, manage task lifecycle; `"pr"`: pick a PR with pending review feedback, check out its branch (requires `worktree: true`)
+- `output` (optional, `"task"`) — controls the `content` type in the unified `AgentOutput` schema. When `"task"`, the prompt instructs Claude to return `content: { type: "task", body: { title, severity, ... } }` and the orchestrator creates an aven task. When omitted, the prompt instructs `content: { type: "generic", body: "string" }`. Independent of `worktree`.
+- `assignTo` (optional, requires `output: "task"`) — name of the agent that should work on the tasks this agent creates; stored as aven metadata `actor`. When omitted, tasks get no `actor` and go to `tasks.defaultActor`. A warning is logged if no agent with that name exists.
+- `input` (optional, `"task"` or `"pr"`) — `"task"`: pick a ready task routed to this agent (see Task manager → routing), manage task lifecycle; `"pr"`: pick a PR with pending review feedback, check out its branch (requires `worktree: true`)
 - `prTriggerLabel` — label that signals "this PR needs work" (e.g. `vteam:changes-requested`); the orchestrator discovers PRs by this label and removes it after the agent pushes
 - `autoPR` (default: `false`) — create a pull request after pushing
 - `cron` — cron expression (5 fields: minute hour day month weekday) for scheduling via `vteam loop start`
@@ -85,19 +86,34 @@ prCreateLabels: [vteam]
 - `allowedTools` — Claude Code tools the agent may use (same syntax as the `--allowedTools` CLI flag, e.g. `["Read", "Bash(git *)"]`)
 - `disallowedTools` — Claude Code tools the agent may NOT use (same syntax as `--disallowedTools`)
 
-The frontmatter is validated via zod on agent load. The markdown body (after frontmatter) becomes the system prompt. `vteam.config.json` contains global settings (baseBranch, platform, worktreeDir, tasks, taskManager). Add custom agents by creating `vteam/agents/<name>/AGENT.md` — no config changes needed.
+The frontmatter is validated via zod on agent load. The markdown body (after frontmatter) becomes the system prompt. `vteam.config.json` contains global settings (baseBranch, platform, worktreeDir, tasks). Add custom agents by creating `vteam/agents/<name>/AGENT.md` — no config changes needed.
 
 ### Task manager
 
-All task operations (list, create, move, update) go through the `TaskManager` interface (`src/tasks/task-manager.ts`). The active implementation is selected by the `taskManager` field in `vteam.config.json`:
+All task operations go through the `TaskManager` interface (`src/tasks/task-manager.ts`: `listReady`, `getIndex`, `create`, `update`). The only implementation is `AvenTaskManager` (`src/tasks/aven-manager.ts`), which shells out to the `aven` CLI — it never touches aven's SQLite file directly. Configuration lives under `tasks` in `vteam.config.json`:
 
 ```json
 {
-  "taskManager": { "provider": "filesystem" }
+  "tasks": { "maxRetries": 3, "project": "my-app", "label": "vteam", "defaultActor": "refactorer", "workspace": "optional" }
 }
 ```
 
-The `provider` field is a discriminated union validated by zod. Currently only `"filesystem"` is supported (the default). The factory in `src/tasks/factory.ts` instantiates the correct implementation based on the config. To add a new backend: add a config type to the `TaskManagerConfig` union in `types.ts`, add a zod schema variant in `schema.ts`, implement the `TaskManager` interface, and add a `case` in the factory.
+- `tasks.project` (required) — aven project; aven creates it on the first `add`. `vteam init` defaults it to the directory name.
+- `tasks.label` (default `"vteam"`) — opt-in label. vteam only lists, picks, and dedups against tasks with this label, and creates the label on demand. Humans can queue their own aven tasks for the refactorer by adding the label.
+- `tasks.defaultActor` (required) — agent that works on tasks with no `actor` metadata (tasks from agents without `assignTo`, and tasks humans create). `vteam init` sets it to `refactorer`.
+- `tasks.workspace` (optional) — passed as `--workspace` to every aven call.
+
+Routing: each task's aven metadata `actor` names the agent that should work on it. The creating agent sets it from its `assignTo` frontmatter; humans can reassign with `aven edit <ref> --metadata actor=<agent>` or send a task back to the default actor with `--remove-metadata actor`. An `input: "task"` agent picks tasks where `actor` equals its own name; the `tasks.defaultActor` agent additionally picks tasks with no `actor`. `found-by` is provenance only and never used for routing. `vteam status` shows each open task's actor and warns about actors with no matching agent directory.
+
+Mapping: severity `critical/high/medium/low` ↔ aven priority `urgent/high/medium/low` (priority `none` reads as `low`). `files`, `found-by`, `actor`, `retry-count`, `completed`, `branch`, `pr-url` are aven metadata (string values; `files` is comma-separated). The finding's description, suggested fix, and affected files become the aven description.
+
+Lifecycle for `input: "task"` agents:
+1. `aven list --status todo --ready --metadata actor=<agent>` — plus `--missing-metadata actor` for the default actor (respects aven dependencies and `available_at`; if aven has never seen an `actor` field, every task counts as unassigned) — drop tasks with `retry-count >= maxRetries`, sort by severity then oldest — pick the first and set it `active`.
+2. Commit pushed → `done` with `completed`/`branch`/`pr-url` metadata.
+3. Worktree agent produced no changes → back to `todo` with `retry-count` incremented.
+4. Any other ending (error, crash, readOnly or non-worktree agent) → back to `todo` in `finally`, retries unchanged. A hard-killed process can leave a task `active`; reset it in aven.
+
+`getIndex` costs one `aven show --full --json` per task (8 concurrent), because `aven list --json` omits description and metadata. `unknown-project`/`unknown-label` errors from `aven list` are treated as an empty list.
 
 ### On-finish hooks
 
@@ -167,7 +183,7 @@ src/
 │   ├── init.ts                   vteam init — scaffold vteam/ in any project
 │   ├── run.ts                    vteam run <agent> — main orchestration flow
 │   ├── loop.ts                   vteam loop — long-lived scheduler process
-│   ├── status.ts                 vteam status — task board overview
+│   ├── status.ts                 vteam status — task board overview (from aven)
 │   ├── clean.ts                  vteam clean — prune worktrees, stale locks
 │   └── skill.ts                  vteam skill install/uninstall — manage Claude Code skill symlinks
 ├── config/
@@ -179,13 +195,10 @@ src/
 │   ├── output-schema.ts          Zod schema for Claude's unified AgentOutput (discriminated content union)
 │   └── prompt-builder.ts         Assembles layered prompts + output format instructions
 ├── memory/
-│   ├── task-index.ts             Scans task dirs, builds title list for dedup
 │   └── lock.ts                   Advisory file locking (atomic mkdir)
 ├── tasks/
-│   ├── task-manager.ts           TaskManager interface + TaskIndex type
-│   ├── filesystem-manager.ts     Filesystem implementation of TaskManager
-│   ├── factory.ts                Creates TaskManager from config
-│   └── task-file.ts              Low-level task markdown I/O (used by filesystem manager)
+│   ├── task-manager.ts           TaskManager interface, TaskIndex type, severity ordering, task description format
+│   └── aven-manager.ts           AvenTaskManager — TaskManager backed by the aven CLI
 ├── worktree/
 │   └── manager.ts                Git worktree create/remove/list/cleanup
 ├── integrations/
@@ -238,18 +251,18 @@ All three must pass before any commit or PR:
 - Supports both GitHub (`gh`) and GitLab (`glab`) — configured via `platform` in `vteam.config.json`.
 - No Slack integration yet.
 - No `--max-budget-usd` caps on agent runs.
+- Requires the `aven` CLI on PATH for task management.
 - ESM-only (`"type": "module"`), Node >= 20, TypeScript with strict mode.
 - Templates are non-TS files in `src/templates/` — the build step copies them to `dist/templates/`.
 
 ## Conventions
 
 - Self-documenting code, no comments unless the why is non-obvious.
-- Task filenames: `YYYY-MM-DD-HH-mm-ss-<slugified-title>.md`
-- Task frontmatter uses YAML via `gray-matter`.
+- Task refs (e.g. `APP-7KQ9`) are local to the user's aven database. Never put them in branch names, commit messages, or PR bodies.
 - Locking uses atomic `mkdir` with stale detection (30 min timeout).
-- Task files are local-only and gitignored (`vteam/tasks/`). The real shared artifacts are PRs.
-- All agents return a unified `AgentOutput` JSON. The orchestrator handles all state mutations based on the output fields: creates task files from `content.type: "task"`, commits from `commitMessage` + `filesChanged`, and passes `content` through to ON_FINISH hooks.
-- `src/commands/pipeline.test.ts` is the integration test for the agent → ON_FINISH → MEMORY data flow. When adding new hooks, output fields, or changing how agent output is routed to downstream stages, update this test.
+- Tasks live in the user's aven database, not the repo. The real shared artifacts are PRs.
+- All agents return a unified `AgentOutput` JSON. The orchestrator handles all state mutations based on the output fields: creates aven tasks from `content.type: "task"`, commits from `commitMessage` + `filesChanged`, and passes `content` through to ON_FINISH hooks.
+- `src/commands/pipeline.test.ts` is the integration test for the agent → ON_FINISH → MEMORY data flow and the task lifecycle (it mocks `AvenTaskManager` with an in-memory fake). `src/tasks/aven-manager.test.ts` includes a round-trip test against the real `aven` binary using a temp `--db`; it is skipped when `aven` is not installed. When adding new hooks, output fields, or changing how agent output is routed to downstream stages, update this test.
 
 ## Keeping CLAUDE.md and README.md current
 

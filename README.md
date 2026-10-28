@@ -6,7 +6,7 @@ You define agent prompts, triage findings, and review pull requests. vteam handl
 
 ## How it works
 
-vteam runs Claude in headless mode (`claude -p`) as a subprocess. Each agent invocation is stateless — all memory is external, injected into the prompt as markdown files.
+vteam runs Claude in headless mode (`claude -p`) as a subprocess. Each agent invocation is stateless — all memory is external (tasks in [aven](#task-lifecycle), per-agent memory files) and injected into the prompt.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -31,13 +31,14 @@ vteam runs Claude in headless mode (`claude -p`) as a subprocess. Each agent inv
 └─────────────────────────────────────────────────────────────┘
 ```
 
-The orchestrator never reasons about code. Claude never creates task files, commits, or pushes branches. This separation means if Claude crashes mid-run, no state is corrupted — the orchestrator applies state transitions only after Claude finishes and returns structured output.
+The orchestrator never reasons about code. Claude never creates tasks, commits, or pushes branches. This separation means if Claude crashes mid-run, no state is corrupted — the orchestrator applies state transitions only after Claude finishes and returns structured output.
 
 ## Prerequisites
 
 - **Node.js** >= 20
 - **Claude Code** CLI — `claude` must be on your PATH ([install guide](https://docs.anthropic.com/en/docs/claude-code/getting-started))
 - **Git** — the project must be a git repository
+- **aven** — the local-first task manager CLI. `aven` must be installed and on your PATH; vteam stores all tasks in it.
 - **`gh`** (GitHub CLI) or **`glab`** (GitLab CLI) — required for automatic pull request creation. Without it, branches are pushed but PRs must be created manually.
 
 ## Installation
@@ -63,7 +64,7 @@ vteam init
 # 2. Edit the config
 $EDITOR vteam/vteam.config.json
 
-# 3. Run the code reviewer — finds issues, writes them to todo
+# 3. Run the code reviewer — finds issues, creates them as aven tasks in todo
 vteam run code-reviewer
 
 # 4. Run the refactorer — picks a task, fixes it, pushes a branch, opens a PR
@@ -108,12 +109,9 @@ vteam/
 │   └── test-writer/
 │       ├── AGENT.md                # Test writer prompt/personality
 │       └── MEMORY.md               # Memory curation strategy
-└── tasks/                          # Local only — gitignored
-    ├── todo/                       # Findings from code reviewer, ready for implementation
-    └── done/                       # Completed tasks
 ```
 
-Also adds `.vteam-worktrees/` and `vteam/tasks/` to `.gitignore`. Task files are local workflow state, not source code — the real shared artifacts are the PRs that the refactorer creates.
+Sets `tasks.project` in the config to the current directory name. Also adds `.vteam-worktrees/` and vteam's local state directories (`vteam/.locks/`, `vteam/.logs/`, `vteam/.runs/`, `vteam/.memory/`) to `.gitignore`. Tasks live in aven, not in the repo — the real shared artifacts are the PRs that the refactorer creates.
 
 Will refuse to run if `vteam/` already exists.
 
@@ -131,9 +129,9 @@ vteam run code-reviewer --focus "only look at the auth module"
 
 1. Acquires an advisory lock (`vteam/.locks/code-reviewer.lock`)
 2. Reads the agent prompt from `vteam/agents/code-reviewer/AGENT.md`
-3. Scans existing task files in `todo/` and `done/` and injects their titles into the prompt so Claude knows what's already been found
+3. Lists all vteam-labelled tasks in the aven project (every status) and injects them into the prompt so Claude knows what's already been found
 4. Spawns `claude -p` — Claude scans the codebase and returns findings as structured JSON
-5. The orchestrator creates task files in `vteam/tasks/todo/` from each finding
+5. The orchestrator creates an aven task (status `todo`) from each finding via `aven add`
 6. Releases the lock
 
 Claude is read-only — it scans and reports. The orchestrator owns all file creation.
@@ -141,18 +139,19 @@ Claude is read-only — it scans and reports. The orchestrator owns all file cre
 ### `vteam run refactorer`
 
 1. Acquires an advisory lock (`vteam/.locks/refactorer.lock`)
-2. Scans `vteam/tasks/todo/` for the highest-severity task (skips tasks that have failed 3+ times)
-3. Creates a git worktree at `.vteam-worktrees/vteam/<task-slug>` branched from the base branch
+2. Picks the highest-severity ready task routed to it from aven (`aven list --status todo --ready` filtered by `actor`, see [Routing tasks to agents](#routing-tasks-to-agents); oldest first within a severity; skips tasks that have failed `maxRetries` times) and sets it to `active`
+3. Creates a git worktree at `.vteam-worktrees/vteam/<task-title-slug>-<runId>` branched from the base branch
 4. Builds the prompt with the task description, existing task titles, and agent instructions
 5. Spawns `claude -p` in the worktree — Claude implements the fix and returns a commit message as structured JSON
 6. If Claude reported changes:
    - The orchestrator commits (`git add -A` + `git commit` using Claude's commit message)
    - Force-pushes the branch to origin
    - Creates a pull request via `gh` or `glab` (falls back gracefully if CLI is missing or labels don't exist)
-   - Moves the task file from `todo/` to `done/` with completion metadata
-7. If Claude reported no changes: increments `retry-count` in the task frontmatter
-8. Cleans up the worktree
-9. Releases the lock
+   - Sets the task to `done` with completion metadata
+7. If Claude reported no changes: returns the task to `todo` and increments its `retry-count` metadata
+8. On any other ending (crash, error): returns the task to `todo` without incrementing retries
+9. Cleans up the worktree
+10. Releases the lock
 
 ### `vteam run review-responder`
 
@@ -172,7 +171,7 @@ The intended loop: a reviewer leaves comments on a PR, adds the `vteam:changes-r
 
 ### `vteam status`
 
-Displays task counts by status (todo, done), lists in-progress todo items with retry counts, shows active worktrees, and prints recent run IDs.
+Displays the aven project and label, task counts per aven status, lists active and todo tasks with their refs and retry counts, shows active worktrees, and prints recent run IDs.
 
 ### `vteam clean`
 
@@ -200,21 +199,24 @@ Global settings live in `vteam/vteam.config.json`:
   "platform": "github",
   "worktreeDir": ".vteam-worktrees",
   "tasks": {
-    "maxRetries": 3
-  },
-  "taskManager": {
-    "provider": "filesystem"
+    "maxRetries": 3,
+    "project": "my-app",
+    "label": "vteam",
+    "defaultActor": "refactorer"
   }
 }
 ```
 
-| Field                  | Description                                                                             |
-| ---------------------- | --------------------------------------------------------------------------------------- |
-| `baseBranch`           | Branch to create worktrees from and target PRs against                                  |
-| `platform`             | `"github"` or `"gitlab"` — determines which CLI (`gh` / `glab`) is used for PR creation |
-| `worktreeDir`          | Where worktrees are created (relative to repo root). Gitignored.                        |
-| `tasks.maxRetries`     | How many times the refactorer retries a failing task before skipping it                 |
-| `taskManager.provider` | Task storage backend. Currently only `"filesystem"` (the default). Omit the field entirely to use the default. |
+| Field              | Description                                                                             |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| `baseBranch`       | Branch to create worktrees from and target PRs against                                  |
+| `platform`         | `"github"` or `"gitlab"` — determines which CLI (`gh` / `glab`) is used for PR creation |
+| `worktreeDir`      | Where worktrees are created (relative to repo root). Gitignored.                        |
+| `tasks.maxRetries` | How many times the refactorer retries a failing task before skipping it                 |
+| `tasks.project`    | Required. The aven project vteam's tasks live in. aven creates it on the first task. `vteam init` sets it to the current directory name. |
+| `tasks.label`      | Default `"vteam"`. vteam only sees and picks up tasks carrying this label. Created automatically. |
+| `tasks.defaultActor` | Required. Agent that works on tasks with no `actor` (see [Routing tasks to agents](#routing-tasks-to-agents)). `vteam init` sets `refactorer`. |
+| `tasks.workspace`  | Optional. aven workspace, passed to every `aven` call as `--workspace`.                 |
 
 ### Agent configuration (AGENT.md frontmatter)
 
@@ -235,8 +237,9 @@ prCreateLabels: [vteam]
 | `model`           | `"sonnet"` | Claude model (`"sonnet"`, `"opus"`, `"haiku"`)                                                                   |
 | `worktree`        | `false`    | Run in an isolated git worktree; push branch on commit                                                           |
 | `readOnly`        | `false`    | Run in a worktree but skip commit/push/PR (requires `worktree: true`, incompatible with `autoPR`). Agent runs freely — `readOnly` only prevents the orchestrator from committing/pushing afterward. |
-| `output`          | —          | `"task"` to produce findings that the orchestrator creates as task files. When omitted, the agent uses generic content output. All agents share a unified output schema — `output` controls only the `content` field type. |
-| `input`           | —          | `"task"` to pick from `todo/` queue; `"pr"` to respond to PR review comments (requires `worktree: true`)         |
+| `output`          | —          | `"task"` to produce findings that the orchestrator creates as aven tasks. When omitted, the agent uses generic content output. All agents share a unified output schema — `output` controls only the `content` field type. |
+| `assignTo`        | —          | Requires `output: "task"`. Agent that should work on the created tasks (sets aven metadata `actor`). Omit to route to `tasks.defaultActor`. |
+| `input`           | —          | `"task"` to pick from the aven `todo` queue; `"pr"` to respond to PR review comments (requires `worktree: true`)         |
 | `prTriggerLabel`  | —          | Label signalling "this PR needs work" (e.g. `vteam:changes-requested`); the orchestrator discovers PRs by this label and removes it after the agent pushes |
 | `autoPR`          | `false`    | Create a pull request after pushing                                                                              |
 | `prCreateLabels`  | —          | Labels applied to created PRs (auto-created if they don't exist)                                                 |
@@ -271,53 +274,53 @@ The hook runs in the main project directory (not the worktree). Hook failures ar
 
 ## Task lifecycle
 
-Task files live in `vteam/tasks/` and are **gitignored** — they are local workflow state, not version-controlled artifacts. The real output of vteam is the PRs created by the refactorer.
+Tasks live in [aven](#prerequisites), a local-first task manager backed by SQLite. vteam scopes everything to one aven project (`tasks.project`) and one label (`tasks.label`, default `vteam`) — it only sees tasks that carry the label. The real output of vteam is the PRs created by the refactorer.
 
 ```
 code-reviewer finds issue
         │
         ▼
-    ┌──────┐      refactorer     ┌──────┐
-    │ todo │ ──────────────────▶ │ done │
-    └──────┘   branch + PR       └──────┘
+    ┌──────┐  refactorer picks  ┌────────┐  branch + PR  ┌──────┐
+    │ todo │ ─────────────────▶ │ active │ ────────────▶ │ done │
+    └──────┘                    └────────┘               └──────┘
+        ▲                           │
+        └───────────────────────────┘
+          no changes (retry-count + 1),
+          crash or error (no increment)
 ```
 
-### Task file format
+Any ending other than a pushed commit or "no changes" — a crash, an error, or a `readOnly` / non-worktree agent with `input: "task"` — returns the task to `todo` without incrementing `retry-count`.
 
-Task files are markdown with YAML frontmatter. Named `YYYY-MM-DD-HH-mm-ss-<slugified-title>.md`.
+### Routing tasks to agents
 
-```markdown
----
-title: Missing null check in auth middleware
-created: 2026-04-18T14:30:00Z
-status: todo
-severity: high
-found-by: code-reviewer
-files:
-  - src/middleware/auth.ts:45
----
+Every task can carry an `actor` metadata field naming the agent that should work on it:
 
-## Description
+- An agent that creates tasks sets `actor` from its `assignTo` frontmatter (e.g. a code-reviewer with `assignTo: test-writer` hands its findings to the test-writer). Without `assignTo`, no `actor` is set.
+- An `input: "task"` agent only picks tasks whose `actor` is its own name. The agent named in `tasks.defaultActor` also picks every task with no `actor` — including tasks you create yourself in aven.
+- Reassign a task with `aven edit <ref> --metadata actor=<agent>`, or hand it back to the default actor with `aven edit <ref> --remove-metadata actor`.
+- `found-by` records which agent found the task; it does not affect routing.
+- `vteam status` shows each open task's actor and warns when an actor has no matching `vteam/agents/<name>/`.
 
-The `verifyToken` function does not check for null token before calling
-`jwt.verify()`, which throws an unhandled exception.
+Agents only pick tasks returned by `aven list --status todo --ready`, so aven's dependency blocking and deferral (`available_at`) are respected. If the vteam process is killed hard mid-run, the task may stay `active` — reset it manually with `aven edit <ref> --status todo`.
 
-## Suggested Fix
+Because tasks live in aven, you can triage them with `aven tui` or the `aven` CLI: move findings to `backlog` or `canceled`, change priority, add dependencies, or add the `vteam` label to your own tasks to queue them for the refactorer.
 
-Add a guard clause at the top of `verifyToken`.
+### How a task is represented in aven
 
-## Affected Files
+| aven field             | Set by vteam                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| title                  | The finding's title                                                             |
+| project / label        | `tasks.project` / `tasks.label`                                                 |
+| status                 | `todo` on creation; `active` while being worked on; `done` on success           |
+| priority               | From severity: `critical`→`urgent`, `high`→`high`, `medium`→`medium`, `low`→`low` (aven `none` reads back as `low`) |
+| description            | Markdown with `## Description`, `## Suggested Fix` (optional), `## Affected Files` |
+| metadata `found-by`    | Name of the agent that created the task (provenance only)                       |
+| metadata `actor`       | Agent that should work on the task; absent means `tasks.defaultActor`           |
+| metadata `files`       | Comma-separated affected files                                                  |
+| metadata `retry-count` | Incremented each time the refactorer finishes with no changes                   |
+| metadata `completed`, `branch`, `pr-url` | Added when the task is set to `done` (`pr-url` only if a PR was created) |
 
-- `src/middleware/auth.ts:45` — missing null check
-```
-
-When a task is completed, the orchestrator adds to its frontmatter:
-
-```yaml
-completed: 2026-04-19T10:15:00Z
-branch: vteam/missing-null-check-auth
-pr-url: https://github.com/org/repo/pull/42
-```
+Tasks are referenced by their aven ref (e.g. `APP-7KQ9`); run state files in `vteam/.runs/` record it as `taskRef`. Refs are local to aven, so vteam keeps them out of branch names and PRs.
 
 ### Severity levels
 
@@ -327,9 +330,9 @@ The refactorer picks the highest-severity task first.
 
 ## Memory and deduplication
 
-There is no separate overview file. At prompt-build time, the orchestrator scans all task files in `todo/` and `done/`, reads their frontmatter titles, and injects a summary list into the agent's prompt. Claude uses this list to avoid reporting duplicate findings.
+There is no separate overview file. At prompt-build time, the orchestrator lists every non-deleted task in the aven project carrying the vteam label — all statuses (inbox, backlog, todo, active, done, canceled) — and injects them into the agent's prompt as `- [status] severity | title | files`. Claude uses this list to avoid reporting duplicate findings. Canceling a task in aven therefore marks it as rejected (e.g. a false positive): the reviewer sees it and won't report it again.
 
-Claude returns findings as structured JSON; the orchestrator creates the actual task files.
+Claude returns findings as structured JSON; the orchestrator creates the actual aven tasks.
 
 ### Per-agent memory (MEMORY.md)
 
@@ -352,7 +355,7 @@ Maximum 30 lines — drop oldest entries first.
 3. After the run, the orchestrator spawns a small curation agent that merges the new update into existing memory according to the MEMORY.md rules
 4. The orchestrator writes the curated result back to the memory file (full replacement)
 
-Memory files are stored in `vteam/.memory/` and are gitignored — they are local workflow state like task files. The curation agent failure is non-fatal and does not affect the agent run's exit status.
+Memory files are stored in `vteam/.memory/` and are gitignored — they are local workflow state. The curation agent failure is non-fatal and does not affect the agent run's exit status.
 
 | Field             | Default | Description                                    |
 | ----------------- | ------- | ---------------------------------------------- |
@@ -369,14 +372,14 @@ vteam ships with four default agents (code-reviewer, refactorer, review-responde
 ### Code reviewer
 
 - Read-only — scans the codebase, never modifies any files
-- Returns findings as structured JSON — the orchestrator creates task files in `vteam/tasks/todo/`
+- Returns findings as structured JSON — the orchestrator creates them as aven tasks in `todo`
 - Does not use a worktree or commit — findings stay local until the refactorer acts on them
 - Limited to 1 finding per run (configurable in the AGENT.md prompt)
 - Prioritizes severity: security bugs > performance > code quality
 
 ### Refactorer
 
-- Picks one task per run from `todo/`
+- Picks one ready task per run from the aven `todo` queue
 - Works in an isolated git worktree (never touches the main working tree)
 - Makes minimal, focused changes following existing code style
 - Does not commit or push — the orchestrator handles all git operations and PR creation
@@ -399,7 +402,7 @@ vteam ships with four default agents (code-reviewer, refactorer, review-responde
 - Does not modify source code — only adds or updates test files
 - Does not commit or push — the orchestrator handles all git operations
 
-All agents return a unified JSON output (`AgentOutput`). The orchestrator validates it, creates task files from `content` when type is `"task"`, commits from `commitMessage` when present, and passes `content` through to ON_FINISH hooks. All agents receive existing task titles in their prompt, giving them full context of past and present work.
+All agents return a unified JSON output (`AgentOutput`). The orchestrator validates it, creates aven tasks from `content` when type is `"task"`, commits from `commitMessage` when present, and passes `content` through to ON_FINISH hooks. All agents receive existing task titles in their prompt, giving them full context of past and present work.
 
 ## Caveats and known limitations
 
@@ -415,7 +418,7 @@ vteam uses advisory file locking via atomic `mkdir` (POSIX guarantees this is at
 ### Worktrees
 
 - **Crash cleanup**: If the refactorer crashes after creating a worktree but before cleanup, the worktree and its branch persist. Run `vteam clean` to remove orphans.
-- **Stale branches**: On retry, `createWorktree` deletes any existing local branch with the same name before creating a new worktree. Remote branches are overwritten via `git push --force`.
+- **Stale branches**: Task branch names include the run ID (`vteam/<title-slug>-<runId>`), so a retried task never reuses an earlier attempt's branch. If a local branch with the same name exists, `createWorktree` deletes it before creating a new worktree.
 - **Force push**: vteam force-pushes to its own branches (`vteam/*`). This is safe because these branches are ephemeral and owned by the tool — no human should be pushing to them. But if you manually commit to a `vteam/*` branch, those commits will be lost on the next refactorer run.
 - **Disk space**: Each worktree is a full checkout. On large repos, this can be significant. Worktrees are cleaned up after each run.
 
@@ -431,6 +434,8 @@ vteam uses advisory file locking via atomic `mkdir` (POSIX guarantees this is at
 - **No budget caps**: There's no `--max-budget-usd` on agent runs. A single code-reviewer or refactorer invocation uses one Claude session with no spending limit. Monitor usage via your Anthropic dashboard.
 - **No rollback**: If the refactorer's changes break something, you close the PR. There's no automatic revert mechanism.
 - **Title-based dedup only**: Duplicate detection relies on Claude reading existing task titles in its prompt. Similar but differently-worded findings may slip through.
+- **One `aven show` per task**: `aven list --json` doesn't include metadata or descriptions, so building the task index runs `aven show --full --json` for every labelled task (8 at a time). Large projects make prompt building slower.
+- **Stuck `active` tasks**: If the vteam process is killed hard, the picked task stays `active` and won't be retried until reset with `aven edit <ref> --status todo`.
 
 ## Claude Code skills
 
@@ -476,6 +481,7 @@ vteam aims to keep external dependencies to a minimum. YAML frontmatter parsing,
 | -------- | ---------- | ---------------------------------------- |
 | `claude` | Yes        | Claude Code CLI — all agent intelligence |
 | `git`    | Yes        | Worktree management, branch operations   |
+| `aven`   | Yes        | Task storage and lifecycle               |
 | `gh`     | For GitHub | Pull request creation (`gh pr create`)   |
 | `glab`   | For GitLab | Pull request creation (`glab mr create`) |
 

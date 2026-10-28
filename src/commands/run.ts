@@ -10,8 +10,8 @@ import { acquireLock, type FileLock } from "../memory/lock.js";
 import { buildPrompt, buildOnFinishPrompt, buildMemoryCurationPrompt } from "../orchestrator/prompt-builder.js";
 import { runClaudeAgent } from "../orchestrator/agent-runner.js";
 import { parseAgentOutput } from "../orchestrator/output-schema.js";
-import { createTaskManager } from "../tasks/factory.js";
-import { severityPriority } from "../tasks/task-file.js";
+import { AvenTaskManager } from "../tasks/aven-manager.js";
+import { severityPriority, type TaskManager } from "../tasks/task-manager.js";
 import {
   createWorktree,
   checkoutWorktree,
@@ -33,7 +33,7 @@ import type {
   AgentConfig,
   VteamConfig,
   RunState,
-  TaskFile,
+  Task,
   PRReviewContext,
   RunOutcome,
 } from "../types.js";
@@ -118,7 +118,7 @@ async function runAgent(
   focus?: string,
 ): Promise<void> {
   const runId = generateRunId(agent.name);
-  const taskManager = createTaskManager(config.taskManager, cwd);
+  const taskManager = new AvenTaskManager(config.tasks);
   const locksDir = resolve(cwd, "vteam", ".locks");
   mkdirSync(locksDir, { recursive: true });
 
@@ -126,7 +126,8 @@ async function runAgent(
   let agentLock: FileLock | undefined;
   let worktreePath: string | undefined;
   let branchName: string | undefined;
-  let task: TaskFile | undefined;
+  let task: Task | undefined;
+  let taskSettled = false;
   let reviewContext: PRReviewContext | undefined;
   let prUrl: string | undefined;
   let memoryUpdate: string | undefined;
@@ -140,17 +141,13 @@ async function runAgent(
     );
 
     if (agent.input === "task") {
-      const todoTasks = await taskManager.list("todo");
-      const eligible = todoTasks
-        .filter(
-          (t) =>
-            (t.frontmatter["retry-count"] ?? 0) <
-            config.tasks.maxRetries,
-        )
+      const readyTasks = await taskManager.listReady(agent.name);
+      const eligible = readyTasks
+        .filter((t) => t.retryCount < config.tasks.maxRetries)
         .sort(
           (a, b) =>
-            severityPriority(a.frontmatter.severity) -
-            severityPriority(b.frontmatter.severity),
+            severityPriority(a.severity) - severityPriority(b.severity) ||
+            a.createdAt.localeCompare(b.createdAt),
         );
 
       if (eligible.length === 0) {
@@ -158,9 +155,8 @@ async function runAgent(
         return;
       }
       task = eligible[0];
-      console.log(
-        `Picked task: ${task.frontmatter.title} (${task.frontmatter.severity})`,
-      );
+      await taskManager.update(task.ref, { status: "active" });
+      console.log(`Picked task: ${task.ref} ${task.title} (${task.severity})`);
     }
 
     if (agent.input === "pr") {
@@ -183,7 +179,7 @@ async function runAgent(
       agent: agent.name,
       status: "started",
       startedAt,
-      ...(task ? { taskFile: task.filename } : {}),
+      ...(task ? { taskRef: task.ref } : {}),
     };
     writeRunState(cwd, runState);
 
@@ -201,7 +197,7 @@ async function runAgent(
       } else {
         console.log("Creating worktree...");
         const slug = task
-          ? task.filename.replace(/\.md$/, "")
+          ? `${task.title}-${runId}`
           : `${agent.name}-${runId}`;
         const wt = createWorktree(
           cwd,
@@ -265,9 +261,12 @@ async function runAgent(
     runState.commitMessage = output.commitMessage;
 
     if (output.content?.type === "task") {
-      const taskId = await taskManager.create(output.content.body, agent.name);
+      if (agent.assignTo && !listAgentNames(cwd).includes(agent.assignTo)) {
+        console.warn(`Warning: assignTo "${agent.assignTo}" does not match any agent in vteam/agents/.`);
+      }
+      const taskId = await taskManager.create(output.content.body, agent.name, agent.assignTo);
       runState.tasksCreated = [taskId];
-      console.log(`Created task: ${output.content.body.title} (${output.content.body.severity})`);
+      console.log(`Created task: ${taskId} ${output.content.body.title} (${output.content.body.severity})`);
     }
 
     if (agent.worktree && agent.readOnly && worktreePath) {
@@ -328,8 +327,8 @@ async function runAgent(
       if (agent.autoPR) {
         console.log("Creating pull request...");
         try {
-          const prBody = output.commitMessage.body || `Automated by vteam (${agent.name}).${task ? `\n\nTask: ${task.frontmatter.title}` : ""}`;
-          const summary = task?.frontmatter.title || output.commitMessage.subject.replace(/^vteam:\s*/i, "") || "";
+          const prBody = output.commitMessage.body || `Automated by vteam (${agent.name}).${task ? `\n\nTask: ${task.title}` : ""}`;
+          const summary = task?.title || output.commitMessage.subject.replace(/^vteam:\s*/i, "") || "";
           const prTitle = summary
             ? `vteam: ${agent.name}: ${summary}`
             : `vteam: ${agent.name}`;
@@ -353,12 +352,15 @@ async function runAgent(
       }
 
       if (task) {
-        await taskManager.move(task.id, "done", {
+        await taskManager.update(task.ref, {
           status: "done",
-          completed: new Date().toISOString(),
-          branch: branchName,
-          ...(prUrl ? { "pr-url": prUrl } : {}),
+          metadata: {
+            completed: new Date().toISOString(),
+            branch: branchName,
+            "pr-url": prUrl,
+          },
         });
+        taskSettled = true;
         console.log("Task completed.");
       }
     } else if (agent.worktree && worktreePath && branchName) {
@@ -367,13 +369,13 @@ async function runAgent(
         console.log(`Reason: ${output.blockerReason ?? output.summary}`);
       }
       if (task) {
-        const currentRetries = task.frontmatter["retry-count"] ?? 0;
-        await taskManager.update(task.id, {
-          "retry-count": currentRetries + 1,
+        const retryCount = task.retryCount + 1;
+        await taskManager.update(task.ref, {
+          status: "todo",
+          metadata: { "retry-count": String(retryCount) },
         });
-        console.log(
-          `Retry count: ${currentRetries + 1}/${config.tasks.maxRetries}`,
-        );
+        taskSettled = true;
+        console.log(`Retry count: ${retryCount}/${config.tasks.maxRetries}`);
       }
     }
 
@@ -391,7 +393,7 @@ async function runAgent(
       startedAt,
       completedAt,
       focus,
-      task: task ? { title: task.frontmatter.title, severity: task.frontmatter.severity, files: task.frontmatter.files } : undefined,
+      task: task ? { title: task.title, severity: task.severity, files: task.files } : undefined,
       branch: branchName,
       prUrl,
       reviewedPR: reviewContext ? { number: reviewContext.pr.number, title: reviewContext.pr.title, url: reviewContext.pr.url } : undefined,
@@ -418,11 +420,14 @@ async function runAgent(
       completedAt: failedAt,
       error: errorMsg,
       focus,
-      task: task ? { title: task.frontmatter.title, severity: task.frontmatter.severity, files: task.frontmatter.files } : undefined,
+      task: task ? { title: task.title, severity: task.severity, files: task.files } : undefined,
       branch: branchName,
       reviewedPR: reviewContext ? { number: reviewContext.pr.number, title: reviewContext.pr.title, url: reviewContext.pr.url } : undefined,
     };
   } finally {
+    if (task && !taskSettled) {
+      await releaseTask(taskManager, task);
+    }
     if (runOutcome) {
       await runOnFinishHook(agent, runOutcome, cwd);
       await runMemoryCuration(agent, memoryUpdate, focus, cwd);
@@ -435,6 +440,17 @@ async function runAgent(
     if (runOutcome?.status === "failed") {
       process.exit(1);
     }
+  }
+}
+
+async function releaseTask(taskManager: TaskManager, task: Task): Promise<void> {
+  try {
+    await taskManager.update(task.ref, { status: "todo" });
+  } catch (err) {
+    console.error(
+      `Failed to return task ${task.ref} to todo:`,
+      err instanceof Error ? err.message : err,
+    );
   }
 }
 

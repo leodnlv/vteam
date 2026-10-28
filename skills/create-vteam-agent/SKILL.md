@@ -24,18 +24,20 @@ Use the `AskUserQuestion` tool to ask the following questions. Ask them all in a
 | Option | When to use |
 |--------|-------------|
 | No input (scan) | The agent scans the codebase on its own (e.g., code reviewer, test writer) |
-| Task queue (`input: "task"`) | The agent picks a task from `todo/` and implements it (e.g., refactorer) |
+| Task queue (`input: "task"`) | The agent picks a task from the aven todo queue and implements it (e.g., refactorer) |
 | PR review (`input: "pr"`) | The agent responds to review comments on a pull request |
 
 **2. Output mode** — What does the agent produce?
 
 | Option | When to use |
 |--------|-------------|
-| Tasks (`output: "task"`) | The agent creates findings/issues as task files for other agents to pick up |
+| Tasks (`output: "task"`) | The agent creates findings as aven tasks for other agents to pick up |
 | Code changes (worktree) | The agent edits files and the orchestrator commits + pushes |
 | Code changes + auto-PR | Same as above, plus the orchestrator creates a PR automatically |
 | Analysis only (read-only worktree) | The agent reads code in a worktree but produces only a text report |
 | Generic text output | The agent returns freeform text (report, summary) without a worktree |
+
+**2b. Task routing** (only if output is Tasks) — Which agent should work on the tasks this agent creates? If it's the project's default actor (`tasks.defaultActor` in `vteam/vteam.config.json`, usually `refactorer`), omit `assignTo`. Otherwise set `assignTo: <agent-name>` — check that `vteam/agents/<agent-name>/` exists or will be created. Conversely, if the new agent uses `input: "task"`, tell the user it only picks tasks whose `actor` metadata equals its name (plus unassigned tasks if it is the default actor), so some producer needs `assignTo: <new-agent-name>`.
 
 **3. Tool permissions** — What tools does the agent need?
 
@@ -66,7 +68,8 @@ cron: "<expr>"                    # only if scheduled
 worktree: true                    # if the agent edits files OR uses readOnly
 readOnly: true                    # if worktree but no commit/push (analysis only)
 input: task | pr                  # only if consuming from task queue or PR reviews
-output: task                      # only if producing task files
+output: task                      # only if creating findings as aven tasks
+assignTo: <agent-name>            # only with output: task, when the worker isn't tasks.defaultActor
 autoPR: true                      # only if code changes should become PRs
 prTriggerLabel: "<label>"         # only if input: pr
 prCreateLabels: [vteam]           # only if autoPR: true
@@ -80,6 +83,7 @@ disallowedTools: [...]            # only if needed
 - `readOnly: true` is incompatible with `autoPR: true`
 - `output: "task"` is incompatible with `autoPR: true`
 - `output: "task"` is incompatible with `readOnly: true`
+- `assignTo` requires `output: "task"`
 
 ## Step 4 — Generate the agent name
 

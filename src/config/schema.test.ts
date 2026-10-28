@@ -6,7 +6,7 @@ describe("vteamConfigSchema", () => {
     baseBranch: "main",
     platform: "github",
     worktreeDir: ".vteam-worktrees",
-    tasks: { maxRetries: 3 },
+    tasks: { maxRetries: 3, project: "app", defaultActor: "refactorer" },
   };
 
   it("accepts a valid config", () => {
@@ -31,48 +31,63 @@ describe("vteamConfigSchema", () => {
   it("rejects negative maxRetries", () => {
     const result = vteamConfigSchema.safeParse({
       ...validConfig,
-      tasks: { maxRetries: -1 },
+      tasks: { ...validConfig.tasks, maxRetries: -1 },
     });
     expect(result.success).toBe(false);
   });
 
-  it("defaults taskManager to filesystem when omitted", () => {
+  it("defaults label to vteam", () => {
     const result = vteamConfigSchema.safeParse(validConfig);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.taskManager).toEqual({ provider: "filesystem" });
+      expect(result.data.tasks.label).toBe("vteam");
     }
   });
 
-  it("accepts explicit filesystem taskManager", () => {
+  it("accepts optional workspace", () => {
     const result = vteamConfigSchema.safeParse({
       ...validConfig,
-      taskManager: { provider: "filesystem" },
+      tasks: { ...validConfig.tasks, workspace: "work" },
     });
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.taskManager.provider).toBe("filesystem");
-    }
   });
 
-  it("rejects unknown taskManager provider", () => {
+  it("rejects missing project", () => {
     const result = vteamConfigSchema.safeParse({
       ...validConfig,
-      taskManager: { provider: "jira" },
+      tasks: { maxRetries: 3, defaultActor: "refactorer" },
     });
     expect(result.success).toBe(false);
   });
 
-  it("rejects taskManager without provider", () => {
+  it("rejects missing defaultActor", () => {
     const result = vteamConfigSchema.safeParse({
       ...validConfig,
-      taskManager: {},
+      tasks: { maxRetries: 3, project: "app" },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty project", () => {
+    const result = vteamConfigSchema.safeParse({
+      ...validConfig,
+      tasks: { ...validConfig.tasks, project: "" },
     });
     expect(result.success).toBe(false);
   });
 });
 
 describe("agentFrontmatterSchema", () => {
+  it("accepts assignTo with output: task", () => {
+    const result = agentFrontmatterSchema.safeParse({ output: "task", assignTo: "refactorer" });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects assignTo without output: task", () => {
+    const result = agentFrontmatterSchema.safeParse({ assignTo: "refactorer" });
+    expect(result.success).toBe(false);
+  });
+
   it("accepts empty frontmatter (bare AGENT.md)", () => {
     const result = agentFrontmatterSchema.safeParse({});
     expect(result.success).toBe(true);

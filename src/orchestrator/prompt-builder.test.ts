@@ -1,13 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { rmSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
-import { stringify } from "../frontmatter.js";
 import { buildPrompt, buildOnFinishPrompt, buildMemoryCurationPrompt } from "./prompt-builder.js";
-import { FilesystemTaskManager } from "../tasks/filesystem-manager.js";
 import type { TaskManager } from "../tasks/task-manager.js";
-import type { AgentConfig, TaskFile, TaskFrontmatter, PRReviewContext, RunOutcome } from "../types.js";
+import type { AgentConfig, Task, PRReviewContext, RunOutcome } from "../types.js";
 
 let tmp: string;
 
@@ -19,31 +17,38 @@ afterEach(() => {
   rmSync(tmp, { recursive: true, force: true });
 });
 
-function createTasksDir(): string {
-  const tasksDir = resolve(tmp, "tasks");
-  for (const sub of ["todo", "done"]) {
-    mkdirSync(resolve(tasksDir, sub), { recursive: true });
-  }
-  return tasksDir;
+function makeTask(overrides: Partial<Task>): Task {
+  return {
+    ref: "VTM-AAAA",
+    title: "Task",
+    status: "todo",
+    severity: "medium",
+    files: [],
+    retryCount: 0,
+    description: "",
+    createdAt: "2026-04-19T00:00:00Z",
+    ...overrides,
+  };
 }
 
-function writeTask(
-  tasksDir: string,
-  status: "todo" | "done",
-  filename: string,
-  fm: TaskFrontmatter,
-  body: string,
-): void {
-  const content = stringify(body, fm);
-  writeFileSync(resolve(tasksDir, status, filename), content, "utf-8");
+function stubTaskManager(tasks: Task[]): TaskManager {
+  return {
+    listReady: async () => tasks.filter((t) => t.status === "todo"),
+    getIndex: async () => ({
+      all: tasks,
+      byStatus: new Map(),
+      titles: tasks.map((t) => t.title),
+    }),
+    create: async () => "VTM-NEW1",
+    update: async () => {},
+  };
 }
 
-function setup(): { agentConfig: AgentConfig; taskManager: TaskManager; tasksDir: string } {
+function setup(tasks: Task[] = []): { agentConfig: AgentConfig; taskManager: TaskManager } {
   const agentMdPath = resolve(tmp, "AGENT.md");
   writeFileSync(agentMdPath, "---\nmodel: sonnet\nworktree: true\n---\n\n# Test Agent\n\nYou are a test agent.", "utf-8");
 
-  const tasksDir = createTasksDir();
-  const taskManager = new FilesystemTaskManager(tasksDir);
+  const taskManager = stubTaskManager(tasks);
 
   return {
     agentConfig: {
@@ -52,7 +57,6 @@ function setup(): { agentConfig: AgentConfig; taskManager: TaskManager; tasksDir
       model: "sonnet",
     },
     taskManager,
-    tasksDir,
   };
 }
 
@@ -64,15 +68,9 @@ describe("buildPrompt", () => {
   });
 
   it("includes existing task titles in user prompt", async () => {
-    const { agentConfig, taskManager, tasksDir } = setup();
-    writeTask(tasksDir, "todo", "task-a.md", {
-      title: "Null check missing",
-      created: "2026-04-19",
-      status: "todo",
-      severity: "high",
-      "found-by": "code-reviewer",
-      files: ["src/auth.ts:45"],
-    }, "## Description\n\nSome bug.");
+    const { agentConfig, taskManager } = setup([
+      makeTask({ title: "Null check missing", severity: "high", files: ["src/auth.ts:45"] }),
+    ]);
 
     const { userPrompt } = await buildPrompt(agentConfig, taskManager);
     expect(userPrompt).toContain("Null check missing");
@@ -87,20 +85,12 @@ describe("buildPrompt", () => {
 
   it("includes task details when task provided", async () => {
     const { agentConfig, taskManager } = setup();
-    const task: TaskFile = {
-      id: "task.md",
-      filename: "task.md",
-      path: "/tasks/todo/task.md",
-      frontmatter: {
-        title: "Fix null check",
-        created: "2026-04-19",
-        status: "todo",
-        severity: "high",
-        "found-by": "code-reviewer",
-        files: ["src/auth.ts:45"],
-      },
-      body: "## Description\n\nThe auth module is broken.",
-    };
+    const task = makeTask({
+      title: "Fix null check",
+      severity: "high",
+      files: ["src/auth.ts:45"],
+      description: "## Description\n\nThe auth module is broken.",
+    });
 
     const { systemPrompt, userPrompt } = await buildPrompt(agentConfig, taskManager, task);
     expect(systemPrompt).toContain("You are a test agent");
@@ -124,28 +114,15 @@ describe("buildPrompt", () => {
     expect(userPrompt).not.toContain("## Your Task");
   });
 
-  it("shows tasks from all status directories", async () => {
-    const { agentConfig, taskManager, tasksDir } = setup();
-    writeTask(tasksDir, "todo", "a.md", {
-      title: "Todo task",
-      created: "2026-04-19",
-      status: "todo",
-      severity: "high",
-      "found-by": "code-reviewer",
-      files: ["a.ts"],
-    }, "");
-    writeTask(tasksDir, "done", "b.md", {
-      title: "Done task",
-      created: "2026-04-19",
-      status: "done",
-      severity: "low",
-      "found-by": "code-reviewer",
-      files: ["b.ts"],
-    }, "");
+  it("shows tasks of every status with status, severity, and files", async () => {
+    const { agentConfig, taskManager } = setup([
+      makeTask({ title: "Todo task", status: "todo", severity: "high", files: ["a.ts"] }),
+      makeTask({ title: "Rejected task", status: "canceled", severity: "low", files: ["b.ts", "c.ts"] }),
+    ]);
 
     const { userPrompt } = await buildPrompt(agentConfig, taskManager);
-    expect(userPrompt).toContain("Todo task");
-    expect(userPrompt).toContain("Done task");
+    expect(userPrompt).toContain("- [todo] high | Todo task | a.ts");
+    expect(userPrompt).toContain("- [canceled] low | Rejected task | b.ts, c.ts");
   });
 
   it("includes review context when provided", async () => {

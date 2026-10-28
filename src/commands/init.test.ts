@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, existsSync, readFileSync } from "node:fs";
 import { rmSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve, join, basename } from "node:path";
 import { tmpdir } from "node:os";
 
 let tmp: string;
@@ -27,17 +27,25 @@ describe("initCommand", () => {
     expect(existsSync(resolve(tmp, "vteam", "vteam.config.json"))).toBe(true);
     expect(existsSync(resolve(tmp, "vteam", "agents", "code-reviewer", "AGENT.md"))).toBe(true);
     expect(existsSync(resolve(tmp, "vteam", "agents", "refactorer", "AGENT.md"))).toBe(true);
-    expect(existsSync(resolve(tmp, "vteam", "tasks", "todo"))).toBe(true);
-    expect(existsSync(resolve(tmp, "vteam", "tasks", "done"))).toBe(true);
+    expect(existsSync(resolve(tmp, "vteam", "tasks"))).toBe(false);
   });
 
-  it("creates .gitignore with worktree and tasks entries", async () => {
+  it("sets the aven project to the directory name", async () => {
+    const { initCommand } = await import("./init.js");
+    await initCommand();
+
+    const config = JSON.parse(readFileSync(resolve(tmp, "vteam", "vteam.config.json"), "utf-8"));
+    expect(config.tasks.project).toBe(basename(tmp));
+    expect(config.tasks.label).toBe("vteam");
+    expect(config.tasks.defaultActor).toBe("refactorer");
+  });
+
+  it("creates .gitignore with worktree and state entries", async () => {
     const { initCommand } = await import("./init.js");
     await initCommand();
 
     const gitignore = readFileSync(resolve(tmp, ".gitignore"), "utf-8");
     expect(gitignore).toContain(".vteam-worktrees/");
-    expect(gitignore).toContain("vteam/tasks/");
     expect(gitignore).toContain("vteam/.locks/");
     expect(gitignore).toContain("vteam/.logs/");
     expect(gitignore).toContain("vteam/.runs/");
@@ -53,7 +61,6 @@ describe("initCommand", () => {
     const gitignore = readFileSync(resolve(tmp, ".gitignore"), "utf-8");
     expect(gitignore).toContain("node_modules/");
     expect(gitignore).toContain(".vteam-worktrees/");
-    expect(gitignore).toContain("vteam/tasks/");
     expect(gitignore).toContain("vteam/.locks/");
     expect(gitignore).toContain("vteam/.logs/");
     expect(gitignore).toContain("vteam/.runs/");
