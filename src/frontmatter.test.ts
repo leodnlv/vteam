@@ -136,6 +136,19 @@ describe("parse", () => {
     expect(data.empty).toBeNull();
     expect(data.next).toBe("value");
   });
+
+  it("parses nested mappings with flow, block and null values", () => {
+    const { data } = parse(
+      "---\ntaskFilter:\n  found-by: [improver, null]\n  owner:\n    - a\n    - b\n  actor: null\ninput: task\n---\n"
+    );
+    expect(data.taskFilter).toEqual({ "found-by": ["improver", null], owner: ["a", "b"], actor: null });
+    expect(data.input).toBe("task");
+  });
+
+  it("skips blank and comment lines inside nested mappings", () => {
+    const { data } = parse("---\ntaskFilter:\n  # who\n  actor: coder\n\n  kind: bug\n---\n");
+    expect(data.taskFilter).toEqual({ actor: "coder", kind: "bug" });
+  });
 });
 
 describe("stringify", () => {

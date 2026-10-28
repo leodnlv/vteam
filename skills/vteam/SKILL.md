@@ -75,7 +75,6 @@ vteam/
     "maxRetries": 3,
     "project": "my-app",
     "label": "vteam",
-    "defaultActor": "coder",
     "workspace": "optional"
   }
 }
@@ -89,7 +88,6 @@ vteam/
 | `tasks.maxRetries` | How many times the coder retries a failing task before skipping it                      |
 | `tasks.project`    | Required, non-empty. aven project for vteam's tasks; aven auto-creates it on the first task |
 | `tasks.label`      | Default `"vteam"`. Opt-in label — vteam only sees/picks up tasks carrying it. Auto-created |
-| `tasks.defaultActor` | Required. Agent that works on tasks with no `actor` metadata (incl. human-created tasks) |
 | `tasks.workspace`  | Optional. aven workspace, passed as `--workspace` to every `aven` call                  |
 
 ## Agent configuration (AGENT.md)
@@ -106,7 +104,8 @@ worktree: true # Run in an isolated git worktree
 readOnly: true # Worktree but no commit/push/PR (requires worktree: true)
 input: task # "task" (pick from the aven todo queue) or "pr" (respond to PR reviews)
 output: task # "task" to produce findings as aven tasks
-assignTo: coder # requires output: task — sets aven metadata actor; omit to route to tasks.defaultActor
+taskFilter: # requires input: task — aven metadata key → value | [values] | null (missing); keys AND, list values OR
+  found-by: [improver, security-analyst]
 autoPR: true # Create a PR after pushing
 prTriggerLabel: "vteam:changes-requested" # Label to discover PRs needing work
 prCreateLabels: [vteam] # Labels applied to created PRs
@@ -179,9 +178,9 @@ no changes / crash / error → active → back to todo
 
 Tasks live in aven, scoped to `tasks.project` + `tasks.label`. Refs look like `APP-7KQ9` (recorded as `taskRef` in `vteam/.runs/*.json`).
 
-- **Creating** (`output: "task"`): `aven add` with `--project`, `--status todo`, `--label`, priority from severity (critical→urgent, high→high, medium→medium, low→low), metadata `found-by=<agent>`, `actor=<assignTo>` (only if `assignTo` is set), and `files=<comma-separated>`, and a markdown description (Description / Suggested Fix / Affected Files). Aven priority `none` reads back as `low`.
-- **Routing**: metadata `actor` names the agent that should work on a task. An `input: "task"` agent picks tasks with `actor` equal to its own name; the `tasks.defaultActor` agent also picks tasks with no `actor`. Reassign with `aven edit <ref> --metadata actor=<agent>`; `--remove-metadata actor` sends it back to the default actor. `found-by` is provenance only.
-- **Picking** (`input: "task"`): `aven list --project P --label L --status todo --ready` filtered by `actor` as above, so aven dependency blocking and `available_at` deferral are respected. Tasks with `retry-count` >= `maxRetries` are skipped. Sorted by severity (`critical` > `high` > `medium` > `low`), then oldest first. The picked task is set to `active` immediately.
+- **Creating** (`output: "task"`): `aven add` with `--project`, `--status todo`, `--label`, priority from severity (critical→urgent, high→high, medium→medium, low→low), metadata `found-by=<agent>` and `files=<comma-separated>`, and a markdown description (Description / Suggested Fix / Affected Files). Aven priority `none` reads back as `low`.
+- **Routing**: each `input: "task"` agent's `taskFilter` (frontmatter) selects tasks by aven metadata — keys AND, list values OR, `null` = key missing/empty. No `taskFilter` = matches everything. There is no fallback: a task no agent's filter matches is never picked (`vteam status` warns). Overlaps are allowed; whichever agent runs first sets the task `active`. vteam only writes `found-by`; other keys (e.g. `actor`) are set by humans via `aven edit <ref> --metadata actor=<agent>`.
+- **Picking** (`input: "task"`): `aven list --project P --label L --status todo --ready` (one `aven show` per ready task), then routed in-process as above, so aven dependency blocking and `available_at` deferral are respected. Tasks with `retry-count` >= `maxRetries` are skipped. Sorted by severity (`critical` > `high` > `medium` > `low`), then oldest first. The picked task is set to `active` immediately.
 - **Branch names**: `vteam/<slugified-title>-<runId>` — aven refs are local and are kept out of remote systems.
 - **Human triage**: users can manage tasks in aven (`aven tui` or CLI) — move findings to backlog/canceled, reprioritize, add dependencies, or add the `vteam` label to their own tasks to queue them for the coder. Canceled tasks still appear in the dedup list, so canceling marks a finding as rejected/false positive.
 - **Hard kill**: if the vteam process is killed, the task may remain `active`; reset it with `aven edit <ref> --status todo`.

@@ -11,7 +11,7 @@ import { buildPrompt, buildOnFinishPrompt, buildMemoryCurationPrompt } from "../
 import { runClaudeAgent } from "../orchestrator/agent-runner.js";
 import { parseAgentOutput } from "../orchestrator/output-schema.js";
 import { AvenTaskManager } from "../tasks/aven-manager.js";
-import { severityPriority, type TaskManager } from "../tasks/task-manager.js";
+import { matchesTaskFilter, severityPriority, type TaskManager } from "../tasks/task-manager.js";
 import {
   createWorktree,
   checkoutWorktree,
@@ -141,8 +141,9 @@ async function runAgent(
     );
 
     if (agent.input === "task") {
-      const readyTasks = await taskManager.listReady(agent.name);
+      const readyTasks = await taskManager.listReady();
       const eligible = readyTasks
+        .filter((t) => matchesTaskFilter(t, agent.taskFilter ?? {}))
         .filter((t) => t.retryCount < config.tasks.maxRetries)
         .sort(
           (a, b) =>
@@ -261,10 +262,7 @@ async function runAgent(
     runState.commitMessage = output.commitMessage;
 
     if (output.content?.type === "task") {
-      if (agent.assignTo && !listAgentNames(cwd).includes(agent.assignTo)) {
-        console.warn(`Warning: assignTo "${agent.assignTo}" does not match any agent in vteam/agents/.`);
-      }
-      const taskId = await taskManager.create(output.content.body, agent.name, agent.assignTo);
+      const taskId = await taskManager.create(output.content.body, agent.name);
       runState.tasksCreated = [taskId];
       console.log(`Created task: ${taskId} ${output.content.body.title} (${output.content.body.severity})`);
     }

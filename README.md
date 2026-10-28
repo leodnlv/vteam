@@ -139,7 +139,7 @@ Claude is read-only — it scans and reports. The orchestrator owns all file cre
 ### `vteam run coder`
 
 1. Acquires an advisory lock (`vteam/.locks/coder.lock`)
-2. Picks the highest-severity ready task routed to it from aven (`aven list --status todo --ready` filtered by `actor`, see [Routing tasks to agents](#routing-tasks-to-agents); oldest first within a severity; skips tasks that have failed `maxRetries` times) and sets it to `active`
+2. Picks the highest-severity ready task routed to it from aven (`aven list --status todo --ready` filtered by its `taskFilter`, see [Routing tasks to agents](#routing-tasks-to-agents); oldest first within a severity; skips tasks that have failed `maxRetries` times) and sets it to `active`
 3. Creates a git worktree at `.vteam-worktrees/vteam/<task-title-slug>-<runId>` branched from the base branch
 4. Builds the prompt with the task description, existing task titles, and agent instructions
 5. Spawns `claude -p` in the worktree — Claude implements the fix and returns a commit message as structured JSON
@@ -201,8 +201,7 @@ Global settings live in `vteam/vteam.config.json`:
   "tasks": {
     "maxRetries": 3,
     "project": "my-app",
-    "label": "vteam",
-    "defaultActor": "coder"
+    "label": "vteam"
   }
 }
 ```
@@ -215,7 +214,6 @@ Global settings live in `vteam/vteam.config.json`:
 | `tasks.maxRetries` | How many times the coder retries a failing task before skipping it                      |
 | `tasks.project`    | Required. The aven project vteam's tasks live in. aven creates it on the first task. `vteam init` sets it to the current directory name. |
 | `tasks.label`      | Default `"vteam"`. vteam only sees and picks up tasks carrying this label. Created automatically. |
-| `tasks.defaultActor` | Required. Agent that works on tasks with no `actor` (see [Routing tasks to agents](#routing-tasks-to-agents)). `vteam init` sets `coder`. |
 | `tasks.workspace`  | Optional. aven workspace, passed to every `aven` call as `--workspace`.                 |
 
 ### Agent configuration (AGENT.md frontmatter)
@@ -240,8 +238,8 @@ prCreateLabels: [vteam]
 | `worktree`        | `false`    | Run in an isolated git worktree; push branch on commit                                                           |
 | `readOnly`        | `false`    | Run in a worktree but skip commit/push/PR (requires `worktree: true`, incompatible with `autoPR`). Agent runs freely — `readOnly` only prevents the orchestrator from committing/pushing afterward. |
 | `output`          | —          | `"task"` to produce findings that the orchestrator creates as aven tasks (incompatible with `autoPR` and `readOnly`). When omitted, the agent uses generic content output. All agents share a unified output schema — `output` controls only the `content` field type. |
-| `assignTo`        | —          | Requires `output: "task"`. Agent that should work on the created tasks (sets aven metadata `actor`). Omit to route to `tasks.defaultActor`. |
 | `input`           | —          | `"task"` to pick from the aven `todo` queue; `"pr"` to respond to PR review comments (requires `worktree: true`)         |
+| `taskFilter`      | —          | Requires `input: "task"`. Map of aven metadata key → value, list of values, or `null` (key missing). Picks only matching tasks. See [Routing tasks to agents](#routing-tasks-to-agents). |
 | `prTriggerLabel`  | —          | Label signalling "this PR needs work" (e.g. `vteam:changes-requested`); the orchestrator discovers PRs by this label and removes it after the agent pushes |
 | `autoPR`          | `false`    | Create a pull request after pushing                                                                              |
 | `prCreateLabels`  | —          | Labels applied to created PRs (auto-created if they don't exist)                                                 |
@@ -295,13 +293,25 @@ Any ending other than a pushed commit or "no changes" — a crash, an error, or 
 
 ### Routing tasks to agents
 
-Every task can carry an `actor` metadata field naming the agent that should work on it:
+Each `input: "task"` agent declares which tasks it works on with a `taskFilter` over aven metadata:
 
-- An agent that creates tasks sets `actor` from its `assignTo` frontmatter (e.g. a improver with `assignTo: test-writer` hands its findings to the test-writer). Without `assignTo`, no `actor` is set.
-- An `input: "task"` agent only picks tasks whose `actor` is its own name. The agent named in `tasks.defaultActor` also picks every task with no `actor` — including tasks you create yourself in aven.
-- Reassign a task with `aven edit <ref> --metadata actor=<agent>`, or hand it back to the default actor with `aven edit <ref> --remove-metadata actor`.
-- `found-by` records which agent found the task; it does not affect routing.
-- `vteam status` shows each open task's actor and warns when an actor has no matching `vteam/agents/<name>/`.
+```yaml
+# vteam/agents/coder/AGENT.md: findings from the improver or the security analyst
+input: task
+taskFilter:
+  found-by: [improver, security-analyst]
+
+# vteam/agents/mr-reviewer/AGENT.md: tasks a human handed to it
+input: task
+taskFilter:
+  actor: mr-reviewer
+```
+
+- Different keys must all match (AND). A list of values matches any of them (OR). `null` matches a key that is missing or empty, so `found-by: [improver, null]` also covers tasks you create yourself in aven.
+- An agent without `taskFilter` matches every task.
+- Filters may overlap. The first agent to run sets the task to `active`, which takes it off the others' lists.
+- vteam writes `found-by` (the creating agent) on every task. Any other key, like `actor`, is yours to set: `aven edit <ref> --metadata actor=mr-reviewer`.
+- A task that no agent's filter matches is never picked. `vteam status` shows which agents each open task routes to and warns about `todo` tasks no agent will pick.
 
 Agents only pick tasks returned by `aven list --status todo --ready`, so aven's dependency blocking and deferral (`available_at`) are respected. If the vteam process is killed hard mid-run, the task may stay `active` — reset it manually with `aven edit <ref> --status todo`.
 
@@ -316,8 +326,7 @@ Because tasks live in aven, you can triage them with `aven tui` or the `aven` CL
 | status                 | `todo` on creation; `active` while being worked on; `done` on success           |
 | priority               | From severity: `critical`→`urgent`, `high`→`high`, `medium`→`medium`, `low`→`low` (aven `none` reads back as `low`) |
 | description            | Markdown with `## Description`, `## Suggested Fix` (optional), `## Affected Files` |
-| metadata `found-by`    | Name of the agent that created the task (provenance only)                       |
-| metadata `actor`       | Agent that should work on the task; absent means `tasks.defaultActor`           |
+| metadata `found-by`    | Name of the agent that created the task (usable in `taskFilter`)                |
 | metadata `files`       | Comma-separated affected files                                                  |
 | metadata `retry-count` | Incremented each time the coder finishes with no changes                        |
 | metadata `completed`, `branch`, `pr-url` | Added when the task is set to `done` (`pr-url` only if a PR was created) |

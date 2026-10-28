@@ -19,16 +19,14 @@ vi.mock("../orchestrator/agent-runner.js", () => ({
 
 const taskStore = vi.hoisted(() => ({
   tasks: [] as Task[],
-  created: [] as { body: TaskContentBody; foundBy: string; actor?: string }[],
+  created: [] as { body: TaskContentBody; foundBy: string }[],
   updates: [] as { ref: string; changes: TaskUpdate }[],
 }));
 
 vi.mock("../tasks/aven-manager.js", () => ({
   AvenTaskManager: class implements TaskManager {
-    async listReady(actor: string) {
-      return taskStore.tasks.filter(
-        (t) => t.status === "todo" && (t.actor ?? "test-agent") === actor,
-      );
+    async listReady() {
+      return taskStore.tasks.filter((t) => t.status === "todo");
     }
     async getIndex() {
       return {
@@ -37,8 +35,8 @@ vi.mock("../tasks/aven-manager.js", () => ({
         titles: taskStore.tasks.map((t) => t.title),
       };
     }
-    async create(body: TaskContentBody, foundBy: string, actor?: string) {
-      taskStore.created.push({ body, foundBy, actor });
+    async create(body: TaskContentBody, foundBy: string) {
+      taskStore.created.push({ body, foundBy });
       return `VTM-${taskStore.created.length}`;
     }
     async update(ref: string, changes: TaskUpdate) {
@@ -91,7 +89,7 @@ function setupProject(opts: {
       baseBranch: "main",
       platform: "github",
       worktreeDir: ".worktrees",
-      tasks: { maxRetries: 3, project: "test", defaultActor: "test-agent" },
+      tasks: { maxRetries: 3, project: "test" },
     }),
   );
 
@@ -396,32 +394,8 @@ describe("pipeline: agent output → task creation", () => {
           files: ["src/db.ts:20"],
         },
         foundBy: "test-agent",
-        actor: undefined,
       },
     ]);
-  });
-
-  it("routes created tasks to the assignTo actor", async () => {
-    setupProject({
-      agentFrontmatter: "---\nmodel: sonnet\noutput: task\nassignTo: fixer\n---",
-    });
-
-    mockRunClaude.mockResolvedValueOnce(
-      makeResult(
-        JSON.stringify({
-          status: "completed",
-          summary: "Found issue.",
-          content: {
-            type: "task",
-            body: { title: "T", severity: "low", description: "D", files: ["a.ts"] },
-          },
-        }),
-      ),
-    );
-
-    await runCommand("test-agent", {});
-
-    expect(taskStore.created[0].actor).toBe("fixer");
   });
 
   it("does not create a task for generic content", async () => {
@@ -452,6 +426,7 @@ describe("pipeline: task input lifecycle", () => {
       severity: "high",
       files: ["src/thing.ts"],
       retryCount: 0,
+      metadata: {},
       description: "It is broken.",
       createdAt: "2026-10-01T00:00:00Z",
       ...overrides,
@@ -500,18 +475,52 @@ describe("pipeline: task input lifecycle", () => {
     expect(taskStore.updates[0]).toEqual({ ref: "VTM-HIGH", changes: { status: "active" } });
   });
 
-  it("ignores tasks routed to another actor", async () => {
-    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
-    seedTask({ ref: "VTM-OTHR", severity: "critical", actor: "someone-else" });
-    seedTask({ ref: "VTM-MINE", severity: "low", actor: "test-agent" });
-
+  async function pickedRef(): Promise<string | undefined> {
     mockRunClaude.mockResolvedValueOnce(
       makeResult(JSON.stringify({ status: "completed", summary: "Done." })),
     );
+    await runCommand("test-agent", {});
+    return taskStore.updates.find((u) => u.changes.status === "active")?.ref;
+  }
+
+  it("picks only tasks matching its taskFilter, ORing list values", async () => {
+    setupProject({
+      agentFrontmatter:
+        "---\nmodel: sonnet\ninput: task\ntaskFilter:\n  found-by: [improver, security-analyst]\n---",
+    });
+    seedTask({ ref: "VTM-OTHR", severity: "critical", metadata: { "found-by": "human" } });
+    seedTask({ ref: "VTM-SECU", severity: "low", metadata: { "found-by": "security-analyst" } });
+
+    expect(await pickedRef()).toBe("VTM-SECU");
+  });
+
+  it("matches a missing metadata key with null", async () => {
+    setupProject({
+      agentFrontmatter: "---\nmodel: sonnet\ninput: task\ntaskFilter:\n  actor: null\n---",
+    });
+    seedTask({ ref: "VTM-REVW", severity: "critical", metadata: { actor: "mr-reviewer" } });
+    seedTask({ ref: "VTM-FREE", severity: "low" });
+
+    expect(await pickedRef()).toBe("VTM-FREE");
+  });
+
+  it("picks every task when it has no taskFilter", async () => {
+    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    seedTask({ ref: "VTM-REVW", severity: "critical", metadata: { actor: "mr-reviewer" } });
+
+    expect(await pickedRef()).toBe("VTM-REVW");
+  });
+
+  it("stays idle when no ready task matches its taskFilter", async () => {
+    setupProject({
+      agentFrontmatter: "---\nmodel: sonnet\ninput: task\ntaskFilter:\n  actor: mr-reviewer\n---",
+    });
+    seedTask({ ref: "VTM-OTHR", metadata: { "found-by": "improver" } });
 
     await runCommand("test-agent", {});
 
-    expect(taskStore.updates[0]).toEqual({ ref: "VTM-MINE", changes: { status: "active" } });
+    expect(mockRunClaude).not.toHaveBeenCalled();
+    expect(taskStore.updates).toEqual([]);
   });
 
   it("does nothing when no task is ready", async () => {

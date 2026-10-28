@@ -3,8 +3,9 @@ import { existsSync, readdirSync } from "node:fs";
 import { loadConfig } from "../config/load.js";
 import { AvenTaskManager } from "../tasks/aven-manager.js";
 import { listWorktrees } from "../worktree/manager.js";
-import { listAgentNames } from "../config/agent.js";
-import type { TaskStatus } from "../types.js";
+import { listTaskWorkers } from "../config/agent.js";
+import { matchesTaskFilter } from "../tasks/task-manager.js";
+import type { Task, TaskStatus } from "../types.js";
 
 const STATUSES: TaskStatus[] = ["inbox", "backlog", "todo", "active", "done", "canceled"];
 
@@ -22,8 +23,10 @@ export async function statusCommand(): Promise<void> {
   const index = await taskManager.getIndex();
 
   console.log("=== vteam status ===\n");
-  console.log(`  aven project: ${config.tasks.project} (label: ${config.tasks.label})`);
-  console.log(`  default actor: ${config.tasks.defaultActor}\n`);
+  console.log(`  aven project: ${config.tasks.project} (label: ${config.tasks.label})\n`);
+  const workers = listTaskWorkers(cwd);
+  const routeOf = (t: Task) =>
+    workers.filter((w) => matchesTaskFilter(t, w.taskFilter ?? {})).map((w) => w.name);
   for (const status of STATUSES) {
     const count = index.byStatus.get(status)?.length ?? 0;
     if (count > 0) console.log(`  ${status.padEnd(9)}${count} tasks`);
@@ -36,18 +39,13 @@ export async function statusCommand(): Promise<void> {
     console.log(`\n--- ${status[0].toUpperCase()}${status.slice(1)} ---`);
     for (const t of tasks) {
       const retryNote = t.retryCount > 0 ? ` (retries: ${t.retryCount})` : "";
-      const actor = t.actor ?? `${config.tasks.defaultActor} (default)`;
-      console.log(`  ${t.ref} [${t.severity}] ${t.title} → ${actor}${retryNote}`);
+      console.log(`  ${t.ref} [${t.severity}] ${t.title} → ${routeOf(t).join(", ") || "no agent"}${retryNote}`);
     }
   }
 
-  const agentNames = new Set(listAgentNames(cwd));
-  const openTasks = [...(index.byStatus.get("todo") ?? []), ...(index.byStatus.get("active") ?? [])];
-  const unknownActors = new Set(
-    openTasks.map((t) => t.actor ?? config.tasks.defaultActor).filter((a) => !agentNames.has(a)),
-  );
-  for (const actor of unknownActors) {
-    console.log(`\n  Warning: tasks are routed to "${actor}", but vteam/agents/${actor}/AGENT.md does not exist.`);
+  const unrouted = (index.byStatus.get("todo") ?? []).filter((t) => routeOf(t).length === 0);
+  if (unrouted.length > 0) {
+    console.log(`\n  Warning: ${unrouted.length} todo task(s) match no input: "task" agent's taskFilter and will never be picked.`);
   }
 
   try {

@@ -29,44 +29,68 @@ export function stringify(body: string, data: object): string {
 }
 
 function parseYaml(block: string): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  const lines = block.split("\n");
-  let i = 0;
-  while (i < lines.length) {
-    const trimmed = lines[i].trim();
-    if (trimmed === "" || trimmed.startsWith("#")) {
-      i++;
-      continue;
-    }
+  return parseMapping(block.split("\n"), { line: 0 }, 0);
+}
 
+interface Cursor {
+  line: number;
+}
+
+function indentOf(line: string): number {
+  return line.length - line.trimStart().length;
+}
+
+function nextContentLine(lines: string[], from: number): number | undefined {
+  for (let i = from; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed !== "" && !trimmed.startsWith("#")) return i;
+  }
+  return undefined;
+}
+
+function parseMapping(lines: string[], cursor: Cursor, minIndent: number): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  let next: number | undefined;
+  while ((next = nextContentLine(lines, cursor.line)) !== undefined) {
+    const line = lines[next];
+    if (indentOf(line) < minIndent) break;
+    cursor.line = next + 1;
+
+    const trimmed = line.trim();
     const colonIdx = trimmed.indexOf(":");
-    if (colonIdx === -1) {
-      i++;
-      continue;
-    }
+    if (colonIdx === -1) continue;
 
     const key = trimmed.slice(0, colonIdx).trim();
     const rawValue = trimmed.slice(colonIdx + 1).trim();
-
-    if (rawValue === "" || rawValue === "null" || rawValue === "~") {
-      const items: unknown[] = [];
-      while (i + 1 < lines.length) {
-        const next = lines[i + 1];
-        const nextTrimmed = next.trim();
-        if (nextTrimmed.startsWith("- ")) {
-          items.push(parseValue(nextTrimmed.slice(2).trim()));
-          i++;
-        } else {
-          break;
-        }
-      }
-      result[key] = items.length > 0 ? items : null;
-    } else {
-      result[key] = parseValue(rawValue);
-    }
-    i++;
+    result[key] =
+      rawValue === "" || rawValue === "null" || rawValue === "~"
+        ? parseNested(lines, cursor, indentOf(line))
+        : parseValue(rawValue);
   }
   return result;
+}
+
+function parseNested(lines: string[], cursor: Cursor, parentIndent: number): unknown {
+  const first = nextContentLine(lines, cursor.line);
+  if (first === undefined) return null;
+  const firstIndent = indentOf(lines[first]);
+
+  if (lines[first].trim().startsWith("- ")) {
+    const items: unknown[] = [];
+    let next: number | undefined = first;
+    while (next !== undefined && lines[next].trim().startsWith("- ") && indentOf(lines[next]) >= parentIndent) {
+      items.push(parseValue(lines[next].trim().slice(2).trim()));
+      cursor.line = next + 1;
+      next = nextContentLine(lines, cursor.line);
+    }
+    return items.length > 0 ? items : null;
+  }
+
+  if (firstIndent > parentIndent) {
+    cursor.line = first;
+    return parseMapping(lines, cursor, firstIndent);
+  }
+  return null;
 }
 
 function parseValue(raw: string): unknown {

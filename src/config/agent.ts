@@ -76,3 +76,9 @@ export function listAgentNames(cwd: string): string[] {
     )
     .map((e) => e.name);
 }
+
+export function listTaskWorkers(cwd: string): AgentConfig[] {
+  return listAgentNames(cwd)
+    .map((name) => resolveAgentConfig(name, cwd))
+    .filter((agent) => agent.input === "task");
+}

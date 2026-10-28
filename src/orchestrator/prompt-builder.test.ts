@@ -25,6 +25,7 @@ function makeTask(overrides: Partial<Task>): Task {
     severity: "medium",
     files: [],
     retryCount: 0,
+    metadata: {},
     description: "",
     createdAt: "2026-04-19T00:00:00Z",
     ...overrides,

@@ -37,7 +37,7 @@ describe("initCommand", () => {
     const config = JSON.parse(readFileSync(resolve(tmp, "vteam", "vteam.config.json"), "utf-8"));
     expect(config.tasks.project).toBe(basename(tmp));
     expect(config.tasks.label).toBe("vteam");
-    expect(config.tasks.defaultActor).toBe("coder");
+    expect(config.tasks).not.toHaveProperty("defaultActor");
   });
 
   it("creates .gitignore with worktree and state entries", async () => {

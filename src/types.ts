@@ -17,20 +17,23 @@ export interface Task {
   severity: Severity;
   files: string[];
   retryCount: number;
-  actor?: string;
+  metadata: Record<string, string>;
   description: string;
   createdAt: string;
 }
 
 export interface TaskMetadata {
   "found-by"?: string;
-  actor?: string;
   files?: string;
   "retry-count"?: string;
   completed?: string;
   branch?: string;
   "pr-url"?: string;
 }
+
+export type TaskFilterValue = string | null;
+
+export type TaskFilter = Record<string, TaskFilterValue | TaskFilterValue[]>;
 
 export interface OnFinishConfig {
   onFinishMdPath: string;
@@ -54,8 +57,8 @@ export interface AgentConfig {
   worktree?: boolean;
   readOnly?: boolean;
   output?: "task";
-  assignTo?: string;
   input?: "task" | "pr";
+  taskFilter?: TaskFilter;
   prTriggerLabel?: string;
   autoPR?: boolean;
   prCreateLabels?: string[];
@@ -106,7 +109,6 @@ export interface TasksConfig {
   maxRetries: number;
   project: string;
   label: string;
-  defaultActor: string;
   workspace?: string;
 }
 

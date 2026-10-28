@@ -37,7 +37,7 @@ Use the `AskUserQuestion` tool to ask the following questions. Ask them all in a
 | Analysis only (read-only worktree) | The agent reads code in a worktree but produces only a text report |
 | Generic text output | The agent returns freeform text (report, summary) without a worktree |
 
-**2b. Task routing** (only if output is Tasks) — Which agent should work on the tasks this agent creates? If it's the project's default actor (`tasks.defaultActor` in `vteam/vteam.config.json`, usually `coder`), omit `assignTo`. Otherwise set `assignTo: <agent-name>` — check that `vteam/agents/<agent-name>/` exists or will be created. Conversely, if the new agent uses `input: "task"`, tell the user it only picks tasks whose `actor` metadata equals its name (plus unassigned tasks if it is the default actor), so some producer needs `assignTo: <new-agent-name>`.
+**2b. Task routing** (only if input is Tasks) — Which tasks should this agent pick? Build a `taskFilter` over aven metadata: e.g. `found-by: [improver, security-analyst]` (tasks created by those agents) or `actor: <new-agent-name>` (tasks a human tagged with `aven edit <ref> --metadata actor=<name>`). Keys AND, list values OR, `null` matches a missing key. Without `taskFilter` the agent matches every task, competing with every other `input: "task"` agent (usually `coder`). Tasks that no agent's filter matches are never picked, so check existing consumers' filters still cover what they should. If the new agent creates tasks (`output: "task"`), remind the user that consumers route on its name via `found-by: <new-agent-name>`.
 
 **3. Tool permissions** — What tools does the agent need?
 
@@ -68,8 +68,9 @@ cron: "<expr>"                    # only if scheduled
 worktree: true                    # if the agent edits files OR uses readOnly
 readOnly: true                    # if worktree but no commit/push (analysis only)
 input: task | pr                  # only if consuming from task queue or PR reviews
+taskFilter:                       # only with input: task — which tasks to pick
+  found-by: [improver]            #   value, [values] (OR), or null (key missing); keys AND
 output: task                      # only if creating findings as aven tasks
-assignTo: <agent-name>            # only with output: task, when the worker isn't tasks.defaultActor
 autoPR: true                      # only if code changes should become PRs
 prTriggerLabel: "<label>"         # only if input: pr
 prCreateLabels: [vteam]           # only if autoPR: true
@@ -83,7 +84,7 @@ disallowedTools: [...]            # only if needed
 - `readOnly: true` is incompatible with `autoPR: true`
 - `output: "task"` is incompatible with `autoPR: true`
 - `output: "task"` is incompatible with `readOnly: true`
-- `assignTo` requires `output: "task"`
+- `taskFilter` requires `input: "task"`; values are non-empty strings, `null`, or non-empty lists of those
 
 ## Step 4 — Generate the agent name
 
