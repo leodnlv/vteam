@@ -7,3 +7,4 @@ vteam/.locks/
 vteam/.logs/
 vteam/.memory/
 vteam/tasks/
+.workmux.yaml
