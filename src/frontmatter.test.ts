@@ -258,7 +258,7 @@ describe("roundtrip", () => {
       created: "2026-04-19T10:00:00Z",
       status: "todo",
       severity: "high",
-      "found-by": "code-reviewer",
+      "found-by": "improver",
       files: ["src/auth.ts:45", "src/middleware.ts:12"],
       "retry-count": 0,
     };

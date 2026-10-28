@@ -6,8 +6,8 @@ An npm package (`vteam`) that orchestrates AI agents powered by `claude -p` (Cla
 
 The end user's workflow:
 1. Define agent prompts in `AGENT.md` files
-2. Run code-reviewer — it scans the codebase and writes findings straight to todo
-3. Run refactorer (on a cron) — it picks up a task, marks it active, implements it in a worktree, creates a branch + PR, marks the task done
+2. Run improver — it scans the codebase and writes findings straight to todo
+3. Run coder (on a cron) — it picks up a task, marks it active, implements it in a worktree, creates a branch + PR, marks the task done
 
 ## Architecture
 
@@ -94,13 +94,13 @@ All task operations go through the `TaskManager` interface (`src/tasks/task-mana
 
 ```json
 {
-  "tasks": { "maxRetries": 3, "project": "my-app", "label": "vteam", "defaultActor": "refactorer", "workspace": "optional" }
+  "tasks": { "maxRetries": 3, "project": "my-app", "label": "vteam", "defaultActor": "coder", "workspace": "optional" }
 }
 ```
 
 - `tasks.project` (required) — aven project; aven creates it on the first `add`. `vteam init` defaults it to the directory name.
-- `tasks.label` (default `"vteam"`) — opt-in label. vteam only lists, picks, and dedups against tasks with this label, and creates the label on demand. Humans can queue their own aven tasks for the refactorer by adding the label.
-- `tasks.defaultActor` (required) — agent that works on tasks with no `actor` metadata (tasks from agents without `assignTo`, and tasks humans create). `vteam init` sets it to `refactorer`.
+- `tasks.label` (default `"vteam"`) — opt-in label. vteam only lists, picks, and dedups against tasks with this label, and creates the label on demand. Humans can queue their own aven tasks for the coder by adding the label.
+- `tasks.defaultActor` (required) — agent that works on tasks with no `actor` metadata (tasks from agents without `assignTo`, and tasks humans create). `vteam init` sets it to `coder`.
 - `tasks.workspace` (optional) — passed as `--workspace` to every aven call.
 
 Routing: each task's aven metadata `actor` names the agent that should work on it. The creating agent sets it from its `assignTo` frontmatter; humans can reassign with `aven edit <ref> --metadata actor=<agent>` or send a task back to the default actor with `--remove-metadata actor`. An `input: "task"` agent picks tasks where `actor` equals its own name; the `tasks.defaultActor` agent additionally picks tasks with no `actor`. `found-by` is provenance only and never used for routing. `vteam status` shows each open task's actor and warns about actors with no matching agent directory.
@@ -205,8 +205,8 @@ src/
 │   ├── merge-request.ts          GitHub (gh) and GitLab (glab) MR creation
 │   └── pull-request.ts           PR review discovery, comment fetching, posting
 └── templates/                    Scaffolding templates copied by vteam init
-    ├── code-reviewer.agent.md
-    ├── refactorer.agent.md
+    ├── improver.agent.md
+    ├── coder.agent.md
     ├── review-responder.agent.md
     └── vteam.config.json
 ```
@@ -215,7 +215,7 @@ src/
 
 ```
 just build          # tsc + copy templates to dist/
-just dev <args>     # run CLI via tsx (e.g. just dev run code-reviewer)
+just dev <args>     # run CLI via tsx (e.g. just dev run improver)
 just lint           # tsc --noEmit + eslint
 just test           # vitest
 just clean          # rm -rf dist/
@@ -247,7 +247,7 @@ All three must pass before any commit or PR:
 
 ## v1 scope and constraints
 
-- Ships with four default agents (`code-reviewer`, `refactorer`, `review-responder`, `test-writer`). Custom agents supported by creating `vteam/agents/<name>/AGENT.md`.
+- Ships with four default agents (`improver`, `coder`, `review-responder`, `test-writer`). Custom agents supported by creating `vteam/agents/<name>/AGENT.md`.
 - Supports both GitHub (`gh`) and GitLab (`glab`) — configured via `platform` in `vteam.config.json`.
 - No Slack integration yet.
 - No `--max-budget-usd` caps on agent runs.
@@ -282,4 +282,4 @@ Do not update CLAUDE.md or README.md for internal refactors that don't change ex
 
 ## Dogfooding
 
-This project has a `vteam/` directory that points the code-reviewer and refactorer at its own `src/`. Run `just dev run code-reviewer` to have vteam review itself.
+This project has a `vteam/` directory that points the improver and coder at its own `src/`. Run `just dev run improver` to have vteam review itself.

@@ -25,8 +25,8 @@ describe("initCommand", () => {
 
     expect(existsSync(resolve(tmp, "vteam"))).toBe(true);
     expect(existsSync(resolve(tmp, "vteam", "vteam.config.json"))).toBe(true);
-    expect(existsSync(resolve(tmp, "vteam", "agents", "code-reviewer", "AGENT.md"))).toBe(true);
-    expect(existsSync(resolve(tmp, "vteam", "agents", "refactorer", "AGENT.md"))).toBe(true);
+    expect(existsSync(resolve(tmp, "vteam", "agents", "improver", "AGENT.md"))).toBe(true);
+    expect(existsSync(resolve(tmp, "vteam", "agents", "coder", "AGENT.md"))).toBe(true);
     expect(existsSync(resolve(tmp, "vteam", "tasks"))).toBe(false);
   });
 
@@ -37,7 +37,7 @@ describe("initCommand", () => {
     const config = JSON.parse(readFileSync(resolve(tmp, "vteam", "vteam.config.json"), "utf-8"));
     expect(config.tasks.project).toBe(basename(tmp));
     expect(config.tasks.label).toBe("vteam");
-    expect(config.tasks.defaultActor).toBe("refactorer");
+    expect(config.tasks.defaultActor).toBe("coder");
   });
 
   it("creates .gitignore with worktree and state entries", async () => {

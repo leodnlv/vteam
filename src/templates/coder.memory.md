@@ -2,9 +2,9 @@
 model: haiku
 ---
 
-# Refactorer Memory Curation
+# Coder Memory Curation
 
-You maintain the memory for a refactoring agent that picks up tasks and implements code changes.
+You maintain the memory for a coding agent that picks up tasks and implements code changes.
 
 ## Rules
 

@@ -42,11 +42,11 @@ vteam skill uninstall                   # remove skill symlinks from ~/.claude/s
 vteam/
 ├── vteam.config.json               # Project-level configuration
 ├── agents/
-│   ├── code-reviewer/
+│   ├── improver/
 │   │   ├── AGENT.md                # Agent prompt (frontmatter + system prompt)
 │   │   ├── MEMORY.md               # Optional: memory curation strategy
 │   │   └── ON_FINISH.md            # Optional: post-run hook
-│   ├── refactorer/
+│   ├── coder/
 │   │   ├── AGENT.md
 │   │   ├── MEMORY.md
 │   │   └── ON_FINISH.md
@@ -75,7 +75,7 @@ vteam/
     "maxRetries": 3,
     "project": "my-app",
     "label": "vteam",
-    "defaultActor": "refactorer",
+    "defaultActor": "coder",
     "workspace": "optional"
   }
 }
@@ -86,7 +86,7 @@ vteam/
 | `baseBranch`       | Branch to create worktrees from and target PRs against                                  |
 | `platform`         | `"github"` or `"gitlab"` — determines which CLI (`gh` / `glab`) is used for PR creation |
 | `worktreeDir`      | Where worktrees are created (relative to repo root). Gitignored.                        |
-| `tasks.maxRetries` | How many times the refactorer retries a failing task before skipping it                 |
+| `tasks.maxRetries` | How many times the coder retries a failing task before skipping it                      |
 | `tasks.project`    | Required, non-empty. aven project for vteam's tasks; aven auto-creates it on the first task |
 | `tasks.label`      | Default `"vteam"`. Opt-in label — vteam only sees/picks up tasks carrying it. Auto-created |
 | `tasks.defaultActor` | Required. Agent that works on tasks with no `actor` metadata (incl. human-created tasks) |
@@ -106,7 +106,7 @@ worktree: true # Run in an isolated git worktree
 readOnly: true # Worktree but no commit/push/PR (requires worktree: true)
 input: task # "task" (pick from the aven todo queue) or "pr" (respond to PR reviews)
 output: task # "task" to produce findings as aven tasks
-assignTo: refactorer # requires output: task — sets aven metadata actor; omit to route to tasks.defaultActor
+assignTo: coder # requires output: task — sets aven metadata actor; omit to route to tasks.defaultActor
 autoPR: true # Create a PR after pushing
 prTriggerLabel: "vteam:changes-requested" # Label to discover PRs needing work
 prCreateLabels: [vteam] # Labels applied to created PRs
@@ -127,8 +127,8 @@ disallowedTools: [...] # Claude Code tools the agent may NOT use
 
 | Archetype                | worktree | input  | output | autoPR | Description                                                   |
 | ------------------------ | -------- | ------ | ------ | ------ | ------------------------------------------------------------- |
-| Scanner / code reviewer  | —        | —      | `task` | —      | Scans codebase, returns findings as tasks                     |
-| Implementer / refactorer | `true`   | `task` | —      | `true` | Picks a task, fixes it, creates a PR                          |
+| Scanner / improver       | —        | —      | `task` | —      | Scans codebase, returns findings as tasks                     |
+| Implementer / coder      | `true`   | `task` | —      | `true` | Picks a task, fixes it, creates a PR                          |
 | PR responder             | `true`   | `pr`   | —      | —      | Responds to review comments on PRs                            |
 | Read-only analyzer       | `true`   | —      | —      | —      | Reads code in a worktree, returns text (set `readOnly: true`) |
 | Generic reporter         | —        | —      | —      | —      | Returns freeform text output                                  |
@@ -172,8 +172,8 @@ The orchestrator then:
 ## Task lifecycle
 
 ```
-code-reviewer finds issue → aven task in todo
-refactorer picks task → active → implements fix → branch + PR → done
+improver finds issue → aven task in todo
+coder picks task → active → implements fix → branch + PR → done
 no changes / crash / error → active → back to todo
 ```
 
@@ -183,7 +183,7 @@ Tasks live in aven, scoped to `tasks.project` + `tasks.label`. Refs look like `A
 - **Routing**: metadata `actor` names the agent that should work on a task. An `input: "task"` agent picks tasks with `actor` equal to its own name; the `tasks.defaultActor` agent also picks tasks with no `actor`. Reassign with `aven edit <ref> --metadata actor=<agent>`; `--remove-metadata actor` sends it back to the default actor. `found-by` is provenance only.
 - **Picking** (`input: "task"`): `aven list --project P --label L --status todo --ready` filtered by `actor` as above, so aven dependency blocking and `available_at` deferral are respected. Tasks with `retry-count` >= `maxRetries` are skipped. Sorted by severity (`critical` > `high` > `medium` > `low`), then oldest first. The picked task is set to `active` immediately.
 - **Branch names**: `vteam/<slugified-title>-<runId>` — aven refs are local and are kept out of remote systems.
-- **Human triage**: users can manage tasks in aven (`aven tui` or CLI) — move findings to backlog/canceled, reprioritize, add dependencies, or add the `vteam` label to their own tasks to queue them for the refactorer. Canceled tasks still appear in the dedup list, so canceling marks a finding as rejected/false positive.
+- **Human triage**: users can manage tasks in aven (`aven tui` or CLI) — move findings to backlog/canceled, reprioritize, add dependencies, or add the `vteam` label to their own tasks to queue them for the coder. Canceled tasks still appear in the dedup list, so canceling marks a finding as rejected/false positive.
 - **Hard kill**: if the vteam process is killed, the task may remain `active`; reset it with `aven edit <ref> --status todo`.
 
 ## Optional agent files
@@ -236,16 +236,16 @@ Agents with a `cron` field run on schedule via `vteam loop start` (foreground pr
 All `vteam run` invocations accept `--focus <text>` to inject priority context. The text appears as the first section of the user prompt.
 
 ```bash
-vteam run code-reviewer --focus "only look at the auth module"
-vteam run refactorer --focus "the issue about XYZ"
+vteam run improver --focus "only look at the auth module"
+vteam run coder --focus "the issue about XYZ"
 ```
 
 ## Default agents
 
 | Agent                | Purpose                           | Key traits                                      |
 | -------------------- | --------------------------------- | ----------------------------------------------- |
-| **code-reviewer**    | Scans codebase for issues         | Read-only, `output: task`, no worktree          |
-| **refactorer**       | Picks a task and implements a fix | `input: task`, `worktree: true`, `autoPR: true` |
+| **improver**         | Scans codebase for issues         | Read-only, `output: task`, no worktree          |
+| **coder**            | Picks a task and implements a fix | `input: task`, `worktree: true`, `autoPR: true` |
 | **review-responder** | Addresses PR review comments      | `input: pr`, `worktree: true`, `prTriggerLabel` |
 | **test-writer**      | Adds tests for untested code      | `worktree: true`, `autoPR: true`                |
 
@@ -280,6 +280,6 @@ Common `allowedTools` presets:
 - **Orphaned worktree**: Run `vteam clean` to remove it.
 - **Agent produced no changes**: Check the task's `retry-count` metadata (`aven show <ref>`). After `maxRetries` failures, the task is skipped.
 - **PR creation failed**: Verify `gh` or `glab` is installed and authenticated. The branch is still pushed — create the PR manually.
-- **No eligible tasks**: Run the code-reviewer first to create todo tasks, or add the `vteam` label to existing aven tasks in the project. Tasks blocked by dependencies or deferred are not ready.
+- **No eligible tasks**: Run the improver first to create todo tasks, or add the `vteam` label to existing aven tasks in the project. Tasks blocked by dependencies or deferred are not ready.
 - **Task stuck in `active`**: The vteam process was killed mid-run. Reset with `aven edit <ref> --status todo`.
 - **`aven CLI not found on PATH`**: Install aven and make sure `aven` is on PATH.
