@@ -10,7 +10,7 @@ const config: TasksConfig = {
   maxRetries: 3,
   project: "app",
   label: "vteam",
-  defaultActor: "refactorer",
+  defaultActor: "coder",
 };
 
 const finding: TaskContentBody = {
@@ -51,7 +51,7 @@ describe("AvenTaskManager", () => {
       args[0] === "add" ? 'created APP-7KQ9 ref=7KQ9 project=app status=todo priority=urgent title="x"\n' : "",
     );
 
-    const ref = await new AvenTaskManager(config, exec).create(finding, "code-reviewer", "fixer");
+    const ref = await new AvenTaskManager(config, exec).create(finding, "improver", "fixer");
 
     expect(ref).toBe("APP-7KQ9");
     expect(calls[0].args).toEqual(["label", "create", "vteam"]);
@@ -61,7 +61,7 @@ describe("AvenTaskManager", () => {
       "--status", "todo",
       "--priority", "urgent",
       "--label", "vteam",
-      "--metadata", "found-by=code-reviewer",
+      "--metadata", "found-by=improver",
       "--metadata", "actor=fixer",
       "--metadata", "files=src/a.ts:10, src/b.ts",
       "--description-stdin",
@@ -73,7 +73,7 @@ describe("AvenTaskManager", () => {
   it("omits actor metadata when no actor is given", async () => {
     const { exec, calls } = fakeExec((args) => (args[0] === "add" ? "created APP-0001 ref=0001\n" : ""));
 
-    await new AvenTaskManager(config, exec).create(finding, "code-reviewer");
+    await new AvenTaskManager(config, exec).create(finding, "improver");
 
     expect(calls[1].args.join(" ")).not.toContain("actor=");
   });
@@ -119,7 +119,7 @@ describe("AvenTaskManager", () => {
       return JSON.stringify([{ ref: args.includes("--missing-metadata") ? "APP-FREE" : "APP-MINE" }]);
     });
 
-    const tasks = await new AvenTaskManager(config, exec).listReady("refactorer");
+    const tasks = await new AvenTaskManager(config, exec).listReady("coder");
 
     expect(tasks.map((t) => t.ref)).toEqual(["APP-MINE", "APP-FREE"]);
     expect(calls.find((c) => c.args.includes("--missing-metadata"))?.args).toEqual([
@@ -139,7 +139,7 @@ describe("AvenTaskManager", () => {
 
     const manager = new AvenTaskManager(config, exec);
 
-    expect((await manager.listReady("refactorer")).map((t) => t.ref)).toEqual(["APP-0001"]);
+    expect((await manager.listReady("coder")).map((t) => t.ref)).toEqual(["APP-0001"]);
     expect(await manager.listReady("test-writer")).toEqual([]);
   });
 
@@ -181,7 +181,7 @@ describe("AvenTaskManager", () => {
     const exec: AvenExec = async (args) => {
       throw new AvenError(args, "Error: error unknown-project input=app");
     };
-    expect(await new AvenTaskManager(config, exec).listReady("refactorer")).toEqual([]);
+    expect(await new AvenTaskManager(config, exec).listReady("coder")).toEqual([]);
   });
 
   it("propagates other aven errors", async () => {
@@ -239,26 +239,26 @@ describe.skipIf(!avenInstalled())("AvenTaskManager against real aven", () => {
   });
 
   it("routes tasks by actor, sending unassigned ones to the default actor", async () => {
-    const unassigned = await manager.create({ ...finding, title: "Unassigned" }, "code-reviewer");
-    expect((await manager.listReady("refactorer")).map((t) => t.ref)).toEqual([unassigned]);
+    const unassigned = await manager.create({ ...finding, title: "Unassigned" }, "improver");
+    expect((await manager.listReady("coder")).map((t) => t.ref)).toEqual([unassigned]);
     expect(await manager.listReady("test-writer")).toEqual([]);
 
-    const forTests = await manager.create({ ...finding, title: "Needs tests" }, "code-reviewer", "test-writer");
+    const forTests = await manager.create({ ...finding, title: "Needs tests" }, "improver", "test-writer");
     expect((await manager.listReady("test-writer")).map((t) => t.ref)).toEqual([forTests]);
-    expect((await manager.listReady("refactorer")).map((t) => t.ref)).toEqual([unassigned]);
+    expect((await manager.listReady("coder")).map((t) => t.ref)).toEqual([unassigned]);
 
-    const forRefactorer = await manager.create({ ...finding, title: "Refactor" }, "code-reviewer", "refactorer");
-    expect((await manager.listReady("refactorer")).map((t) => t.ref).sort()).toEqual(
-      [unassigned, forRefactorer].sort(),
+    const forCoder = await manager.create({ ...finding, title: "Refactor" }, "improver", "coder");
+    expect((await manager.listReady("coder")).map((t) => t.ref).sort()).toEqual(
+      [unassigned, forCoder].sort(),
     );
   });
 
   it("round-trips a task through its lifecycle", async () => {
-    expect(await manager.listReady("refactorer")).toEqual([]);
+    expect(await manager.listReady("coder")).toEqual([]);
 
-    const ref = await manager.create(finding, "code-reviewer");
+    const ref = await manager.create(finding, "improver");
 
-    const [ready] = await manager.listReady("refactorer");
+    const [ready] = await manager.listReady("coder");
     expect(ready).toMatchObject({
       ref,
       title: "Null check missing",
@@ -270,10 +270,10 @@ describe.skipIf(!avenInstalled())("AvenTaskManager against real aven", () => {
     expect(ready.description).toContain("Crashes on empty input.");
 
     await manager.update(ref, { status: "active" });
-    expect(await manager.listReady("refactorer")).toEqual([]);
+    expect(await manager.listReady("coder")).toEqual([]);
 
     await manager.update(ref, { status: "todo", metadata: { "retry-count": "1" } });
-    expect((await manager.listReady("refactorer"))[0].retryCount).toBe(1);
+    expect((await manager.listReady("coder"))[0].retryCount).toBe(1);
 
     await manager.update(ref, { status: "done", metadata: { branch: "vteam/fix" } });
     const index = await manager.getIndex();

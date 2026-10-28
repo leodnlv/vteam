@@ -23,8 +23,8 @@ Use the `AskUserQuestion` tool to ask the following questions. Ask them all in a
 
 | Option | When to use |
 |--------|-------------|
-| No input (scan) | The agent scans the codebase on its own (e.g., code reviewer, test writer) |
-| Task queue (`input: "task"`) | The agent picks a task from the aven todo queue and implements it (e.g., refactorer) |
+| No input (scan) | The agent scans the codebase on its own (e.g., improver, test writer) |
+| Task queue (`input: "task"`) | The agent picks a task from the aven todo queue and implements it (e.g., coder) |
 | PR review (`input: "pr"`) | The agent responds to review comments on a pull request |
 
 **2. Output mode** — What does the agent produce?
@@ -37,7 +37,7 @@ Use the `AskUserQuestion` tool to ask the following questions. Ask them all in a
 | Analysis only (read-only worktree) | The agent reads code in a worktree but produces only a text report |
 | Generic text output | The agent returns freeform text (report, summary) without a worktree |
 
-**2b. Task routing** (only if output is Tasks) — Which agent should work on the tasks this agent creates? If it's the project's default actor (`tasks.defaultActor` in `vteam/vteam.config.json`, usually `refactorer`), omit `assignTo`. Otherwise set `assignTo: <agent-name>` — check that `vteam/agents/<agent-name>/` exists or will be created. Conversely, if the new agent uses `input: "task"`, tell the user it only picks tasks whose `actor` metadata equals its name (plus unassigned tasks if it is the default actor), so some producer needs `assignTo: <new-agent-name>`.
+**2b. Task routing** (only if output is Tasks) — Which agent should work on the tasks this agent creates? If it's the project's default actor (`tasks.defaultActor` in `vteam/vteam.config.json`, usually `coder`), omit `assignTo`. Otherwise set `assignTo: <agent-name>` — check that `vteam/agents/<agent-name>/` exists or will be created. Conversely, if the new agent uses `input: "task"`, tell the user it only picks tasks whose `actor` metadata equals its name (plus unassigned tasks if it is the default actor), so some producer needs `assignTo: <new-agent-name>`.
 
 **3. Tool permissions** — What tools does the agent need?
 

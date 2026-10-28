@@ -82,10 +82,10 @@ describe("buildChildArgs", () => {
       "/usr/local/bin/node",
       [],
       "/project/dist/bin.js",
-      "code-reviewer",
+      "improver",
     );
     expect(result.command).toBe("/usr/local/bin/node");
-    expect(result.args).toEqual(["/project/dist/bin.js", "run", "code-reviewer"]);
+    expect(result.args).toEqual(["/project/dist/bin.js", "run", "improver"]);
   });
 
   it("forwards execArgv so node loader flags reach the child process", () => {
@@ -93,14 +93,14 @@ describe("buildChildArgs", () => {
       "/usr/local/bin/node",
       ["--import", "tsx/esm/register"],
       "src/bin.ts",
-      "code-reviewer",
+      "improver",
     );
     expect(result.args).toEqual([
       "--import",
       "tsx/esm/register",
       "src/bin.ts",
       "run",
-      "code-reviewer",
+      "improver",
     ]);
   });
 });

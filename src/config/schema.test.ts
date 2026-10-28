@@ -6,7 +6,7 @@ describe("vteamConfigSchema", () => {
     baseBranch: "main",
     platform: "github",
     worktreeDir: ".vteam-worktrees",
-    tasks: { maxRetries: 3, project: "app", defaultActor: "refactorer" },
+    tasks: { maxRetries: 3, project: "app", defaultActor: "coder" },
   };
 
   it("accepts a valid config", () => {
@@ -55,7 +55,7 @@ describe("vteamConfigSchema", () => {
   it("rejects missing project", () => {
     const result = vteamConfigSchema.safeParse({
       ...validConfig,
-      tasks: { maxRetries: 3, defaultActor: "refactorer" },
+      tasks: { maxRetries: 3, defaultActor: "coder" },
     });
     expect(result.success).toBe(false);
   });
@@ -79,12 +79,12 @@ describe("vteamConfigSchema", () => {
 
 describe("agentFrontmatterSchema", () => {
   it("accepts assignTo with output: task", () => {
-    const result = agentFrontmatterSchema.safeParse({ output: "task", assignTo: "refactorer" });
+    const result = agentFrontmatterSchema.safeParse({ output: "task", assignTo: "coder" });
     expect(result.success).toBe(true);
   });
 
   it("rejects assignTo without output: task", () => {
-    const result = agentFrontmatterSchema.safeParse({ assignTo: "refactorer" });
+    const result = agentFrontmatterSchema.safeParse({ assignTo: "coder" });
     expect(result.success).toBe(false);
   });
 

@@ -256,7 +256,7 @@ describe("buildOnFinishPrompt", () => {
   it("uses ON_FINISH.md body as system prompt", () => {
     const path = setupOnFinish();
     const outcome: RunOutcome = {
-      agent: "refactorer",
+      agent: "coder",
       status: "completed",
       startedAt: "2026-04-21T10:00:00Z",
       completedAt: "2026-04-21T10:05:00Z",
@@ -269,13 +269,13 @@ describe("buildOnFinishPrompt", () => {
   it("includes run outcome in user prompt", () => {
     const path = setupOnFinish();
     const outcome: RunOutcome = {
-      agent: "refactorer",
+      agent: "coder",
       status: "completed",
       startedAt: "2026-04-21T10:00:00Z",
       completedAt: "2026-04-21T10:05:00Z",
     };
     const { userPrompt } = buildOnFinishPrompt({ onFinishMdPath: path }, outcome);
-    expect(userPrompt).toContain("refactorer");
+    expect(userPrompt).toContain("coder");
     expect(userPrompt).toContain("completed");
     expect(userPrompt).toContain("2026-04-21T10:00:00Z");
   });
@@ -283,7 +283,7 @@ describe("buildOnFinishPrompt", () => {
   it("includes task details when present", () => {
     const path = setupOnFinish();
     const outcome: RunOutcome = {
-      agent: "refactorer",
+      agent: "coder",
       status: "completed",
       startedAt: "2026-04-21T10:00:00Z",
       completedAt: "2026-04-21T10:05:00Z",
@@ -302,7 +302,7 @@ describe("buildOnFinishPrompt", () => {
   it("includes error on failure", () => {
     const path = setupOnFinish();
     const outcome: RunOutcome = {
-      agent: "refactorer",
+      agent: "coder",
       status: "failed",
       startedAt: "2026-04-21T10:00:00Z",
       completedAt: "2026-04-21T10:01:00Z",
@@ -331,7 +331,7 @@ describe("buildOnFinishPrompt", () => {
   it("omits optional sections when not present", () => {
     const path = setupOnFinish();
     const outcome: RunOutcome = {
-      agent: "code-reviewer",
+      agent: "improver",
       status: "completed",
       startedAt: "2026-04-21T10:00:00Z",
       completedAt: "2026-04-21T10:05:00Z",
@@ -361,7 +361,7 @@ describe("buildOnFinishPrompt", () => {
   it("includes task content as JSON when present", () => {
     const path = setupOnFinish();
     const outcome: RunOutcome = {
-      agent: "code-reviewer",
+      agent: "improver",
       status: "completed",
       startedAt: "2026-04-21T10:00:00Z",
       completedAt: "2026-04-21T10:05:00Z",
@@ -397,7 +397,7 @@ describe("buildOnFinishPrompt", () => {
   it("omits focus context when not present", () => {
     const path = setupOnFinish();
     const outcome: RunOutcome = {
-      agent: "code-reviewer",
+      agent: "improver",
       status: "completed",
       startedAt: "2026-04-21T10:00:00Z",
       completedAt: "2026-04-21T10:05:00Z",

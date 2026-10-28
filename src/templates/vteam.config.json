@@ -6,6 +6,6 @@
     "maxRetries": 3,
     "project": "",
     "label": "vteam",
-    "defaultActor": "refactorer"
+    "defaultActor": "coder"
   }
 }

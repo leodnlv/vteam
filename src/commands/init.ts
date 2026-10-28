@@ -30,8 +30,8 @@ export async function initCommand(): Promise<void> {
   console.log("Scaffolding vteam/ directory...");
 
   const dirs = [
-    resolve(vteamDir, "agents", "code-reviewer"),
-    resolve(vteamDir, "agents", "refactorer"),
+    resolve(vteamDir, "agents", "improver"),
+    resolve(vteamDir, "agents", "coder"),
     resolve(vteamDir, "agents", "review-responder"),
     resolve(vteamDir, "agents", "test-writer"),
   ];
@@ -40,13 +40,13 @@ export async function initCommand(): Promise<void> {
     mkdirSync(dir, { recursive: true });
   }
 
-  copyTemplate("code-reviewer.agent.md", resolve(vteamDir, "agents", "code-reviewer", "AGENT.md"));
-  copyTemplate("refactorer.agent.md", resolve(vteamDir, "agents", "refactorer", "AGENT.md"));
+  copyTemplate("improver.agent.md", resolve(vteamDir, "agents", "improver", "AGENT.md"));
+  copyTemplate("coder.agent.md", resolve(vteamDir, "agents", "coder", "AGENT.md"));
   copyTemplate("review-responder.agent.md", resolve(vteamDir, "agents", "review-responder", "AGENT.md"));
   copyTemplate("test-writer.agent.md", resolve(vteamDir, "agents", "test-writer", "AGENT.md"));
 
-  copyTemplate("code-reviewer.memory.md", resolve(vteamDir, "agents", "code-reviewer", "MEMORY.md"));
-  copyTemplate("refactorer.memory.md", resolve(vteamDir, "agents", "refactorer", "MEMORY.md"));
+  copyTemplate("improver.memory.md", resolve(vteamDir, "agents", "improver", "MEMORY.md"));
+  copyTemplate("coder.memory.md", resolve(vteamDir, "agents", "coder", "MEMORY.md"));
   copyTemplate("review-responder.memory.md", resolve(vteamDir, "agents", "review-responder", "MEMORY.md"));
   copyTemplate("test-writer.memory.md", resolve(vteamDir, "agents", "test-writer", "MEMORY.md"));
 
@@ -68,8 +68,8 @@ export async function initCommand(): Promise<void> {
     console.log("  Created .gitignore");
   }
 
-  console.log("  Created vteam/agents/code-reviewer/AGENT.md");
-  console.log("  Created vteam/agents/refactorer/AGENT.md");
+  console.log("  Created vteam/agents/improver/AGENT.md");
+  console.log("  Created vteam/agents/coder/AGENT.md");
   console.log("  Created vteam/agents/review-responder/AGENT.md");
   console.log("  Created vteam/agents/test-writer/AGENT.md");
   console.log("  Created MEMORY.md for each agent");

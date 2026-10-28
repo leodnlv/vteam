@@ -36,13 +36,13 @@ describe("acquireLock", () => {
 
   it("writes lock info with PID and agent name", async () => {
     const resource = resolve(tmp, "my-agent");
-    const lock = await acquireLock(resource, "code-reviewer");
+    const lock = await acquireLock(resource, "improver");
 
     const info = JSON.parse(
       require("node:fs").readFileSync(resolve(resource + ".lock", "info.json"), "utf-8"),
     );
     expect(info.pid).toBe(process.pid);
-    expect(info.agent).toBe("code-reviewer");
+    expect(info.agent).toBe("improver");
     expect(typeof info.timestamp).toBe("number");
 
     lock.release();

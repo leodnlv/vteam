@@ -70,13 +70,13 @@ describe("frontmatter combinations", () => {
   });
 
   describe("common agent archetypes", () => {
-    it("code-reviewer: output task, no worktree, read-only tools", () =>
+    it("improver: output task, no worktree, read-only tools", () =>
       valid({
         output: "task",
         allowedTools: ["Read", "Glob", "Grep"],
       }));
 
-    it("refactorer: worktree, input task, autoPR", () =>
+    it("coder: worktree, input task, autoPR", () =>
       valid({
         worktree: true,
         input: "task",

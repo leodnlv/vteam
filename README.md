@@ -64,11 +64,11 @@ vteam init
 # 2. Edit the config
 $EDITOR vteam/vteam.config.json
 
-# 3. Run the code reviewer — finds issues, creates them as aven tasks in todo
-vteam run code-reviewer
+# 3. Run the improver — finds issues, creates them as aven tasks in todo
+vteam run improver
 
-# 4. Run the refactorer — picks a task, fixes it, pushes a branch, opens a PR
-vteam run refactorer
+# 4. Run the coder — picks a task, fixes it, pushes a branch, opens a PR
+vteam run coder
 
 # 5. Review the PR as you would any other
 ```
@@ -97,11 +97,11 @@ Scaffolds a `vteam/` directory in the current project:
 vteam/
 ├── vteam.config.json               # Project-level configuration
 ├── agents/
-│   ├── code-reviewer/
-│   │   ├── AGENT.md                # Code reviewer prompt/personality
+│   ├── improver/
+│   │   ├── AGENT.md                # Improver prompt/personality
 │   │   └── MEMORY.md               # Memory curation strategy
-│   ├── refactorer/
-│   │   ├── AGENT.md                # Refactorer prompt/personality
+│   ├── coder/
+│   │   ├── AGENT.md                # Coder prompt/personality
 │   │   └── MEMORY.md               # Memory curation strategy
 │   ├── review-responder/
 │   │   ├── AGENT.md                # Review responder prompt/personality
@@ -111,7 +111,7 @@ vteam/
 │       └── MEMORY.md               # Memory curation strategy
 ```
 
-Sets `tasks.project` in the config to the current directory name. Also adds `.vteam-worktrees/` and vteam's local state directories (`vteam/.locks/`, `vteam/.logs/`, `vteam/.runs/`, `vteam/.memory/`) to `.gitignore`. Tasks live in aven, not in the repo — the real shared artifacts are the PRs that the refactorer creates.
+Sets `tasks.project` in the config to the current directory name. Also adds `.vteam-worktrees/` and vteam's local state directories (`vteam/.locks/`, `vteam/.logs/`, `vteam/.runs/`, `vteam/.memory/`) to `.gitignore`. Tasks live in aven, not in the repo — the real shared artifacts are the PRs that the coder creates.
 
 Will refuse to run if `vteam/` already exists.
 
@@ -120,15 +120,15 @@ Will refuse to run if `vteam/` already exists.
 All `vteam run` invocations accept `--focus <text>` to inject priority context into the agent's prompt. The text is added as the first section of the user prompt so Claude prioritizes it above all other considerations.
 
 ```bash
-vteam run refactorer --focus "the issue about XYZ"
+vteam run coder --focus "the issue about XYZ"
 vteam run test-writer --focus "invite user functionality"
-vteam run code-reviewer --focus "only look at the auth module"
+vteam run improver --focus "only look at the auth module"
 ```
 
-### `vteam run code-reviewer`
+### `vteam run improver`
 
-1. Acquires an advisory lock (`vteam/.locks/code-reviewer.lock`)
-2. Reads the agent prompt from `vteam/agents/code-reviewer/AGENT.md`
+1. Acquires an advisory lock (`vteam/.locks/improver.lock`)
+2. Reads the agent prompt from `vteam/agents/improver/AGENT.md`
 3. Lists all vteam-labelled tasks in the aven project (every status) and injects them into the prompt so Claude knows what's already been found
 4. Spawns `claude -p` — Claude scans the codebase and returns findings as structured JSON
 5. The orchestrator creates an aven task (status `todo`) from each finding via `aven add`
@@ -136,9 +136,9 @@ vteam run code-reviewer --focus "only look at the auth module"
 
 Claude is read-only — it scans and reports. The orchestrator owns all file creation.
 
-### `vteam run refactorer`
+### `vteam run coder`
 
-1. Acquires an advisory lock (`vteam/.locks/refactorer.lock`)
+1. Acquires an advisory lock (`vteam/.locks/coder.lock`)
 2. Picks the highest-severity ready task routed to it from aven (`aven list --status todo --ready` filtered by `actor`, see [Routing tasks to agents](#routing-tasks-to-agents); oldest first within a severity; skips tasks that have failed `maxRetries` times) and sets it to `active`
 3. Creates a git worktree at `.vteam-worktrees/vteam/<task-title-slug>-<runId>` branched from the base branch
 4. Builds the prompt with the task description, existing task titles, and agent instructions
@@ -202,7 +202,7 @@ Global settings live in `vteam/vteam.config.json`:
     "maxRetries": 3,
     "project": "my-app",
     "label": "vteam",
-    "defaultActor": "refactorer"
+    "defaultActor": "coder"
   }
 }
 ```
@@ -212,10 +212,10 @@ Global settings live in `vteam/vteam.config.json`:
 | `baseBranch`       | Branch to create worktrees from and target PRs against                                  |
 | `platform`         | `"github"` or `"gitlab"` — determines which CLI (`gh` / `glab`) is used for PR creation |
 | `worktreeDir`      | Where worktrees are created (relative to repo root). Gitignored.                        |
-| `tasks.maxRetries` | How many times the refactorer retries a failing task before skipping it                 |
+| `tasks.maxRetries` | How many times the coder retries a failing task before skipping it                      |
 | `tasks.project`    | Required. The aven project vteam's tasks live in. aven creates it on the first task. `vteam init` sets it to the current directory name. |
 | `tasks.label`      | Default `"vteam"`. vteam only sees and picks up tasks carrying this label. Created automatically. |
-| `tasks.defaultActor` | Required. Agent that works on tasks with no `actor` (see [Routing tasks to agents](#routing-tasks-to-agents)). `vteam init` sets `refactorer`. |
+| `tasks.defaultActor` | Required. Agent that works on tasks with no `actor` (see [Routing tasks to agents](#routing-tasks-to-agents)). `vteam init` sets `coder`. |
 | `tasks.workspace`  | Optional. aven workspace, passed to every `aven` call as `--workspace`.                 |
 
 ### Agent configuration (AGENT.md frontmatter)
@@ -274,13 +274,13 @@ The hook runs in the main project directory (not the worktree). Hook failures ar
 
 ## Task lifecycle
 
-Tasks live in [aven](#prerequisites), a local-first task manager backed by SQLite. vteam scopes everything to one aven project (`tasks.project`) and one label (`tasks.label`, default `vteam`) — it only sees tasks that carry the label. The real output of vteam is the PRs created by the refactorer.
+Tasks live in [aven](#prerequisites), a local-first task manager backed by SQLite. vteam scopes everything to one aven project (`tasks.project`) and one label (`tasks.label`, default `vteam`) — it only sees tasks that carry the label. The real output of vteam is the PRs created by the coder.
 
 ```
-code-reviewer finds issue
+improver finds issue
         │
         ▼
-    ┌──────┐  refactorer picks  ┌────────┐  branch + PR  ┌──────┐
+    ┌──────┐  coder picks       ┌────────┐  branch + PR  ┌──────┐
     │ todo │ ─────────────────▶ │ active │ ────────────▶ │ done │
     └──────┘                    └────────┘               └──────┘
         ▲                           │
@@ -295,7 +295,7 @@ Any ending other than a pushed commit or "no changes" — a crash, an error, or 
 
 Every task can carry an `actor` metadata field naming the agent that should work on it:
 
-- An agent that creates tasks sets `actor` from its `assignTo` frontmatter (e.g. a code-reviewer with `assignTo: test-writer` hands its findings to the test-writer). Without `assignTo`, no `actor` is set.
+- An agent that creates tasks sets `actor` from its `assignTo` frontmatter (e.g. a improver with `assignTo: test-writer` hands its findings to the test-writer). Without `assignTo`, no `actor` is set.
 - An `input: "task"` agent only picks tasks whose `actor` is its own name. The agent named in `tasks.defaultActor` also picks every task with no `actor` — including tasks you create yourself in aven.
 - Reassign a task with `aven edit <ref> --metadata actor=<agent>`, or hand it back to the default actor with `aven edit <ref> --remove-metadata actor`.
 - `found-by` records which agent found the task; it does not affect routing.
@@ -303,7 +303,7 @@ Every task can carry an `actor` metadata field naming the agent that should work
 
 Agents only pick tasks returned by `aven list --status todo --ready`, so aven's dependency blocking and deferral (`available_at`) are respected. If the vteam process is killed hard mid-run, the task may stay `active` — reset it manually with `aven edit <ref> --status todo`.
 
-Because tasks live in aven, you can triage them with `aven tui` or the `aven` CLI: move findings to `backlog` or `canceled`, change priority, add dependencies, or add the `vteam` label to your own tasks to queue them for the refactorer.
+Because tasks live in aven, you can triage them with `aven tui` or the `aven` CLI: move findings to `backlog` or `canceled`, change priority, add dependencies, or add the `vteam` label to your own tasks to queue them for the coder.
 
 ### How a task is represented in aven
 
@@ -317,7 +317,7 @@ Because tasks live in aven, you can triage them with `aven tui` or the `aven` CL
 | metadata `found-by`    | Name of the agent that created the task (provenance only)                       |
 | metadata `actor`       | Agent that should work on the task; absent means `tasks.defaultActor`           |
 | metadata `files`       | Comma-separated affected files                                                  |
-| metadata `retry-count` | Incremented each time the refactorer finishes with no changes                   |
+| metadata `retry-count` | Incremented each time the coder finishes with no changes                        |
 | metadata `completed`, `branch`, `pr-url` | Added when the task is set to `done` (`pr-url` only if a PR was created) |
 
 Tasks are referenced by their aven ref (e.g. `APP-7KQ9`); run state files in `vteam/.runs/` record it as `taskRef`. Refs are local to aven, so vteam keeps them out of branch names and PRs.
@@ -326,7 +326,7 @@ Tasks are referenced by their aven ref (e.g. `APP-7KQ9`); run state files in `vt
 
 `critical` > `high` > `medium` > `low`
 
-The refactorer picks the highest-severity task first.
+The coder picks the highest-severity task first.
 
 ## Memory and deduplication
 
@@ -367,17 +367,17 @@ Memory is opt-in — agents without a `MEMORY.md` skip it entirely. `vteam init`
 
 ## Agents
 
-vteam ships with four default agents (code-reviewer, refactorer, review-responder, test-writer). Add custom agents by creating `vteam/agents/<name>/AGENT.md` — no config changes needed.
+vteam ships with four default agents (improver, coder, review-responder, test-writer). Add custom agents by creating `vteam/agents/<name>/AGENT.md` — no config changes needed.
 
-### Code reviewer
+### Improver
 
 - Read-only — scans the codebase, never modifies any files
 - Returns findings as structured JSON — the orchestrator creates them as aven tasks in `todo`
-- Does not use a worktree or commit — findings stay local until the refactorer acts on them
+- Does not use a worktree or commit — findings stay local until the coder acts on them
 - Limited to 1 finding per run (configurable in the AGENT.md prompt)
 - Prioritizes severity: security bugs > performance > code quality
 
-### Refactorer
+### Coder
 
 - Picks one ready task per run from the aven `todo` queue
 - Works in an isolated git worktree (never touches the main working tree)
@@ -413,13 +413,13 @@ vteam uses advisory file locking via atomic `mkdir` (POSIX guarantees this is at
 - **Stale detection**: A lock is considered stale if the holding process is dead (checked via `kill -0`) or the lock is older than 30 minutes.
 - **Not distributed**: Locks are local to the filesystem. If you run vteam from multiple machines against the same repo (e.g., via NFS), locks won't protect against concurrent runs.
 - **Crash recovery**: If vteam crashes while holding a lock, the lock may persist. Run `vteam clean` to break stale locks, or wait 30 minutes for automatic stale detection.
-- **Same agent concurrency**: Two runs of the same agent are serialized by the lock. Different agents (code-reviewer + refactorer) can run concurrently.
+- **Same agent concurrency**: Two runs of the same agent are serialized by the lock. Different agents (improver + coder) can run concurrently.
 
 ### Worktrees
 
-- **Crash cleanup**: If the refactorer crashes after creating a worktree but before cleanup, the worktree and its branch persist. Run `vteam clean` to remove orphans.
+- **Crash cleanup**: If the coder crashes after creating a worktree but before cleanup, the worktree and its branch persist. Run `vteam clean` to remove orphans.
 - **Stale branches**: Task branch names include the run ID (`vteam/<title-slug>-<runId>`), so a retried task never reuses an earlier attempt's branch. If a local branch with the same name exists, `createWorktree` deletes it before creating a new worktree.
-- **Force push**: vteam force-pushes to its own branches (`vteam/*`). This is safe because these branches are ephemeral and owned by the tool — no human should be pushing to them. But if you manually commit to a `vteam/*` branch, those commits will be lost on the next refactorer run.
+- **Force push**: vteam force-pushes to its own branches (`vteam/*`). This is safe because these branches are ephemeral and owned by the tool — no human should be pushing to them. But if you manually commit to a `vteam/*` branch, those commits will be lost on the next coder run.
 - **Disk space**: Each worktree is a full checkout. On large repos, this can be significant. Worktrees are cleaned up after each run.
 
 ### PR creation
@@ -431,8 +431,8 @@ vteam uses advisory file locking via atomic `mkdir` (POSIX guarantees this is at
 
 ### General
 
-- **No budget caps**: There's no `--max-budget-usd` on agent runs. A single code-reviewer or refactorer invocation uses one Claude session with no spending limit. Monitor usage via your Anthropic dashboard.
-- **No rollback**: If the refactorer's changes break something, you close the PR. There's no automatic revert mechanism.
+- **No budget caps**: There's no `--max-budget-usd` on agent runs. A single improver or coder invocation uses one Claude session with no spending limit. Monitor usage via your Anthropic dashboard.
+- **No rollback**: If the coder's changes break something, you close the PR. There's no automatic revert mechanism.
 - **Title-based dedup only**: Duplicate detection relies on Claude reading existing task titles in its prompt. Similar but differently-worded findings may slip through.
 - **One `aven show` per task**: `aven list --json` doesn't include metadata or descriptions, so building the task index runs `aven show --full --json` for every labelled task (8 at a time). Large projects make prompt building slower.
 - **Stuck `active` tasks**: If the vteam process is killed hard, the picked task stays `active` and won't be retried until reset with `aven edit <ref> --status todo`.
@@ -461,7 +461,7 @@ Invoke from any project with `/create-vteam-agent`.
 
 ```bash
 just build          # tsc + copy templates to dist/
-just dev <args>     # run CLI via tsx (e.g., just dev run code-reviewer)
+just dev <args>     # run CLI via tsx (e.g., just dev run improver)
 just lint           # tsc --noEmit + eslint
 just test           # vitest
 just clean          # rm -rf dist/
@@ -469,7 +469,7 @@ just clean          # rm -rf dist/
 
 ### Dogfooding
 
-This project has its own `vteam/` directory pointing the agents at `src/`. Run `just dev run code-reviewer` to have vteam review itself.
+This project has its own `vteam/` directory pointing the agents at `src/`. Run `just dev run improver` to have vteam review itself.
 
 ### Dependencies
 
