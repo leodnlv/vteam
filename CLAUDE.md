@@ -2,12 +2,13 @@
 
 ## What this project is
 
-An npm package (`vteam`) that orchestrates AI agents powered by `claude -p` (Claude Code's headless mode) to autonomously review codebases and implement fixes. The framework manages a task lifecycle (todo → active → done) in the `aven` task manager, runs agents in isolated git worktrees, and maintains a shared memory file so stateless agent invocations don't duplicate work.
+An npm package (`vteam`) that orchestrates AI agents powered by `claude -p` (Claude Code's headless mode) to autonomously review codebases and implement fixes. The framework manages a task lifecycle (inbox → todo → active → done) in the `aven` task manager, runs agents in isolated git worktrees, and maintains a shared memory file so stateless agent invocations don't duplicate work.
 
 The end user's workflow:
 1. Define agent prompts in `AGENT.md` files
-2. Run improver — it scans the codebase and writes findings straight to todo
-3. Run coder (on a cron) — it picks up a task, marks it active, implements it in a worktree, creates a branch + PR, marks the task done
+2. Run improver — it scans the codebase and writes findings to inbox
+3. Triage — move the findings worth fixing from inbox to todo in aven
+4. Run coder (on a cron) — it picks up a task, marks it active, implements it in a worktree, creates a branch + PR, marks the task done
 
 ## Architecture
 
@@ -105,6 +106,8 @@ All task operations go through the `TaskManager` interface (`src/tasks/task-mana
 Routing (`matchesTaskFilter` in `task-manager.ts`): `listReady()` returns every ready labelled task with its metadata; `run` keeps the tasks matching the running agent's `taskFilter` (no filter = all). There is no fallback agent — a task no filter matches is never picked. Overlaps are allowed — picking runs under a global claim lock (see Lifecycle), so exactly one run gets each task. vteam only writes `found-by`; humans set other keys such as `actor` via `aven edit <ref> --metadata actor=<agent>`. `vteam status` loads every `input: "task"` agent (`listTaskWorkers`), shows each open task's matching agents, and warns about `todo` tasks no agent matches. The AGENT.md frontmatter parser (`src/frontmatter.ts`) supports one level of indented nested maps for `taskFilter`.
 
 Mapping: severity `critical/high/medium/low` ↔ aven priority `urgent/high/medium/low` (priority `none` reads as `low`). `files`, `found-by`, `retry-count`, `completed`, `branch`, `pr-url`, `claimed-by`, `claimed-pid`, `claimed-host` are aven metadata (string values; `files` is comma-separated). The finding's description, suggested fix, and affected files become the aven description.
+
+Tasks created from `output: "task"` findings start in `inbox` and are only picked once a human moves them to `todo`. aven promotes inbox tasks with priority medium or higher to `todo` on `add`, so `create` follows up with `aven edit <ref> --status inbox`.
 
 Lifecycle for `input: "task"` agents:
 1. Under the global claim lock `vteam/.locks/task-claim` (shared by all agents, held only while picking): `aven list --status todo --ready` (respects aven dependencies and `available_at`), keep tasks routed to this agent, drop tasks with `retry-count >= maxRetries`, sort by severity then oldest — pick the first and set it `active` with claim metadata `claimed-by` (runId), `claimed-pid`, `claimed-host`. Once `active`, the task drops out of every other agent's `listReady`. aven has no compare-and-swap, so the lock is what prevents two agents claiming the same task; it only works on one machine.
