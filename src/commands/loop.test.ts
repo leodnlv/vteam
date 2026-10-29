@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
-import { findCronAgents, formatLogFilename, buildChildArgs } from "./loop.js";
+import { findCronAgents, buildChildArgs } from "./loop.js";
 import { isValidCronExpression } from "../config/schema.js";
 
 describe("findCronAgents", () => {
@@ -102,12 +102,5 @@ describe("buildChildArgs", () => {
       "run",
       "improver",
     ]);
-  });
-});
-
-describe("formatLogFilename", () => {
-  it("uses ISO 8601 with colons/dots replaced by dashes", () => {
-    const date = new Date("2026-04-21T08:40:00.000Z");
-    expect(formatLogFilename(date)).toBe("2026-04-21T08-40-00-000Z.log");
   });
 });

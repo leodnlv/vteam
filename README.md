@@ -85,7 +85,7 @@ vteam loop start
 vteam loop status
 ```
 
-The scheduler is a foreground process — stop it with Ctrl+C. If an agent is still running when its next cron tick fires, the tick is skipped.
+The scheduler is a foreground process — stop it with Ctrl+C. If an agent is still running when its next cron tick fires, the tick is skipped. Each scheduled run writes its own log file, the same as a manual `vteam run` (see [Logs](#logs)).
 
 ## Commands
 
@@ -124,6 +124,10 @@ vteam run coder --focus "the issue about XYZ"
 vteam run test-writer --focus "invite user functionality"
 vteam run improver --focus "only look at the auth module"
 ```
+
+### Logs
+
+Every `vteam run <agent>` writes its full output to a new file at `vteam/.logs/<agent>/<ISO-timestamp>.log`, whether you start it by hand or `vteam loop start` starts it. The output still goes to your terminal; the log file gets a copy of it. This includes Claude's tool calls, orchestrator messages, the ON_FINISH hook and memory curation, plus the error if the run crashes. The path is printed when the run starts.
 
 ### `vteam run improver`
 

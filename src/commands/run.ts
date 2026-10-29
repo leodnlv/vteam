@@ -30,6 +30,7 @@ import {
 } from "../integrations/pull-request.js";
 import { loadConfig } from "../config/load.js";
 import { resolveAgentConfig, listAgentNames } from "../config/agent.js";
+import { startRunLog } from "../run-log.js";
 import type {
   AgentConfig,
   VteamConfig,
@@ -95,9 +96,18 @@ export async function runCommand(agentName: string | undefined, options: RunOpti
     return;
   }
 
-  const config = loadConfig(cwd);
   const agent = resolveAgentConfig(agentName, cwd);
-  await runAgent(cwd, config, agent, options.focus);
+  const runLog = startRunLog(cwd, agent.name);
+  console.log(`Logging to ${runLog.path}`);
+  try {
+    const config = loadConfig(cwd);
+    await runAgent(cwd, config, agent, options.focus);
+  } catch (err) {
+    runLog.write(`${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`);
+    throw err;
+  } finally {
+    runLog.close();
+  }
 }
 
 function hasUncommittedChanges(worktreePath: string): boolean {

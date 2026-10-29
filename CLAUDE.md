@@ -179,6 +179,7 @@ skills/
 src/
 ├── bin.ts                        CLI entry point (commander)
 ├── types.ts                      All shared TypeScript types
+├── run-log.ts                    Per-run log file under vteam/.logs/<agent>/ (tees stdout/stderr)
 ├── commands/
 │   ├── init.ts                   vteam init — scaffold vteam/ in any project
 │   ├── run.ts                    vteam run <agent> — main orchestration flow
@@ -236,7 +237,9 @@ vteam skill install                     # symlink skills from skills/ into ~/.cl
 vteam skill uninstall                   # remove skill symlinks from ~/.claude/skills/
 ```
 
-`vteam loop start` runs a foreground Node.js process that schedules agents based on `cron` patterns in their frontmatter (parsed via `croner`). Each agent run spawns a subprocess (`vteam run <agent>`). If an agent is still running when its next cron tick fires, the tick is skipped. Logs are appended to `vteam/.logs/<agent>.log`. Stop with Ctrl+C.
+`vteam loop start` runs a foreground Node.js process that schedules agents based on `cron` patterns in their frontmatter (parsed via `croner`). Each agent run spawns a subprocess (`vteam run <agent>`). If an agent is still running when its next cron tick fires, the tick is skipped. The loop discards the child's stdout/stderr because the child writes its own log. Stop with Ctrl+C.
+
+Every `vteam run <agent>` writes a log file for that run at `vteam/.logs/<agent>/<ISO-timestamp>.log` (`src/run-log.ts`), whether it was started by hand or by the loop. It copies `process.stdout`/`process.stderr` into the file with synchronous writes, so nothing is lost on `process.exit`, and it records the error stack if the run throws. Logging starts after the agent is resolved, so an unknown agent name creates no file.
 
 ## Before submitting changes
 

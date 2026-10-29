@@ -230,6 +230,8 @@ Advisory file locking via atomic `mkdir`. Each lock contains PID + timestamp. St
 
 Agents with a `cron` field run on schedule via `vteam loop start` (foreground process, stop with Ctrl+C). If an agent is still running when its next tick fires, the tick is skipped.
 
+Every `vteam run <agent>`, whether started by hand or by the loop, writes its full output to `vteam/.logs/<agent>/<ISO-timestamp>.log` and still prints to the terminal. Check there first when troubleshooting a run.
+
 ## The `--focus` option
 
 All `vteam run` invocations accept `--focus <text>` to inject priority context. The text appears as the first section of the user prompt.
