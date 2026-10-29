@@ -21,6 +21,8 @@ const taskStore = vi.hoisted(() => ({
   tasks: [] as Task[],
   created: [] as { body: TaskContentBody; foundBy: string }[],
   updates: [] as { ref: string; changes: TaskUpdate }[],
+  notes: [] as { ref: string; text: string }[],
+  failNotes: false,
 }));
 
 vi.mock("../tasks/aven-manager.js", () => ({
@@ -45,6 +47,10 @@ vi.mock("../tasks/aven-manager.js", () => ({
       taskStore.updates.push({ ref, changes });
       const task = taskStore.tasks.find((t) => t.ref === ref);
       if (task && changes.status) task.status = changes.status;
+    }
+    async addNote(ref: string, text: string) {
+      if (taskStore.failNotes) throw new Error("aven note failed");
+      taskStore.notes.push({ ref, text });
     }
   },
 }));
@@ -133,6 +139,8 @@ beforeEach(() => {
   taskStore.tasks = [];
   taskStore.created = [];
   taskStore.updates = [];
+  taskStore.notes = [];
+  taskStore.failNotes = false;
 });
 
 afterEach(() => {
@@ -430,6 +438,7 @@ describe("pipeline: task input lifecycle", () => {
       retryCount: 0,
       metadata: {},
       description: "It is broken.",
+      notes: [],
       createdAt: "2026-10-01T00:00:00Z",
       ...overrides,
     };
@@ -508,6 +517,36 @@ describe("pipeline: task input lifecycle", () => {
     expect(mockRunClaude).toHaveBeenCalledTimes(1);
   });
 
+  it("notes the agent's summary and blocker reason on the task", async () => {
+    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    seedTask();
+
+    mockRunClaude.mockResolvedValueOnce(
+      makeResult(JSON.stringify({ status: "blocked", summary: "Looked.", blockerReason: "No DB." })),
+    );
+
+    await runCommand("test-agent", {});
+
+    expect(taskStore.notes).toEqual([
+      { ref: "VTM-ABCD", text: "test-agent: blocked\n\nLooked.\n\nBlocker: No DB." },
+    ]);
+  });
+
+  it("still releases the task when the note cannot be written", async () => {
+    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    seedTask();
+    taskStore.failNotes = true;
+
+    mockRunClaude.mockResolvedValueOnce(
+      makeResult(JSON.stringify({ status: "completed", summary: "Looked." })),
+    );
+
+    await runCommand("test-agent", {});
+
+    expect(taskStore.updates.map((u) => u.changes.status)).toEqual(["active", "todo"]);
+    expect(process.exit).not.toHaveBeenCalled();
+  });
+
   it("returns the task to todo when the agent fails", async () => {
     setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
     seedTask();
@@ -517,6 +556,7 @@ describe("pipeline: task input lifecycle", () => {
     await runCommand("test-agent", {});
 
     expect(taskStore.updates.map((u) => u.changes.status)).toEqual(["active", "todo"]);
+    expect(taskStore.notes).toEqual([]);
   });
 
   it("picks the highest severity task and skips tasks over the retry limit", async () => {

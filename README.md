@@ -148,7 +148,7 @@ Claude is read-only — it scans and reports. The orchestrator owns all file cre
 1. Acquires an advisory lock (`vteam/.locks/coder.lock`)
 2. Under a short-lived claim lock shared by all agents (`vteam/.locks/task-claim.lock`), picks the highest-severity ready task routed to it from aven (`aven list --status todo --ready` filtered by its `taskFilter`, see [Routing tasks to agents](#routing-tasks-to-agents); oldest first within a severity; skips tasks that have failed `maxRetries` times) and sets it to `active` with `claimed-*` metadata
 3. Creates a git worktree at `.vteam-worktrees/vteam/<task-title-slug>-<runId>` branched from the base branch
-4. Builds the prompt with the task description, existing task titles, and agent instructions
+4. Builds the prompt with the task description, the task's aven notes (including summaries from earlier attempts), existing task titles, and agent instructions
 5. Spawns `claude -p` in the worktree — Claude implements the fix and returns a commit message as structured JSON
 6. If Claude reported changes:
    - The orchestrator commits (`git add -A` + `git commit` using Claude's commit message)
@@ -157,8 +157,9 @@ Claude is read-only — it scans and reports. The orchestrator owns all file cre
    - Sets the task to `done` with completion metadata
 7. If Claude reported no changes: returns the task to `todo` and increments its `retry-count` metadata
 8. On any other ending (crash, error): returns the task to `todo` without incrementing retries
-9. Cleans up the worktree
-10. Releases the lock
+9. Unless it crashed or errored, adds an aven note to the task with Claude's summary (and blocker reason or PR URL, if any)
+10. Cleans up the worktree
+11. Releases the lock
 
 ### `vteam run review-responder`
 
@@ -342,6 +343,7 @@ Because tasks live in aven, you can triage them with `aven tui` or the `aven` CL
 | metadata `files`       | Comma-separated affected files                                                  |
 | metadata `retry-count` | Incremented each time the coder finishes with no changes                        |
 | metadata `completed`, `branch`, `pr-url` | Added when the task is set to `done` (`pr-url` only if a PR was created) |
+| notes                  | One per run that returned output: `<agent>: <status>`, the agent's summary, blocker reason and PR URL if any. All notes, yours included, are shown to the agent that next picks the task |
 | metadata `claimed-by`, `claimed-pid`, `claimed-host` | Run ID, process ID and hostname of the run working the task. Set with `active`, removed when the task leaves `active` |
 
 Tasks are referenced by their aven ref (e.g. `APP-7KQ9`); run state files in `vteam/.runs/` record it as `taskRef`. Refs are local to aven, so vteam keeps them out of branch names and PRs.

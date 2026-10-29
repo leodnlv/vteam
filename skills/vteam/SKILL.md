@@ -140,7 +140,7 @@ Each agent is invoked as a `claude -p` subprocess. The orchestrator assembles a 
 2. **Priority focus** — optional `--focus` text, injected first so Claude prioritizes it
 3. **Agent memory** — accumulated memory from previous runs (if MEMORY.md exists)
 4. **Existing tasks** — every non-deleted labelled task in the aven project, all statuses, as `- [status] severity | title | files` (for deduplication)
-5. **Task content** — if `input: "task"`, the specific task to implement
+5. **Task content** — if `input: "task"`, the specific task to implement, followed by a `## Task Notes` section with the task's aven notes (oldest first) when it has any
 6. **PR review comments** — if `input: "pr"`, the unresolved review threads
 7. **Output format instructions** — JSON schema the agent must return
 
@@ -166,6 +166,7 @@ The orchestrator then:
 - Sets the task to `done` (metadata `completed`, `branch`, `pr-url`) if a commit was pushed
 - Returns the task to `todo` and increments `retry-count` metadata if the agent produced no changes
 - Returns the task to `todo` without incrementing on any other ending (crash, error, readOnly or non-worktree agent)
+- Appends an aven note to the task (`<agent>: <status>`, `summary`, `Blocker: …`, `PR: …`) whenever the agent returned output; a failed note write is non-fatal
 - Passes `content` through to the ON_FINISH hook
 
 ## Task lifecycle

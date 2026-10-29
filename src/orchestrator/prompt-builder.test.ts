@@ -27,6 +27,7 @@ function makeTask(overrides: Partial<Task>): Task {
     retryCount: 0,
     metadata: {},
     description: "",
+    notes: [],
     createdAt: "2026-04-19T00:00:00Z",
     ...overrides,
   };
@@ -42,6 +43,7 @@ function stubTaskManager(tasks: Task[]): TaskManager {
     }),
     create: async () => "VTM-NEW1",
     update: async () => {},
+    addNote: async () => {},
   };
 }
 
@@ -99,6 +101,26 @@ describe("buildPrompt", () => {
     expect(userPrompt).toContain("high");
     expect(userPrompt).toContain("src/auth.ts:45");
     expect(userPrompt).toContain("auth module is broken");
+  });
+
+  it("includes task notes oldest first when the task has notes", async () => {
+    const { agentConfig, taskManager } = setup();
+    const task = makeTask({
+      notes: [
+        { body: "coder: blocked\n\nTests would not run.", createdAt: "2026-10-01T00:00:00Z" },
+        { body: "Try mocking the DB.", createdAt: "2026-10-02T00:00:00Z" },
+      ],
+    });
+
+    const { userPrompt } = await buildPrompt(agentConfig, taskManager, task);
+    expect(userPrompt).toContain("## Task Notes");
+    expect(userPrompt.indexOf("Tests would not run.")).toBeLessThan(userPrompt.indexOf("Try mocking the DB."));
+  });
+
+  it("omits the task notes section when the task has no notes", async () => {
+    const { agentConfig, taskManager } = setup();
+    const { userPrompt } = await buildPrompt(agentConfig, taskManager, makeTask({}));
+    expect(userPrompt).not.toContain("## Task Notes");
   });
 
   it("excludes frontmatter from system prompt", async () => {

@@ -66,6 +66,7 @@ interface AvenTaskDetail {
   };
   description: string;
   metadata: Record<string, string>;
+  notes?: { body: string; created_at: string }[];
 }
 
 function isAvenError(err: unknown, code: RegExp): boolean {
@@ -75,7 +76,7 @@ function isAvenError(err: unknown, code: RegExp): boolean {
 const MISSING_SCOPE = /unknown-(project|label)/;
 
 function toTask(detail: AvenTaskDetail): Task {
-  const { task, description, metadata } = detail;
+  const { task, description, metadata, notes = [] } = detail;
   return {
     ref: task.ref,
     title: task.title,
@@ -85,6 +86,7 @@ function toTask(detail: AvenTaskDetail): Task {
     retryCount: Number.parseInt(metadata["retry-count"] ?? "", 10) || 0,
     metadata,
     description,
+    notes: notes.map((n) => ({ body: n.body, createdAt: n.created_at })),
     createdAt: task.created_at,
   };
 }
@@ -160,6 +162,10 @@ export class AvenTaskManager implements TaskManager {
       args.push("--remove-metadata", key);
     }
     await this.aven(args);
+  }
+
+  async addNote(ref: string, text: string): Promise<void> {
+    await this.aven(["note", ref, "--stdin"], text);
   }
 
   private async list(filters: string[]): Promise<Task[]> {

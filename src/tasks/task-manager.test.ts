@@ -12,6 +12,7 @@ function task(metadata: Record<string, string>): Task {
     retryCount: 0,
     metadata,
     description: "",
+    notes: [],
     createdAt: "",
   };
 }

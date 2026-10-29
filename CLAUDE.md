@@ -24,7 +24,7 @@ Each agent is invoked as a `claude -p` subprocess with:
 - `--allowedTools` / `--disallowedTools` — per-agent tool permissions from frontmatter (uses the same syntax as native Claude Code CLI flags)
 - `--no-session-persistence` — no session clutter
 
-The orchestrator assembles a layered prompt: AGENT.md (role) → optional `--focus` context (priority section) → existing task titles (from aven) → task content or PR review comments → output format instructions. The prompt is passed via stdin. Claude returns structured JSON as its final output — the orchestrator parses this to create aven tasks, git commits, and PRs.
+The orchestrator assembles a layered prompt: AGENT.md (role) → optional `--focus` context (priority section) → existing task titles (from aven) → task content (plus its aven notes, oldest first, under `## Task Notes`) or PR review comments → output format instructions. The prompt is passed via stdin. Claude returns structured JSON as its final output — the orchestrator parses this to create aven tasks, git commits, and PRs.
 
 ### Structured output contract
 
@@ -116,7 +116,9 @@ Lifecycle for `input: "task"` agents:
 4. Any other ending (error, crash, readOnly or non-worktree agent) → back to `todo` in `finally`, retries unchanged.
 5. Every transition out of `active` removes the claim metadata. A hard-killed process can leave a task `active`; `vteam clean` returns `active` tasks to `todo` when their `claimed-host` is this machine and `claimed-pid` is dead. Tasks claimed on another host, or `active` without a claim (e.g. set by a human), are left alone.
 
-`getIndex` and `listReady` cost one `aven show --full --json` per task (8 concurrent), because `aven list --json` omits description and metadata. `unknown-project`/`unknown-label` errors from `aven list` are treated as an empty list.
+Whenever the agent returned output (every ending except an error or crash), the orchestrator appends an aven note to the task: `<agent>: <status>`, the agent's `summary`, `Blocker: <blockerReason>` if present, and `PR: <url>` if one was created. A failed note write is logged and does not fail the run. Notes (from runs and from humans) are injected into the prompt the next time an agent picks the task, so retries see why earlier attempts failed.
+
+`getIndex` and `listReady` cost one `aven show --full --json` per task (8 concurrent), because `aven list --json` omits description, metadata, and notes. `unknown-project`/`unknown-label` errors from `aven list` are treated as an empty list.
 
 ### On-finish hooks
 

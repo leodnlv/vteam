@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { parse } from "../frontmatter.js";
 import type { TaskManager } from "../tasks/task-manager.js";
-import type { AgentConfig, Task, PRReviewContext, OnFinishConfig, MemoryConfig, RunOutcome } from "../types.js";
+import type { AgentConfig, Task, TaskNote, PRReviewContext, OnFinishConfig, MemoryConfig, RunOutcome } from "../types.js";
 
 interface PromptParts {
   systemPrompt: string;
@@ -50,6 +50,9 @@ export async function buildPrompt(
     sections.push(
       `## Your Task\n\nTitle: ${task.title}\nSeverity: ${task.severity}\nFiles: ${task.files.join(", ")}\n\n${task.description}`,
     );
+    if (task.notes.length > 0) {
+      sections.push(buildTaskNotesSection(task.notes));
+    }
   }
 
   if (review) {
@@ -200,6 +203,11 @@ ${contentInstruction},
 - "content" is optional. Include it when you have a primary deliverable (finding, review, analysis).
 - "filesChanged" and "commitMessage" are optional. Include them only when you modified files.
 - "blockerReason" is optional. Include it only when status is "blocked" or "failed".`;
+}
+
+function buildTaskNotesSection(notes: TaskNote[]): string {
+  const entries = notes.map((n) => `### ${n.createdAt}\n\n${n.body}`);
+  return `## Task Notes\n\nNotes left on this task by earlier runs and by humans, oldest first. Do not repeat an approach that already failed.\n\n${entries.join("\n\n")}`;
 }
 
 function buildReviewSection(review: PRReviewContext): string {

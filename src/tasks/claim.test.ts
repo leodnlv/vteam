@@ -14,6 +14,7 @@ function task(ref: string, metadata: Record<string, string> = {}): Task {
     retryCount: 0,
     metadata,
     description: "",
+    notes: [],
     createdAt: "2026-10-01T00:00:00Z",
   };
 }
@@ -31,6 +32,7 @@ function fakeManager(tasks: Task[]) {
     update: async (ref, changes) => {
       updates.push({ ref, changes });
     },
+    addNote: async () => {},
   };
   return { manager, updates };
 }

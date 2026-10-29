@@ -19,6 +19,12 @@ export interface Task {
   retryCount: number;
   metadata: Record<string, string>;
   description: string;
+  notes: TaskNote[];
+  createdAt: string;
+}
+
+export interface TaskNote {
+  body: string;
   createdAt: string;
 }
 

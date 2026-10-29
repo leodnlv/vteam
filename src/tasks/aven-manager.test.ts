@@ -31,6 +31,7 @@ function detail(ref: string, overrides: Record<string, unknown> = {}) {
     },
     description: "body",
     metadata: { files: "a.ts, b.ts", "retry-count": "2" },
+    notes: [{ id: "N1", body: "Tried once.", created_at: "2026-10-02T00:00:00Z" }],
     ...overrides,
   });
 }
@@ -97,6 +98,7 @@ describe("AvenTaskManager", () => {
         retryCount: 2,
         metadata: { files: "a.ts, b.ts", "retry-count": "2" },
         description: "body",
+        notes: [{ body: "Tried once.", createdAt: "2026-10-02T00:00:00Z" }],
         createdAt: "2026-10-01T00:00:00Z",
       },
     ]);
@@ -109,6 +111,7 @@ describe("AvenTaskManager", () => {
         : detail(args[1], {
             task: { ref: "APP-0002", title: "Human task", status: "todo", priority: "none", created_at: "" },
             metadata: {},
+            notes: undefined,
           }),
     );
 
@@ -118,6 +121,7 @@ describe("AvenTaskManager", () => {
     expect(task.files).toEqual([]);
     expect(task.retryCount).toBe(0);
     expect(task.metadata).toEqual({});
+    expect(task.notes).toEqual([]);
   });
 
   it("groups the index by status", async () => {
@@ -175,6 +179,14 @@ describe("AvenTaskManager", () => {
       "edit", "APP-0001", "--status", "todo",
       "--remove-metadata", "claimed-by", "--remove-metadata", "claimed-pid",
     ]);
+  });
+
+  it("adds a note via stdin", async () => {
+    const { exec, calls } = fakeExec(() => "");
+
+    await new AvenTaskManager(config, exec).addNote("APP-0001", "line one\nline two");
+
+    expect(calls[0]).toEqual({ args: ["note", "APP-0001", "--stdin"], stdin: "line one\nline two" });
   });
 
   it("prefixes every command with the configured workspace", async () => {
@@ -251,8 +263,12 @@ describe.skipIf(!avenInstalled())("AvenTaskManager against real aven", () => {
     expect(retried.retryCount).toBe(1);
     expect(retried.metadata).not.toHaveProperty("claimed-by");
 
+    await manager.addNote(ref, "coder: completed\n\nFixed it.");
     await manager.update(ref, { status: "done", metadata: { branch: "vteam/fix" } });
     const index = await manager.getIndex();
     expect(index.byStatus.get("done")?.map((t) => t.ref)).toEqual([ref]);
+    expect(index.all[0].notes).toEqual([
+      { body: "coder: completed\n\nFixed it.", createdAt: expect.any(String) },
+    ]);
   });
 });

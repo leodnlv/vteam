@@ -33,6 +33,7 @@ import { resolveAgentConfig, listAgentNames } from "../config/agent.js";
 import { startRunLog } from "../run-log.js";
 import type {
   AgentConfig,
+  AgentOutput,
   VteamConfig,
   RunState,
   Task,
@@ -379,6 +380,10 @@ async function runAgent(
       }
     }
 
+    if (task) {
+      await addRunNote(taskManager, task, formatRunNote(agent.name, output, prUrl));
+    }
+
     writeRunState(cwd, runState);
 
     console.log(`\n${agent.name} finished.`);
@@ -476,6 +481,28 @@ async function releaseTask(taskManager: TaskManager, task: Task): Promise<void> 
   } catch (err) {
     console.error(
       `Failed to return task ${task.ref} to todo:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
+function formatRunNote(agentName: string, output: AgentOutput, prUrl: string | undefined): string {
+  return [
+    `${agentName}: ${output.status}`,
+    output.summary,
+    output.blockerReason ? `Blocker: ${output.blockerReason}` : "",
+    prUrl ? `PR: ${prUrl}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+async function addRunNote(taskManager: TaskManager, task: Task, text: string): Promise<void> {
+  try {
+    await taskManager.addNote(task.ref, text);
+  } catch (err) {
+    console.error(
+      `Failed to add note to task ${task.ref}:`,
       err instanceof Error ? err.message : err,
     );
   }

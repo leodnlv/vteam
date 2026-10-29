@@ -24,6 +24,7 @@ export interface TaskManager {
   getIndex(): Promise<TaskIndex>;
   create(body: TaskContentBody, foundBy: string): Promise<string>;
   update(ref: string, changes: TaskUpdate): Promise<void>;
+  addNote(ref: string, text: string): Promise<void>;
 }
 
 export function matchesTaskFilter(task: Task, filter: TaskFilter): boolean {
