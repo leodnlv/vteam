@@ -29,6 +29,9 @@ export interface TaskMetadata {
   completed?: string;
   branch?: string;
   "pr-url"?: string;
+  "claimed-by"?: string;
+  "claimed-pid"?: string;
+  "claimed-host"?: string;
 }
 
 export type TaskFilterValue = string | null;

@@ -26,7 +26,9 @@ const taskStore = vi.hoisted(() => ({
 vi.mock("../tasks/aven-manager.js", () => ({
   AvenTaskManager: class implements TaskManager {
     async listReady() {
-      return taskStore.tasks.filter((t) => t.status === "todo");
+      const ready = taskStore.tasks.filter((t) => t.status === "todo");
+      await new Promise((r) => setTimeout(r, 10));
+      return ready;
     }
     async getIndex() {
       return {
@@ -449,6 +451,63 @@ describe("pipeline: task input lifecycle", () => {
     expect(mockRunClaude.mock.calls[0][0].userPrompt).toContain("It is broken.");
   });
 
+  it("claims the task with run metadata and clears the claim on release", async () => {
+    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    seedTask();
+
+    mockRunClaude.mockResolvedValueOnce(
+      makeResult(JSON.stringify({ status: "completed", summary: "Looked." })),
+    );
+
+    await runCommand("test-agent", {});
+
+    const [claim, release] = taskStore.updates.map((u) => u.changes);
+    expect(claim.metadata).toMatchObject({
+      "claimed-by": expect.stringMatching(/-test-agent$/),
+      "claimed-pid": String(process.pid),
+    });
+    expect(release.removeMetadata).toEqual(["claimed-by", "claimed-pid", "claimed-host"]);
+  });
+
+  it("releases the claim lock before the agent runs", async () => {
+    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    seedTask();
+
+    const claimLock = resolve(tmp, "vteam", ".locks", "task-claim.lock");
+    let claimLockHeld: boolean | undefined;
+    mockRunClaude.mockImplementationOnce(async () => {
+      claimLockHeld = existsSync(claimLock);
+      return makeResult(JSON.stringify({ status: "completed", summary: "Looked." }));
+    });
+
+    await runCommand("test-agent", {});
+
+    expect(claimLockHeld).toBe(false);
+  });
+
+  it("never hands the same task to two agents running at once", async () => {
+    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    const otherDir = resolve(tmp, "vteam", "agents", "other-agent");
+    mkdirSync(otherDir, { recursive: true });
+    writeFileSync(resolve(otherDir, "AGENT.md"), "---\nmodel: sonnet\ninput: task\n---\n\nOther.");
+    seedTask();
+
+    let openGate!: () => void;
+    const gate = new Promise<void>((r) => (openGate = r));
+    mockRunClaude.mockImplementation(async () => {
+      await gate;
+      return makeResult(JSON.stringify({ status: "completed", summary: "Looked." }));
+    });
+
+    const runs = [runCommand("test-agent", {}), runCommand("other-agent", {})];
+    await Promise.race([...runs, new Promise((r) => setTimeout(r, 3000))]);
+    openGate();
+    await Promise.all(runs);
+
+    expect(taskStore.updates.filter((u) => u.changes.status === "active")).toHaveLength(1);
+    expect(mockRunClaude).toHaveBeenCalledTimes(1);
+  });
+
   it("returns the task to todo when the agent fails", async () => {
     setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
     seedTask();
@@ -472,7 +531,7 @@ describe("pipeline: task input lifecycle", () => {
 
     await runCommand("test-agent", {});
 
-    expect(taskStore.updates[0]).toEqual({ ref: "VTM-HIGH", changes: { status: "active" } });
+    expect(taskStore.updates[0]).toMatchObject({ ref: "VTM-HIGH", changes: { status: "active" } });
   });
 
   async function pickedRef(): Promise<string | undefined> {

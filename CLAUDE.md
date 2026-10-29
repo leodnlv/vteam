@@ -102,15 +102,16 @@ All task operations go through the `TaskManager` interface (`src/tasks/task-mana
 - `tasks.label` (default `"vteam"`) — opt-in label. vteam only lists, picks, and dedups against tasks with this label, and creates the label on demand. Humans can queue their own aven tasks for the coder by adding the label.
 - `tasks.workspace` (optional) — passed as `--workspace` to every aven call.
 
-Routing (`matchesTaskFilter` in `task-manager.ts`): `listReady()` returns every ready labelled task with its metadata; `run` keeps the tasks matching the running agent's `taskFilter` (no filter = all). There is no fallback agent — a task no filter matches is never picked. Overlaps are allowed — the first run to set a task `active` wins. vteam only writes `found-by`; humans set other keys such as `actor` via `aven edit <ref> --metadata actor=<agent>`. `vteam status` loads every `input: "task"` agent (`listTaskWorkers`), shows each open task's matching agents, and warns about `todo` tasks no agent matches. The AGENT.md frontmatter parser (`src/frontmatter.ts`) supports one level of indented nested maps for `taskFilter`.
+Routing (`matchesTaskFilter` in `task-manager.ts`): `listReady()` returns every ready labelled task with its metadata; `run` keeps the tasks matching the running agent's `taskFilter` (no filter = all). There is no fallback agent — a task no filter matches is never picked. Overlaps are allowed — picking runs under a global claim lock (see Lifecycle), so exactly one run gets each task. vteam only writes `found-by`; humans set other keys such as `actor` via `aven edit <ref> --metadata actor=<agent>`. `vteam status` loads every `input: "task"` agent (`listTaskWorkers`), shows each open task's matching agents, and warns about `todo` tasks no agent matches. The AGENT.md frontmatter parser (`src/frontmatter.ts`) supports one level of indented nested maps for `taskFilter`.
 
-Mapping: severity `critical/high/medium/low` ↔ aven priority `urgent/high/medium/low` (priority `none` reads as `low`). `files`, `found-by`, `retry-count`, `completed`, `branch`, `pr-url` are aven metadata (string values; `files` is comma-separated). The finding's description, suggested fix, and affected files become the aven description.
+Mapping: severity `critical/high/medium/low` ↔ aven priority `urgent/high/medium/low` (priority `none` reads as `low`). `files`, `found-by`, `retry-count`, `completed`, `branch`, `pr-url`, `claimed-by`, `claimed-pid`, `claimed-host` are aven metadata (string values; `files` is comma-separated). The finding's description, suggested fix, and affected files become the aven description.
 
 Lifecycle for `input: "task"` agents:
-1. `aven list --status todo --ready` (respects aven dependencies and `available_at`), keep tasks routed to this agent, drop tasks with `retry-count >= maxRetries`, sort by severity then oldest — pick the first and set it `active`.
+1. Under the global claim lock `vteam/.locks/task-claim` (shared by all agents, held only while picking): `aven list --status todo --ready` (respects aven dependencies and `available_at`), keep tasks routed to this agent, drop tasks with `retry-count >= maxRetries`, sort by severity then oldest — pick the first and set it `active` with claim metadata `claimed-by` (runId), `claimed-pid`, `claimed-host`. Once `active`, the task drops out of every other agent's `listReady`. aven has no compare-and-swap, so the lock is what prevents two agents claiming the same task; it only works on one machine.
 2. Commit pushed → `done` with `completed`/`branch`/`pr-url` metadata.
 3. Worktree agent produced no changes → back to `todo` with `retry-count` incremented.
-4. Any other ending (error, crash, readOnly or non-worktree agent) → back to `todo` in `finally`, retries unchanged. A hard-killed process can leave a task `active`; reset it in aven.
+4. Any other ending (error, crash, readOnly or non-worktree agent) → back to `todo` in `finally`, retries unchanged.
+5. Every transition out of `active` removes the claim metadata. A hard-killed process can leave a task `active`; `vteam clean` returns `active` tasks to `todo` when their `claimed-host` is this machine and `claimed-pid` is dead. Tasks claimed on another host, or `active` without a claim (e.g. set by a human), are left alone.
 
 `getIndex` and `listReady` cost one `aven show --full --json` per task (8 concurrent), because `aven list --json` omits description and metadata. `unknown-project`/`unknown-label` errors from `aven list` are treated as an empty list.
 
@@ -183,7 +184,7 @@ src/
 │   ├── run.ts                    vteam run <agent> — main orchestration flow
 │   ├── loop.ts                   vteam loop — long-lived scheduler process
 │   ├── status.ts                 vteam status — task board overview (from aven)
-│   ├── clean.ts                  vteam clean — prune worktrees, stale locks
+│   ├── clean.ts                  vteam clean — prune worktrees, stale locks, orphaned active tasks
 │   └── skill.ts                  vteam skill install/uninstall — manage Claude Code skill symlinks
 ├── config/
 │   ├── schema.ts                 Zod schemas for config and agent frontmatter
@@ -197,6 +198,7 @@ src/
 │   └── lock.ts                   Advisory file locking (atomic mkdir)
 ├── tasks/
 │   ├── task-manager.ts           TaskManager interface, TaskIndex type, severity ordering, task description format
+│   ├── claim.ts                  Task claim metadata and orphaned-claim release for vteam clean
 │   └── aven-manager.ts           AvenTaskManager — TaskManager backed by the aven CLI
 ├── worktree/
 │   └── manager.ts                Git worktree create/remove/list/cleanup
@@ -227,7 +229,7 @@ vteam init                              # scaffold vteam/ directory
 vteam run <agent>                       # run a specific agent
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
 vteam status                            # show task board overview
-vteam clean                             # prune worktrees, break stale locks
+vteam clean                             # prune worktrees, break stale locks, release orphaned active tasks
 vteam loop start                        # start long-lived scheduler for agents with cron patterns
 vteam loop status                       # show agents with cron schedules and next fire times
 vteam skill install                     # symlink skills from skills/ into ~/.claude/skills/
