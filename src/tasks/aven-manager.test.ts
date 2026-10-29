@@ -45,9 +45,9 @@ function fakeExec(handler: (args: string[]) => string) {
 }
 
 describe("AvenTaskManager", () => {
-  it("creates a labelled todo task with metadata and returns its ref", async () => {
+  it("creates a labelled inbox task with metadata and returns its ref", async () => {
     const { exec, calls } = fakeExec((args) =>
-      args[0] === "add" ? 'created APP-7KQ9 ref=7KQ9 project=app status=todo priority=urgent title="x"\n' : "",
+      args[0] === "add" ? 'created APP-7KQ9 ref=7KQ9 project=app status=inbox priority=urgent title="x"\n' : "",
     );
 
     const ref = await new AvenTaskManager(config, exec).create(finding, "improver");
@@ -57,7 +57,7 @@ describe("AvenTaskManager", () => {
     expect(calls[1].args).toEqual([
       "add", "Null check missing",
       "--project", "app",
-      "--status", "todo",
+      "--status", "inbox",
       "--priority", "urgent",
       "--label", "vteam",
       "--metadata", "found-by=improver",
@@ -66,6 +66,7 @@ describe("AvenTaskManager", () => {
     ]);
     expect(calls[1].stdin).toContain("## Suggested Fix\n\nGuard the input.");
     expect(calls[1].stdin).toContain("- `src/b.ts`");
+    expect(calls[2].args).toEqual(["edit", "APP-7KQ9", "--status", "inbox"]);
   });
 
   it("throws when the created ref cannot be parsed", async () => {
@@ -212,6 +213,7 @@ describe.skipIf(!avenInstalled())("AvenTaskManager against real aven", () => {
 
   it("exposes found-by metadata on listed tasks", async () => {
     const ref = await manager.create(finding, "improver");
+    await manager.update(ref, { status: "todo" });
     const [ready] = await manager.listReady();
     expect(ready.ref).toBe(ref);
     expect(ready.metadata["found-by"]).toBe("improver");
@@ -221,7 +223,11 @@ describe.skipIf(!avenInstalled())("AvenTaskManager against real aven", () => {
     expect(await manager.listReady()).toEqual([]);
 
     const ref = await manager.create(finding, "improver");
+    expect(await manager.listReady()).toEqual([]);
+    const created = await manager.getIndex();
+    expect(created.byStatus.get("inbox")?.map((t) => t.ref)).toEqual([ref]);
 
+    await manager.update(ref, { status: "todo" });
     const [ready] = await manager.listReady();
     expect(ready).toMatchObject({
       ref,

@@ -171,14 +171,15 @@ The orchestrator then:
 ## Task lifecycle
 
 ```
-improver finds issue → aven task in todo
+improver finds issue → aven task in inbox
+human triages → todo
 coder picks task → active → implements fix → branch + PR → done
 no changes / crash / error → active → back to todo
 ```
 
 Tasks live in aven, scoped to `tasks.project` + `tasks.label`. Refs look like `APP-7KQ9` (recorded as `taskRef` in `vteam/.runs/*.json`).
 
-- **Creating** (`output: "task"`): `aven add` with `--project`, `--status todo`, `--label`, priority from severity (critical→urgent, high→high, medium→medium, low→low), metadata `found-by=<agent>` and `files=<comma-separated>`, and a markdown description (Description / Suggested Fix / Affected Files). Aven priority `none` reads back as `low`.
+- **Creating** (`output: "task"`): `aven add` with `--project`, `--status inbox`, `--label`, priority from severity (critical→urgent, high→high, medium→medium, low→low), metadata `found-by=<agent>` and `files=<comma-separated>`, and a markdown description (Description / Suggested Fix / Affected Files). Aven priority `none` reads back as `low`. aven promotes inbox tasks with priority medium or higher to `todo` on add, so vteam follows up with `aven edit <ref> --status inbox`. Tasks are only picked once a human moves them to `todo`.
 - **Routing**: each `input: "task"` agent's `taskFilter` (frontmatter) selects tasks by aven metadata — keys AND, list values OR, `null` = key missing/empty. No `taskFilter` = matches everything. There is no fallback: a task no agent's filter matches is never picked (`vteam status` warns). Overlaps are allowed; picking runs under a global claim lock, so exactly one agent gets each task. vteam only writes `found-by`; other keys (e.g. `actor`) are set by humans via `aven edit <ref> --metadata actor=<agent>`.
 - **Picking** (`input: "task"`): `aven list --project P --label L --status todo --ready` (one `aven show` per ready task), then routed in-process as above, so aven dependency blocking and `available_at` deferral are respected. Tasks with `retry-count` >= `maxRetries` are skipped. Sorted by severity (`critical` > `high` > `medium` > `low`), then oldest first. The picked task is set to `active` immediately with metadata `claimed-by` (runId), `claimed-pid`, `claimed-host`. The whole list → pick → `active` step holds `vteam/.locks/task-claim` (shared by all agents, released before Claude runs), so concurrent agents with overlapping filters never get the same task. Claim metadata is removed whenever the task leaves `active`. Local to one machine only.
 - **Branch names**: `vteam/<slugified-title>-<runId>` — aven refs are local and are kept out of remote systems.
@@ -281,6 +282,6 @@ Common `allowedTools` presets:
 - **Orphaned worktree**: Run `vteam clean` to remove it.
 - **Agent produced no changes**: Check the task's `retry-count` metadata (`aven show <ref>`). After `maxRetries` failures, the task is skipped.
 - **PR creation failed**: Verify `gh` or `glab` is installed and authenticated. The branch is still pushed — create the PR manually.
-- **No eligible tasks**: Run the improver first to create todo tasks, or add the `vteam` label to existing aven tasks in the project. Tasks blocked by dependencies or deferred are not ready.
+- **No eligible tasks**: Run the improver first, then move its findings from `inbox` to `todo` (`aven edit <ref> --status todo`), or add the `vteam` label to existing aven tasks in the project. Tasks blocked by dependencies or deferred are not ready.
 - **Task stuck in `active`**: The vteam process was killed mid-run. Run `vteam clean` on the machine that claimed it, or reset with `aven edit <ref> --status todo`.
 - **`aven CLI not found on PATH`**: Install aven and make sure `aven` is on PATH.

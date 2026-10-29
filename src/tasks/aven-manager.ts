@@ -132,7 +132,7 @@ export class AvenTaskManager implements TaskManager {
         "add",
         body.title,
         "--project", this.config.project,
-        "--status", "todo",
+        "--status", "inbox",
         "--priority", PRIORITY_BY_SEVERITY[body.severity],
         "--label", this.config.label,
         "--metadata", `found-by=${foundBy}`,
@@ -145,6 +145,8 @@ export class AvenTaskManager implements TaskManager {
     if (!ref) {
       throw new Error(`Could not parse task ref from aven output: ${output.trim()}`);
     }
+    // aven promotes inbox tasks with priority medium or higher to todo on add; an explicit edit keeps them in inbox.
+    await this.aven(["edit", ref, "--status", "inbox"]);
     return ref;
   }
 

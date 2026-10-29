@@ -64,8 +64,11 @@ vteam init
 # 2. Edit the config
 $EDITOR vteam/vteam.config.json
 
-# 3. Run the improver — finds issues, creates them as aven tasks in todo
+# 3. Run the improver — finds issues, creates them as aven tasks in inbox
 vteam run improver
+
+# 3b. Triage — move the findings you want fixed to todo
+aven edit <ref> --status todo
 
 # 4. Run the coder — picks a task, fixes it, pushes a branch, opens a PR
 vteam run coder
@@ -135,7 +138,7 @@ Every `vteam run <agent>` writes its full output to a new file at `vteam/.logs/<
 2. Reads the agent prompt from `vteam/agents/improver/AGENT.md`
 3. Lists all vteam-labelled tasks in the aven project (every status) and injects them into the prompt so Claude knows what's already been found
 4. Spawns `claude -p` — Claude scans the codebase and returns findings as structured JSON
-5. The orchestrator creates an aven task (status `todo`) from each finding via `aven add`
+5. The orchestrator creates an aven task (status `inbox`) from each finding via `aven add`. Findings wait in inbox until a human moves them to `todo`
 6. Releases the lock
 
 Claude is read-only — it scans and reports. The orchestrator owns all file creation.
@@ -284,6 +287,11 @@ Tasks live in [aven](#prerequisites), a local-first task manager backed by SQLit
 improver finds issue
         │
         ▼
+    ┌───────┐
+    │ inbox │
+    └───────┘
+        │  human triage (aven edit <ref> --status todo)
+        ▼
     ┌──────┐  coder picks       ┌────────┐  branch + PR  ┌──────┐
     │ todo │ ─────────────────▶ │ active │ ────────────▶ │ done │
     └──────┘                    └────────┘               └──────┘
@@ -327,7 +335,7 @@ Because tasks live in aven, you can triage them with `aven tui` or the `aven` CL
 | ---------------------- | ------------------------------------------------------------------------------- |
 | title                  | The finding's title                                                             |
 | project / label        | `tasks.project` / `tasks.label`                                                 |
-| status                 | `todo` on creation; `active` while being worked on; `done` on success           |
+| status                 | `inbox` on creation; `active` while being worked on; `done` on success          |
 | priority               | From severity: `critical`→`urgent`, `high`→`high`, `medium`→`medium`, `low`→`low` (aven `none` reads back as `low`) |
 | description            | Markdown with `## Description`, `## Suggested Fix` (optional), `## Affected Files` |
 | metadata `found-by`    | Name of the agent that created the task (usable in `taskFilter`)                |
@@ -388,7 +396,7 @@ vteam ships with four default agents (improver, coder, review-responder, test-wr
 ### Improver
 
 - Read-only — scans the codebase, never modifies any files
-- Returns findings as structured JSON — the orchestrator creates them as aven tasks in `todo`
+- Returns findings as structured JSON — the orchestrator creates them as aven tasks in `inbox` for human triage
 - Does not use a worktree or commit — findings stay local until the coder acts on them
 - Limited to 1 finding per run (configurable in the AGENT.md prompt)
 - Prioritizes severity: security bugs > performance > code quality
