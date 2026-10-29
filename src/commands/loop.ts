@@ -118,7 +118,7 @@ export function findCronAgents(cwd: string): AgentConfig[] {
       const agent = resolveAgentConfig(name, cwd);
       if (agent.cron) agents.push(agent);
     } catch {
-      // skip agents with invalid frontmatter
+      // skip agents with invalid config
     }
   }
 

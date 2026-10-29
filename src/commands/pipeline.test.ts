@@ -80,13 +80,13 @@ function setupProject(opts: {
   hasOnFinish?: boolean;
   hasMemory?: boolean;
   existingMemory?: string;
-  agentFrontmatter?: string;
+  agentConfig?: Record<string, unknown>;
 } = {}): void {
   const {
     hasOnFinish = false,
     hasMemory = false,
     existingMemory,
-    agentFrontmatter = "---\nmodel: sonnet\n---",
+    agentConfig = { model: "sonnet" },
   } = opts;
 
   const vteamDir = resolve(tmp, "vteam");
@@ -104,21 +104,26 @@ function setupProject(opts: {
   const agentDir = resolve(vteamDir, "agents", "test-agent");
   mkdirSync(agentDir, { recursive: true });
   writeFileSync(
-    resolve(agentDir, "AGENT.md"),
-    `${agentFrontmatter}\n\nYou are a test agent.`,
+    resolve(agentDir, "agent.json"),
+    JSON.stringify({
+      ...agentConfig,
+      ...(hasOnFinish ? { onFinish: { model: "haiku" } } : {}),
+      ...(hasMemory ? { memory: { model: "haiku" } } : {}),
+    }),
   );
+  writeFileSync(resolve(agentDir, "AGENT.md"), "You are a test agent.");
 
   if (hasOnFinish) {
     writeFileSync(
       resolve(agentDir, "ON_FINISH.md"),
-      "---\nmodel: haiku\n---\n\nPost notification.",
+      "Post notification.",
     );
   }
 
   if (hasMemory) {
     writeFileSync(
       resolve(agentDir, "MEMORY.md"),
-      "---\nmodel: haiku\n---\n\nKeep a running list of scanned areas.",
+      "Keep a running list of scanned areas.",
     );
   }
 
@@ -177,7 +182,7 @@ describe("pipeline: agent output → ON_FINISH", () => {
   it("passes task content as JSON to ON_FINISH hook", async () => {
     setupProject({
       hasOnFinish: true,
-      agentFrontmatter: "---\nmodel: sonnet\noutput: task\n---",
+      agentConfig: { model: "sonnet", output: "task" },
     });
 
     mockRunClaude
@@ -372,7 +377,7 @@ describe("pipeline: agent output → MEMORY curation", () => {
 describe("pipeline: agent output → task creation", () => {
   it("creates a task when agent returns task content", async () => {
     setupProject({
-      agentFrontmatter: "---\nmodel: sonnet\noutput: task\n---",
+      agentConfig: { model: "sonnet", output: "task" },
     });
 
     mockRunClaude.mockResolvedValueOnce(
@@ -447,7 +452,7 @@ describe("pipeline: task input lifecycle", () => {
   }
 
   it("marks the picked task active, then returns it to todo when not settled", async () => {
-    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    setupProject({ agentConfig: { model: "sonnet", input: "task" } });
     seedTask();
 
     mockRunClaude.mockResolvedValueOnce(
@@ -461,7 +466,7 @@ describe("pipeline: task input lifecycle", () => {
   });
 
   it("claims the task with run metadata and clears the claim on release", async () => {
-    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    setupProject({ agentConfig: { model: "sonnet", input: "task" } });
     seedTask();
 
     mockRunClaude.mockResolvedValueOnce(
@@ -479,7 +484,7 @@ describe("pipeline: task input lifecycle", () => {
   });
 
   it("releases the claim lock before the agent runs", async () => {
-    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    setupProject({ agentConfig: { model: "sonnet", input: "task" } });
     seedTask();
 
     const claimLock = resolve(tmp, "vteam", ".locks", "task-claim.lock");
@@ -495,10 +500,11 @@ describe("pipeline: task input lifecycle", () => {
   });
 
   it("never hands the same task to two agents running at once", async () => {
-    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    setupProject({ agentConfig: { model: "sonnet", input: "task" } });
     const otherDir = resolve(tmp, "vteam", "agents", "other-agent");
     mkdirSync(otherDir, { recursive: true });
-    writeFileSync(resolve(otherDir, "AGENT.md"), "---\nmodel: sonnet\ninput: task\n---\n\nOther.");
+    writeFileSync(resolve(otherDir, "agent.json"), JSON.stringify({ model: "sonnet", input: "task" }));
+    writeFileSync(resolve(otherDir, "AGENT.md"), "Other.");
     seedTask();
 
     let openGate!: () => void;
@@ -518,7 +524,7 @@ describe("pipeline: task input lifecycle", () => {
   });
 
   it("notes the agent's summary and blocker reason on the task", async () => {
-    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    setupProject({ agentConfig: { model: "sonnet", input: "task" } });
     seedTask();
 
     mockRunClaude.mockResolvedValueOnce(
@@ -533,7 +539,7 @@ describe("pipeline: task input lifecycle", () => {
   });
 
   it("still releases the task when the note cannot be written", async () => {
-    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    setupProject({ agentConfig: { model: "sonnet", input: "task" } });
     seedTask();
     taskStore.failNotes = true;
 
@@ -548,7 +554,7 @@ describe("pipeline: task input lifecycle", () => {
   });
 
   it("returns the task to todo when the agent fails", async () => {
-    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    setupProject({ agentConfig: { model: "sonnet", input: "task" } });
     seedTask();
 
     mockRunClaude.mockResolvedValueOnce(makeResult(null, 1));
@@ -560,7 +566,7 @@ describe("pipeline: task input lifecycle", () => {
   });
 
   it("picks the highest severity task and skips tasks over the retry limit", async () => {
-    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    setupProject({ agentConfig: { model: "sonnet", input: "task" } });
     seedTask({ ref: "VTM-LOW1", severity: "low" });
     seedTask({ ref: "VTM-CRIT", severity: "critical", retryCount: 3 });
     seedTask({ ref: "VTM-HIGH", severity: "high" });
@@ -584,8 +590,7 @@ describe("pipeline: task input lifecycle", () => {
 
   it("picks only tasks matching its taskFilter, ORing list values", async () => {
     setupProject({
-      agentFrontmatter:
-        "---\nmodel: sonnet\ninput: task\ntaskFilter:\n  found-by: [improver, security-analyst]\n---",
+      agentConfig: { model: "sonnet", input: "task", taskFilter: { "found-by": ["improver", "security-analyst"] } },
     });
     seedTask({ ref: "VTM-OTHR", severity: "critical", metadata: { "found-by": "human" } });
     seedTask({ ref: "VTM-SECU", severity: "low", metadata: { "found-by": "security-analyst" } });
@@ -595,7 +600,7 @@ describe("pipeline: task input lifecycle", () => {
 
   it("matches a missing metadata key with null", async () => {
     setupProject({
-      agentFrontmatter: "---\nmodel: sonnet\ninput: task\ntaskFilter:\n  actor: null\n---",
+      agentConfig: { model: "sonnet", input: "task", taskFilter: { actor: null } },
     });
     seedTask({ ref: "VTM-REVW", severity: "critical", metadata: { actor: "mr-reviewer" } });
     seedTask({ ref: "VTM-FREE", severity: "low" });
@@ -604,7 +609,7 @@ describe("pipeline: task input lifecycle", () => {
   });
 
   it("picks every task when it has no taskFilter", async () => {
-    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    setupProject({ agentConfig: { model: "sonnet", input: "task" } });
     seedTask({ ref: "VTM-REVW", severity: "critical", metadata: { actor: "mr-reviewer" } });
 
     expect(await pickedRef()).toBe("VTM-REVW");
@@ -612,7 +617,7 @@ describe("pipeline: task input lifecycle", () => {
 
   it("stays idle when no ready task matches its taskFilter", async () => {
     setupProject({
-      agentFrontmatter: "---\nmodel: sonnet\ninput: task\ntaskFilter:\n  actor: mr-reviewer\n---",
+      agentConfig: { model: "sonnet", input: "task", taskFilter: { actor: "mr-reviewer" } },
     });
     seedTask({ ref: "VTM-OTHR", metadata: { "found-by": "improver" } });
 
@@ -623,7 +628,7 @@ describe("pipeline: task input lifecycle", () => {
   });
 
   it("does nothing when no task is ready", async () => {
-    setupProject({ agentFrontmatter: "---\nmodel: sonnet\ninput: task\n---" });
+    setupProject({ agentConfig: { model: "sonnet", input: "task" } });
 
     await runCommand("test-agent", {});
 

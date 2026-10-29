@@ -80,7 +80,7 @@ function listAgents(cwd: string): void {
         .join(", ");
       console.log(`  ${name}${flags ? `  (${flags})` : ""}`);
     } catch {
-      console.log(`  ${name}  (invalid frontmatter)`);
+      console.log(`  ${name}  (invalid config)`);
     }
   }
 }

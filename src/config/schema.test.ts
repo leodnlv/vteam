@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { vteamConfigSchema, agentFrontmatterSchema, onFinishFrontmatterSchema } from "./schema.js";
+import { vteamConfigSchema, agentConfigSchema, subagentConfigSchema } from "./schema.js";
 
 describe("vteamConfigSchema", () => {
   const validConfig = {
@@ -69,9 +69,9 @@ describe("vteamConfigSchema", () => {
   });
 });
 
-describe("agentFrontmatterSchema", () => {
+describe("agentConfigSchema", () => {
   it("accepts taskFilter with strings, lists and null", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       input: "task",
       taskFilter: { "found-by": ["improver", "security-analyst", null], actor: "coder", owner: null },
     });
@@ -79,22 +79,36 @@ describe("agentFrontmatterSchema", () => {
   });
 
   it("rejects taskFilter without input: task", () => {
-    const result = agentFrontmatterSchema.safeParse({ taskFilter: { actor: "coder" } });
+    const result = agentConfigSchema.safeParse({ taskFilter: { actor: "coder" } });
     expect(result.success).toBe(false);
   });
 
   it("rejects non-string taskFilter values and empty lists", () => {
-    expect(agentFrontmatterSchema.safeParse({ input: "task", taskFilter: { n: 1 } }).success).toBe(false);
-    expect(agentFrontmatterSchema.safeParse({ input: "task", taskFilter: { n: [] } }).success).toBe(false);
+    expect(agentConfigSchema.safeParse({ input: "task", taskFilter: { n: 1 } }).success).toBe(false);
+    expect(agentConfigSchema.safeParse({ input: "task", taskFilter: { n: [] } }).success).toBe(false);
   });
 
-  it("accepts empty frontmatter (bare AGENT.md)", () => {
-    const result = agentFrontmatterSchema.safeParse({});
+  it("rejects unknown keys", () => {
+    expect(agentConfigSchema.safeParse({ modle: "sonnet" }).success).toBe(false);
+    expect(agentConfigSchema.safeParse({ memory: { modle: "haiku" } }).success).toBe(false);
+  });
+
+  it("accepts $schema, memory and onFinish sections", () => {
+    const result = agentConfigSchema.safeParse({
+      $schema: "../../agent.schema.json",
+      memory: { model: "haiku" },
+      onFinish: { model: "haiku", allowedTools: ["Bash(curl *)"] },
+    });
     expect(result.success).toBe(true);
   });
 
-  it("accepts full frontmatter", () => {
-    const result = agentFrontmatterSchema.safeParse({
+  it("accepts empty config (bare AGENT.md)", () => {
+    const result = agentConfigSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts full config", () => {
+    const result = agentConfigSchema.safeParse({
       model: "sonnet",
       worktree: true,
       input: "task",
@@ -106,7 +120,7 @@ describe("agentFrontmatterSchema", () => {
   });
 
   it("accepts autoPR without worktree", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       autoPR: true,
       worktree: false,
     });
@@ -114,7 +128,7 @@ describe("agentFrontmatterSchema", () => {
   });
 
   it("rejects input pr without worktree", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       input: "pr",
       worktree: false,
     });
@@ -122,7 +136,7 @@ describe("agentFrontmatterSchema", () => {
   });
 
   it("accepts input pr with worktree", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       input: "pr",
       worktree: true,
     });
@@ -130,35 +144,35 @@ describe("agentFrontmatterSchema", () => {
   });
 
   it("accepts input task without worktree", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       input: "task",
     });
     expect(result.success).toBe(true);
   });
 
   it("rejects invalid input value", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       input: "invalid",
     });
     expect(result.success).toBe(false);
   });
 
   it("accepts output task", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       output: "task",
     });
     expect(result.success).toBe(true);
   });
 
   it("rejects invalid output value", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       output: "invalid",
     });
     expect(result.success).toBe(false);
   });
 
   it("accepts output task with worktree", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       output: "task",
       worktree: true,
     });
@@ -166,7 +180,7 @@ describe("agentFrontmatterSchema", () => {
   });
 
   it("accepts prTriggerLabel with input pr", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       input: "pr",
       prTriggerLabel: "vteam:changes-requested",
       worktree: true,
@@ -175,35 +189,35 @@ describe("agentFrontmatterSchema", () => {
   });
 
   it("accepts valid cron pattern", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       cron: "0 */6 * * *",
     });
     expect(result.success).toBe(true);
   });
 
   it("rejects invalid cron pattern", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       cron: "not a cron",
     });
     expect(result.success).toBe(false);
   });
 
   it("accepts allowedTools", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       allowedTools: ["Read", "Glob", "Grep", "Bash(git *)"],
     });
     expect(result.success).toBe(true);
   });
 
   it("accepts disallowedTools", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       disallowedTools: ["Write", "Bash(rm *)"],
     });
     expect(result.success).toBe(true);
   });
 
   it("accepts both allowedTools and disallowedTools", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       allowedTools: ["Read", "Edit", "Bash(git *)"],
       disallowedTools: ["Bash(rm *)"],
     });
@@ -211,7 +225,7 @@ describe("agentFrontmatterSchema", () => {
   });
 
   it("accepts readOnly with worktree", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       readOnly: true,
       worktree: true,
     });
@@ -219,14 +233,14 @@ describe("agentFrontmatterSchema", () => {
   });
 
   it("rejects readOnly without worktree", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       readOnly: true,
     });
     expect(result.success).toBe(false);
   });
 
   it("rejects readOnly with worktree false", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       readOnly: true,
       worktree: false,
     });
@@ -234,7 +248,7 @@ describe("agentFrontmatterSchema", () => {
   });
 
   it("rejects readOnly with autoPR", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       readOnly: true,
       worktree: true,
       autoPR: true,
@@ -243,7 +257,7 @@ describe("agentFrontmatterSchema", () => {
   });
 
   it("accepts readOnly with input pr", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       readOnly: true,
       worktree: true,
       input: "pr",
@@ -252,7 +266,7 @@ describe("agentFrontmatterSchema", () => {
   });
 
   it("accepts readOnly with input task", () => {
-    const result = agentFrontmatterSchema.safeParse({
+    const result = agentConfigSchema.safeParse({
       readOnly: true,
       worktree: true,
       input: "task",
@@ -261,14 +275,14 @@ describe("agentFrontmatterSchema", () => {
   });
 });
 
-describe("onFinishFrontmatterSchema", () => {
-  it("accepts empty frontmatter", () => {
-    const result = onFinishFrontmatterSchema.safeParse({});
+describe("subagentConfigSchema", () => {
+  it("accepts empty config", () => {
+    const result = subagentConfigSchema.safeParse({});
     expect(result.success).toBe(true);
   });
 
   it("accepts model and tool permissions", () => {
-    const result = onFinishFrontmatterSchema.safeParse({
+    const result = subagentConfigSchema.safeParse({
       model: "haiku",
       allowedTools: ["Bash(curl *)"],
       disallowedTools: ["Write"],
@@ -277,7 +291,7 @@ describe("onFinishFrontmatterSchema", () => {
   });
 
   it("accepts only model", () => {
-    const result = onFinishFrontmatterSchema.safeParse({
+    const result = subagentConfigSchema.safeParse({
       model: "sonnet",
     });
     expect(result.success).toBe(true);

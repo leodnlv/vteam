@@ -1,23 +1,3 @@
----
-model: sonnet
-worktree: true
-input: pr
-prTriggerLabel: vteam:changes-requested
-allowedTools:
-  - Read
-  - Edit
-  - Write
-  - Glob
-  - Grep
-  - Bash(npm *)
-  - Bash(npx *)
-  - Bash(just *)
-  - Bash(gh *)
-  - Bash(glab *)
-  - Bash(cat *)
-  - Bash(ls *)
----
-
 # Review Responder Agent
 
 You are an expert software engineer addressing pull request review feedback as part of an automated virtual development team.

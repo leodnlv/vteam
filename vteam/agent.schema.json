@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "cron": {
+      "type": "string"
+    },
+    "worktree": {
+      "type": "boolean"
+    },
+    "readOnly": {
+      "type": "boolean"
+    },
+    "output": {
+      "type": "string",
+      "enum": [
+        "task"
+      ]
+    },
+    "input": {
+      "type": "string",
+      "enum": [
+        "task",
+        "pr"
+      ]
+    },
+    "taskFilter": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "prTriggerLabel": {
+      "type": "string"
+    },
+    "autoPR": {
+      "type": "boolean"
+    },
+    "prCreateLabels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "allowedTools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "disallowedTools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "memory": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "allowedTools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "disallowedTools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "onFinish": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "allowedTools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "disallowedTools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

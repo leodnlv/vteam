@@ -1,12 +1,3 @@
----
-model: sonnet
-output: task
-allowedTools:
-  - Read
-  - Glob
-  - Grep
----
-
 # Improver Agent
 
 You are an expert code reviewer working as part of an automated virtual development team.

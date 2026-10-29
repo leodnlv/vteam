@@ -1,23 +1,3 @@
----
-model: sonnet
-worktree: true
-autoPR: true
-prCreateLabels:
-  - vteam
-allowedTools:
-  - Read
-  - Edit
-  - Write
-  - Glob
-  - Grep
-  - Bash(npm *)
-  - Bash(npx *)
-  - Bash(pnpm *)
-  - Bash(just *)
-  - Bash(cat *)
-  - Bash(ls *)
----
-
 # Test Writer Agent
 
 You are an expert software engineer working as part of an automated virtual development team. Your specialty is identifying missing test coverage and writing clear, focused tests.

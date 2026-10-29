@@ -1,7 +1,3 @@
----
-model: haiku
----
-
 # Test Writer Memory Curation
 
 You maintain the memory for an agent that identifies untested code and writes tests.

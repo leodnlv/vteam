@@ -15,8 +15,15 @@ export function isValidCronExpression(expr: string): boolean {
 
 const taskFilterValueSchema = z.string().min(1).nullable();
 
-export const agentFrontmatterSchema = z
-  .object({
+export const subagentConfigSchema = z.strictObject({
+  model: z.string().optional(),
+  allowedTools: z.array(z.string()).optional(),
+  disallowedTools: z.array(z.string()).optional(),
+});
+
+export const agentConfigSchema = z
+  .strictObject({
+    $schema: z.string().optional(),
     model: z.string().optional(),
     cron: z
       .string()
@@ -40,6 +47,8 @@ export const agentFrontmatterSchema = z
     prCreateLabels: z.array(z.string()).optional(),
     allowedTools: z.array(z.string()).optional(),
     disallowedTools: z.array(z.string()).optional(),
+    memory: subagentConfigSchema.optional(),
+    onFinish: subagentConfigSchema.optional(),
   })
   .refine((agent) => agent.input !== "pr" || agent.worktree, {
     message: 'input: "pr" requires worktree: true',
@@ -60,17 +69,9 @@ export const agentFrontmatterSchema = z
     message: 'taskFilter requires input: "task"',
   });
 
-export const onFinishFrontmatterSchema = z.object({
-  model: z.string().optional(),
-  allowedTools: z.array(z.string()).optional(),
-  disallowedTools: z.array(z.string()).optional(),
-});
-
-export const memoryFrontmatterSchema = z.object({
-  model: z.string().optional(),
-  allowedTools: z.array(z.string()).optional(),
-  disallowedTools: z.array(z.string()).optional(),
-});
+export function agentConfigJsonSchema(): Record<string, unknown> {
+  return z.toJSONSchema(agentConfigSchema, { io: "input" });
+}
 
 export const vteamConfigSchema = z.object({
   baseBranch: z.string(),

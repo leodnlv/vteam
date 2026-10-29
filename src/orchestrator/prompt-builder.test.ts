@@ -49,7 +49,7 @@ function stubTaskManager(tasks: Task[]): TaskManager {
 
 function setup(tasks: Task[] = []): { agentConfig: AgentConfig; taskManager: TaskManager } {
   const agentMdPath = resolve(tmp, "AGENT.md");
-  writeFileSync(agentMdPath, "---\nmodel: sonnet\nworktree: true\n---\n\n# Test Agent\n\nYou are a test agent.", "utf-8");
+  writeFileSync(agentMdPath, "# Test Agent\n\nYou are a test agent.\n", "utf-8");
 
   const taskManager = stubTaskManager(tasks);
 
@@ -121,14 +121,6 @@ describe("buildPrompt", () => {
     const { agentConfig, taskManager } = setup();
     const { userPrompt } = await buildPrompt(agentConfig, taskManager, makeTask({}));
     expect(userPrompt).not.toContain("## Task Notes");
-  });
-
-  it("excludes frontmatter from system prompt", async () => {
-    const { agentConfig, taskManager } = setup();
-    const { systemPrompt } = await buildPrompt(agentConfig, taskManager);
-    expect(systemPrompt).not.toContain("model:");
-    expect(systemPrompt).not.toContain("worktree:");
-    expect(systemPrompt).not.toContain("---");
   });
 
   it("omits task section when no task provided", async () => {
@@ -270,7 +262,7 @@ describe("buildOnFinishPrompt", () => {
     const onFinishPath = resolve(tmp, "ON_FINISH.md");
     writeFileSync(
       onFinishPath,
-      "---\nmodel: haiku\nallowedTools: [Bash(curl *)]\n---\n\nPost a Slack notification with the run result.",
+      "Post a Slack notification with the run result.",
       "utf-8",
     );
     return onFinishPath;
@@ -285,8 +277,7 @@ describe("buildOnFinishPrompt", () => {
       completedAt: "2026-04-21T10:05:00Z",
     };
     const { systemPrompt } = buildOnFinishPrompt({ onFinishMdPath: path }, outcome);
-    expect(systemPrompt).toContain("Slack notification");
-    expect(systemPrompt).not.toContain("model:");
+    expect(systemPrompt).toBe("Post a Slack notification with the run result.");
   });
 
   it("includes run outcome in user prompt", () => {
@@ -435,7 +426,7 @@ describe("buildMemoryCurationPrompt", () => {
     const memoryPath = resolve(tmp, "MEMORY.md");
     writeFileSync(
       memoryPath,
-      "---\nmodel: haiku\n---\n\nKeep a running list of scanned areas.",
+      "Keep a running list of scanned areas.",
       "utf-8",
     );
     return memoryPath;

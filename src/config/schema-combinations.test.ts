@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { agentFrontmatterSchema } from "./schema.js";
+import { agentConfigSchema } from "./schema.js";
 
 function valid(fm: Record<string, unknown>): void {
-  const result = agentFrontmatterSchema.safeParse(fm);
+  const result = agentConfigSchema.safeParse(fm);
   expect(result.success, `Expected valid but got: ${!result.success ? result.error.issues.map((i) => i.message).join(", ") : ""}`).toBe(true);
 }
 
 function invalid(fm: Record<string, unknown>, messageFragment?: string): void {
-  const result = agentFrontmatterSchema.safeParse(fm);
+  const result = agentConfigSchema.safeParse(fm);
   expect(result.success).toBe(false);
   if (messageFragment && !result.success) {
     const messages = result.error.issues.map((i) => i.message).join("; ");
@@ -15,7 +15,7 @@ function invalid(fm: Record<string, unknown>, messageFragment?: string): void {
   }
 }
 
-describe("frontmatter combinations", () => {
+describe("agent config combinations", () => {
   describe("output: task", () => {
     it("standalone", () => valid({ output: "task" }));
 
@@ -111,7 +111,7 @@ describe("frontmatter combinations", () => {
         readOnly: true,
       }));
 
-    it("bare agent: empty frontmatter", () =>
+    it("bare agent: empty config", () =>
       valid({}));
   });
 

@@ -17,18 +17,16 @@ describe("findCronAgents", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  function addAgent(name: string, frontmatter: string): void {
+  function addAgent(name: string, config: Record<string, unknown>): void {
     const agentDir = resolve(dir, "vteam", "agents", name);
     mkdirSync(agentDir, { recursive: true });
-    writeFileSync(
-      resolve(agentDir, "AGENT.md"),
-      `---\n${frontmatter}\n---\nAgent prompt.`,
-    );
+    writeFileSync(resolve(agentDir, "agent.json"), JSON.stringify(config));
+    writeFileSync(resolve(agentDir, "AGENT.md"), "Agent prompt.");
   }
 
   it("returns agents with cron patterns", () => {
-    addAgent("reviewer", 'cron: "0 */6 * * *"');
-    addAgent("fixer", "worktree: true");
+    addAgent("reviewer", { cron: "0 */6 * * *" });
+    addAgent("fixer", { worktree: true });
 
     const agents = findCronAgents(dir);
     expect(agents).toHaveLength(1);
@@ -37,7 +35,7 @@ describe("findCronAgents", () => {
   });
 
   it("returns empty array when no agents have cron", () => {
-    addAgent("fixer", "worktree: true");
+    addAgent("fixer", { worktree: true });
     expect(findCronAgents(dir)).toHaveLength(0);
   });
 
@@ -45,9 +43,9 @@ describe("findCronAgents", () => {
     expect(findCronAgents(dir)).toHaveLength(0);
   });
 
-  it("skips agents with invalid frontmatter", () => {
-    addAgent("good", 'cron: "0 */6 * * *"');
-    addAgent("bad", 'cron: "not a cron"');
+  it("skips agents with invalid config", () => {
+    addAgent("good", { cron: "0 */6 * * *" });
+    addAgent("bad", { cron: "not a cron" });
 
     const agents = findCronAgents(dir);
     expect(agents).toHaveLength(1);

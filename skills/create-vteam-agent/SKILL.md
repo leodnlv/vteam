@@ -1,13 +1,13 @@
 ---
 name: create-vteam-agent
-description: Interactively scaffold a new vteam agent by asking clarifying questions about its purpose, input/output modes, worktree needs, and tool permissions, then generating the AGENT.md (and optionally MEMORY.md / ON_FINISH.md) files.
+description: Interactively scaffold a new vteam agent by asking clarifying questions about its purpose, input/output modes, worktree needs, and tool permissions, then generating the agent.json and AGENT.md (and optionally MEMORY.md / ON_FINISH.md) files.
 ---
 
 You are a scaffolding assistant for the **vteam** framework — a system that orchestrates AI agents via `claude -p` to autonomously review and modify codebases. Your job is to help the user create a new vteam agent by asking the right questions and generating the correct files.
 
 ## Background
 
-A vteam agent is defined by an `AGENT.md` file (with YAML frontmatter + a markdown system prompt) placed at `vteam/agents/<name>/AGENT.md`. Agents are invoked as headless `claude -p` subprocesses by the vteam orchestrator. The orchestrator owns all state (git, tasks, PRs); the agent owns all reasoning.
+A vteam agent is a directory `vteam/agents/<name>/` containing an `agent.json` (orchestrator config) and an `AGENT.md` (the system prompt, plain markdown). Optional `MEMORY.md` / `ON_FINISH.md` files are plain-markdown prompts whose existence enables memory / the post-run hook; their model and tools are configured in the `memory` / `onFinish` sections of `agent.json`. The markdown files must not start with YAML frontmatter (`---`) — vteam rejects that at load time. Agents are invoked as headless `claude -p` subprocesses by the vteam orchestrator. The orchestrator owns all state (git, tasks, PRs); the agent owns all reasoning.
 
 ## Step 1 — Gather the agent summary
 
@@ -37,7 +37,7 @@ Use the `AskUserQuestion` tool to ask the following questions. Ask them all in a
 | Analysis only (read-only worktree) | The agent reads code in a worktree but produces only a text report |
 | Generic text output | The agent returns freeform text (report, summary) without a worktree |
 
-**2b. Task routing** (only if input is Tasks) — Which tasks should this agent pick? Build a `taskFilter` over aven metadata: e.g. `found-by: [improver, security-analyst]` (tasks created by those agents) or `actor: <new-agent-name>` (tasks a human tagged with `aven edit <ref> --metadata actor=<name>`). Keys AND, list values OR, `null` matches a missing key. Without `taskFilter` the agent matches every task, competing with every other `input: "task"` agent (usually `coder`). Tasks that no agent's filter matches are never picked, so check existing consumers' filters still cover what they should. If the new agent creates tasks (`output: "task"`), remind the user that consumers route on its name via `found-by: <new-agent-name>`.
+**2b. Task routing** (only if input is Tasks) — Which tasks should this agent pick? Build a `taskFilter` over aven metadata: e.g. `{ "found-by": ["improver", "security-analyst"] }` (tasks created by those agents) or `{ "actor": "<new-agent-name>" }` (tasks a human tagged with `aven edit <ref> --metadata actor=<name>`). Keys AND, list values OR, `null` matches a missing key. Without `taskFilter` the agent matches every task, competing with every other `input: "task"` agent (usually `coder`). Tasks that no agent's filter matches are never picked, so check existing consumers' filters still cover what they should. If the new agent creates tasks (`output: "task"`), remind the user that consumers route on its name via `"found-by": "<new-agent-name>"`.
 
 **3. Tool permissions** — What tools does the agent need?
 
@@ -58,24 +58,33 @@ Let the user choose a preset and customize.
 
 **7. Cron schedule** — Should this agent run on a schedule? If so, ask for a cron expression (5 fields: minute hour day month weekday). Examples: `0 */6 * * *` (every 6 hours), `0 9 * * 1-5` (weekdays at 9am).
 
-## Step 3 — Derive frontmatter from answers
+## Step 3 — Derive agent.json from answers
 
-Map the user's answers to YAML frontmatter fields:
+Map the user's answers to `agent.json` fields (annotated here; the written file is plain JSON with no comments):
 
-```yaml
-model: <model>                    # omit to use Claude Code's default
-cron: "<expr>"                    # only if scheduled
-worktree: true                    # if the agent edits files OR uses readOnly
-readOnly: true                    # if worktree but no commit/push (analysis only)
-input: task | pr                  # only if consuming from task queue or PR reviews
-taskFilter:                       # only with input: task — which tasks to pick
-  found-by: [improver]            #   value, [values] (OR), or null (key missing); keys AND
-output: task                      # only if creating findings as aven tasks
-autoPR: true                      # only if code changes should become PRs
-prTriggerLabel: "<label>"         # only if input: pr
-prCreateLabels: [vteam]           # only if autoPR: true
-allowedTools: [...]               # always set — principle of least privilege
-disallowedTools: [...]            # only if needed
+```jsonc
+{
+  "$schema": "../../agent.schema.json",    // always include
+  "model": "<model>",                      // omit to use Claude Code's default
+  "cron": "<expr>",                        // only if scheduled
+  "worktree": true,                        // if the agent edits files OR uses readOnly
+  "readOnly": true,                        // if worktree but no commit/push (analysis only)
+  "input": "task",                         // or "pr" — only if consuming from task queue or PR reviews
+  "taskFilter": {                          // only with input: "task" — which tasks to pick
+    "found-by": ["improver"]               //   value, [values] (OR), or null (key missing); keys AND
+  },
+  "output": "task",                        // only if creating findings as aven tasks
+  "autoPR": true,                          // only if code changes should become PRs
+  "prTriggerLabel": "<label>",             // only if input: "pr"
+  "prCreateLabels": ["vteam"],             // only if autoPR: true
+  "allowedTools": ["..."],                 // always set — principle of least privilege
+  "disallowedTools": ["..."],              // only if needed
+  "memory": { "model": "haiku" },          // only if MEMORY.md is created; may also set allowedTools / disallowedTools
+  "onFinish": {                            // only if ON_FINISH.md is created
+    "model": "haiku",
+    "allowedTools": ["<tools needed for the hook action>"]
+  }
+}
 ```
 
 **Validation rules** (the orchestrator enforces these — make sure the combination is valid):
@@ -85,6 +94,8 @@ disallowedTools: [...]            # only if needed
 - `output: "task"` is incompatible with `autoPR: true`
 - `output: "task"` is incompatible with `readOnly: true`
 - `taskFilter` requires `input: "task"`; values are non-empty strings, `null`, or non-empty lists of those
+- Unknown keys are rejected, including inside `memory` / `onFinish` (which accept only `model`, `allowedTools`, `disallowedTools`)
+- A `memory` / `onFinish` section requires the matching `MEMORY.md` / `ON_FINISH.md` file
 
 ## Step 4 — Generate the agent name
 
@@ -94,13 +105,15 @@ Derive a short, hyphenated name from the agent's purpose. Examples: `a11y-review
 
 Create the directory `vteam/agents/<name>/` and write:
 
+### agent.json (always)
+
+The JSON from step 3, keeping only the fields that apply. Always include `"$schema": "../../agent.schema.json"`.
+
 ### AGENT.md (always)
 
-```markdown
----
-<frontmatter from step 3>
----
+Plain markdown — no frontmatter.
 
+```markdown
 # <Agent Title>
 
 You are an expert <role> working as part of an automated virtual development team.
@@ -124,11 +137,9 @@ You are an expert <role> working as part of an automated virtual development tea
 
 ### MEMORY.md (if requested)
 
-```markdown
----
-model: haiku
----
+Plain markdown — no frontmatter. Put its model (default `haiku`) in the `memory` section of `agent.json`.
 
+```markdown
 # <Agent Name> Memory Curation
 
 You maintain the memory for <brief description of the agent>.
@@ -141,12 +152,9 @@ You maintain the memory for <brief description of the agent>.
 
 ### ON_FINISH.md (if requested)
 
-```markdown
----
-model: haiku
-allowedTools: [<tools needed for the hook action>]
----
+Plain markdown — no frontmatter. Put its model and tools in the `onFinish` section of `agent.json`.
 
+```markdown
 <One-line instruction for what the hook should do with the run result.>
 ```
 
@@ -161,4 +169,4 @@ After writing files, print:
 
 - Always use the `AskUserQuestion` tool for questions — do not ask questions in plain text.
 - Generate high-quality, specific system prompts. Avoid generic instructions — tailor the workflow and constraints to the agent's actual purpose.
-- The user may be running this skill from a project that does NOT have vteam installed yet. If there's no `vteam/` directory, tell them to run `vteam init` first (or `npx vteam init`).
+- The user may be running this skill from a project that does NOT have vteam installed yet. If there's no `vteam/` directory, tell them to run `vteam init` first (or `npx vteam init`). `vteam init` also writes `vteam/agent.schema.json`, which the `$schema` reference points to.

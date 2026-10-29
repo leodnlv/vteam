@@ -1,8 +1,25 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { parse } from "../frontmatter.js";
-import { agentFrontmatterSchema, onFinishFrontmatterSchema, memoryFrontmatterSchema } from "./schema.js";
-import type { AgentConfig, OnFinishConfig, MemoryConfig } from "../types.js";
+import { agentConfigSchema } from "./schema.js";
+import type { AgentConfig } from "../types.js";
+
+function assertNoFrontmatter(path: string, label: string): void {
+  const raw = readFileSync(path, "utf-8");
+  if (raw.replace(/^\uFEFF/, "").startsWith("---")) {
+    throw new Error(
+      `${label} starts with YAML frontmatter, which is no longer supported. Move its fields to agent.json and leave only the prompt in the markdown file.`,
+    );
+  }
+}
+
+function readAgentJson(path: string, name: string): unknown {
+  if (!existsSync(path)) return {};
+  try {
+    return JSON.parse(readFileSync(path, "utf-8"));
+  } catch (err) {
+    throw new Error(`Invalid JSON in ${name}/agent.json: ${(err as Error).message}`);
+  }
+}
 
 export function resolveAgentConfig(
   name: string,
@@ -14,53 +31,37 @@ export function resolveAgentConfig(
   if (!existsSync(agentMdPath)) {
     throw new Error(`Agent "${name}" not found at ${agentMdPath}`);
   }
+  assertNoFrontmatter(agentMdPath, `${name}/AGENT.md`);
 
-  const raw = readFileSync(agentMdPath, "utf-8");
-  const { data } = parse(raw);
-  const result = agentFrontmatterSchema.safeParse(data);
+  const result = agentConfigSchema.safeParse(readAgentJson(resolve(agentDir, "agent.json"), name));
   if (!result.success) {
     const issues = result.error.issues
-      .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
+      .map((i) => `  - ${i.path.length > 0 ? i.path.join(".") : "(root)"}: ${i.message}`)
       .join("\n");
-    throw new Error(`Invalid frontmatter in ${name}/AGENT.md:\n${issues}`);
+    throw new Error(`Invalid config in ${name}/agent.json:\n${issues}`);
   }
+  const { $schema: _schema, memory: memoryConfig, onFinish: onFinishConfig, ...agentConfig } = result.data;
 
-  let onFinish: OnFinishConfig | undefined;
-  const onFinishPath = resolve(agentDir, "ON_FINISH.md");
-  if (existsSync(onFinishPath)) {
-    const rawOnFinish = readFileSync(onFinishPath, "utf-8");
-    const { data: onFinishData } = parse(rawOnFinish);
-    const onFinishResult = onFinishFrontmatterSchema.safeParse(onFinishData);
-    if (!onFinishResult.success) {
-      const issues = onFinishResult.error.issues
-        .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
-        .join("\n");
-      throw new Error(`Invalid frontmatter in ${name}/ON_FINISH.md:\n${issues}`);
-    }
-    onFinish = { onFinishMdPath: onFinishPath, ...onFinishResult.data };
+  const onFinishMdPath = resolve(agentDir, "ON_FINISH.md");
+  const hasOnFinish = existsSync(onFinishMdPath);
+  if (onFinishConfig && !hasOnFinish) {
+    throw new Error(`${name}/agent.json has an "onFinish" section but ${name}/ON_FINISH.md does not exist`);
   }
+  if (hasOnFinish) assertNoFrontmatter(onFinishMdPath, `${name}/ON_FINISH.md`);
 
-  let memory: MemoryConfig | undefined;
-  const memoryPath = resolve(agentDir, "MEMORY.md");
-  if (existsSync(memoryPath)) {
-    const rawMemory = readFileSync(memoryPath, "utf-8");
-    const { data: memoryData } = parse(rawMemory);
-    const memoryResult = memoryFrontmatterSchema.safeParse(memoryData);
-    if (!memoryResult.success) {
-      const issues = memoryResult.error.issues
-        .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
-        .join("\n");
-      throw new Error(`Invalid frontmatter in ${name}/MEMORY.md:\n${issues}`);
-    }
-    memory = { memoryMdPath: memoryPath, ...memoryResult.data };
+  const memoryMdPath = resolve(agentDir, "MEMORY.md");
+  const hasMemory = existsSync(memoryMdPath);
+  if (memoryConfig && !hasMemory) {
+    throw new Error(`${name}/agent.json has a "memory" section but ${name}/MEMORY.md does not exist`);
   }
+  if (hasMemory) assertNoFrontmatter(memoryMdPath, `${name}/MEMORY.md`);
 
   return {
     name,
     agentMdPath,
-    ...result.data,
-    ...(onFinish ? { onFinish } : {}),
-    ...(memory ? { memory } : {}),
+    ...agentConfig,
+    ...(hasOnFinish ? { onFinish: { onFinishMdPath, ...onFinishConfig } } : {}),
+    ...(hasMemory ? { memory: { memoryMdPath, ...memoryConfig } } : {}),
   };
 }
 

@@ -1,0 +1,23 @@
+{
+  "$schema": "../../agent.schema.json",
+  "model": "sonnet",
+  "cron": "*/5 * * * *",
+  "worktree": true,
+  "input": "task",
+  "autoPR": true,
+  "prCreateLabels": [
+    "vteam"
+  ],
+  "allowedTools": [
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "Bash(npm *)",
+    "Bash(npx *)",
+    "Bash(just *)",
+    "Bash(cat *)",
+    "Bash(ls *)"
+  ]
+}

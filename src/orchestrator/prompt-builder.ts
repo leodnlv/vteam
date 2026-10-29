@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { parse } from "../frontmatter.js";
 import type { TaskManager } from "../tasks/task-manager.js";
 import type { AgentConfig, Task, TaskNote, PRReviewContext, OnFinishConfig, MemoryConfig, RunOutcome } from "../types.js";
 
@@ -16,10 +15,7 @@ export async function buildPrompt(
   focus?: string,
   memoryContent?: string,
 ): Promise<PromptParts> {
-  const raw = readFileSync(agent.agentMdPath, "utf-8");
-  const { content } = parse(raw);
-
-  const systemPrompt = content.trim();
+  const systemPrompt = readFileSync(agent.agentMdPath, "utf-8").trim();
 
   const sections: string[] = [];
 
@@ -69,9 +65,7 @@ export function buildOnFinishPrompt(
   onFinish: OnFinishConfig,
   outcome: RunOutcome,
 ): PromptParts {
-  const raw = readFileSync(onFinish.onFinishMdPath, "utf-8");
-  const { content } = parse(raw);
-  const systemPrompt = content.trim();
+  const systemPrompt = readFileSync(onFinish.onFinishMdPath, "utf-8").trim();
 
   const sections: string[] = [];
 
@@ -134,9 +128,7 @@ export function buildMemoryCurationPrompt(
   memoryUpdate: string,
   focus?: string,
 ): PromptParts {
-  const raw = readFileSync(memory.memoryMdPath, "utf-8");
-  const { content } = parse(raw);
-  const systemPrompt = content.trim();
+  const systemPrompt = readFileSync(memory.memoryMdPath, "utf-8").trim();
 
   const sections: string[] = [];
 

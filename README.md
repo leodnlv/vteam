@@ -78,7 +78,7 @@ vteam run coder
 
 ### Running on a schedule
 
-Agents with a `cron` field in their AGENT.md frontmatter can be scheduled via the loop command:
+Agents with a `cron` field in their `agent.json` can be scheduled via the loop command:
 
 ```bash
 # Start the scheduler — runs agents on their cron schedules
@@ -99,19 +99,24 @@ Scaffolds a `vteam/` directory in the current project:
 ```
 vteam/
 ├── vteam.config.json               # Project-level configuration
+├── agent.schema.json               # JSON Schema for agent.json (editor autocomplete/validation)
 ├── agents/
 │   ├── improver/
+│   │   ├── agent.json              # Agent configuration
 │   │   ├── AGENT.md                # Improver prompt/personality
 │   │   └── MEMORY.md               # Memory curation strategy
 │   ├── coder/
+│   │   ├── agent.json
 │   │   ├── AGENT.md                # Coder prompt/personality
-│   │   └── MEMORY.md               # Memory curation strategy
+│   │   └── MEMORY.md
 │   ├── review-responder/
+│   │   ├── agent.json
 │   │   ├── AGENT.md                # Review responder prompt/personality
-│   │   └── MEMORY.md               # Memory curation strategy
+│   │   └── MEMORY.md
 │   └── test-writer/
+│       ├── agent.json
 │       ├── AGENT.md                # Test writer prompt/personality
-│       └── MEMORY.md               # Memory curation strategy
+│       └── MEMORY.md
 ```
 
 Sets `tasks.project` in the config to the current directory name. Also adds `.vteam-worktrees/` and vteam's local state directories (`vteam/.locks/`, `vteam/.logs/`, `vteam/.runs/`, `vteam/.memory/`) to `.gitignore`. Tasks live in aven, not in the repo — the real shared artifacts are the PRs that the coder creates.
@@ -224,20 +229,25 @@ Global settings live in `vteam/vteam.config.json`:
 | `tasks.label`      | Default `"vteam"`. vteam only sees and picks up tasks carrying this label. Created automatically. |
 | `tasks.workspace`  | Optional. aven workspace, passed to every `aven` call as `--workspace`.                 |
 
-### Agent configuration (AGENT.md frontmatter)
+### Agent configuration (agent.json)
 
-Agent behavior is configured via YAML frontmatter in each agent's `AGENT.md`. The markdown body (after the frontmatter) becomes the agent's system prompt.
+Each agent lives in `vteam/agents/<name>/`. `AGENT.md` is required and holds only the system prompt; its presence is what makes the directory an agent. Orchestrator behavior is configured in an optional `agent.json` next to it (missing = all defaults):
 
-```yaml
----
-model: sonnet
-cron: "0 */6 * * *"
-worktree: true
-input: task
-autoPR: true
-prCreateLabels: [vteam]
----
+```json
+{
+  "$schema": "../../agent.schema.json",
+  "model": "sonnet",
+  "cron": "0 */6 * * *",
+  "worktree": true,
+  "input": "task",
+  "autoPR": true,
+  "prCreateLabels": ["vteam"]
+}
 ```
+
+`vteam init` writes `vteam/agent.schema.json` so editors can autocomplete and validate `agent.json` through the `$schema` reference. Cross-field rules (e.g. `readOnly` requires `worktree`) are not in the JSON Schema; vteam checks them when it loads the agent.
+
+Validation is strict: unknown keys are rejected everywhere, including inside `memory` and `onFinish`. Invalid JSON fails with `Invalid JSON in <name>/agent.json`; schema violations fail with `Invalid config in <name>/agent.json:` followed by one line per offending path. YAML frontmatter is rejected: an `AGENT.md`, `MEMORY.md` or `ON_FINISH.md` that starts with `---` is a load error. Agents in the old format must be converted by hand — move the frontmatter fields into `agent.json` and leave only the prompt in the markdown file.
 
 | Field             | Default    | Description                                                                                                      |
 | ----------------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
@@ -253,6 +263,8 @@ prCreateLabels: [vteam]
 | `prCreateLabels`  | —          | Labels applied to created PRs (auto-created if they don't exist)                                                 |
 | `allowedTools`    | —          | Claude Code tools the agent may use (same syntax as `--allowedTools` CLI flag, e.g. `["Read", "Bash(git *)"]`)   |
 | `disallowedTools` | —          | Claude Code tools the agent may NOT use (same syntax as `--disallowedTools` CLI flag)                            |
+| `memory`          | —          | Curation agent settings: `model`, `allowedTools`, `disallowedTools`. Requires `MEMORY.md`. See [Per-agent memory](#per-agent-memory-memorymd). |
+| `onFinish`        | —          | Hook settings: `model`, `allowedTools`, `disallowedTools`. Requires `ON_FINISH.md`. See [On-finish hooks](#on-finish-hooks-on_finishmd). |
 
 ### On-finish hooks (ON_FINISH.md)
 
@@ -260,25 +272,33 @@ Place an `ON_FINISH.md` file alongside `AGENT.md` to run a post-run hook. After 
 
 This lets you add notifications, logging, or any other post-run action without modifying vteam itself — Claude handles the integration using whatever MCPs or CLI tools are available in your environment.
 
-```yaml
----
-model: haiku
-allowedTools: ["Bash(curl *)", "mcp__slack__send_message"]
----
+`ON_FINISH.md` is the hook's system prompt:
 
+```markdown
 You are a notification bot. Post the run result to the #eng-prs Slack channel.
 If the run failed, also ping @oncall.
 ```
 
+The hook's model and tools go in the `onFinish` section of `agent.json`:
+
+```json
+{
+  "onFinish": {
+    "model": "haiku",
+    "allowedTools": ["Bash(curl *)", "mcp__slack__send_message"]
+  }
+}
+```
+
 The user prompt is auto-generated from the run outcome and includes: agent name, status (completed/failed), timestamps, task details, branch name, PR URL, reviewed PR info, agent content output (review text, analysis, etc.), and error message (if any). When the agent returns `content` in its output, the hook receives it in a `## Content` section — this allows hooks to act on the agent's primary deliverable (e.g. post a PR review as a GitHub comment).
 
-| Field             | Default | Description                        |
+| `onFinish` field  | Default | Description                        |
 | ----------------- | ------- | ---------------------------------- |
 | `model`           | —       | Claude model override for the hook |
 | `allowedTools`    | —       | Tools the hook may use             |
 | `disallowedTools` | —       | Tools the hook may NOT use         |
 
-The hook runs in the main project directory (not the worktree). Hook failures are logged but do not affect the agent run's exit status. The hook is opt-in — agents without an `ON_FINISH.md` skip it entirely.
+The hook runs in the main project directory (not the worktree). Hook failures are logged but do not affect the agent run's exit status. The hook is opt-in — agents without an `ON_FINISH.md` skip it entirely. The `onFinish` section is optional; having one without `ON_FINISH.md` is a load error.
 
 ## Task lifecycle
 
@@ -308,19 +328,21 @@ Any ending other than a pushed commit or "no changes" — a crash, an error, or 
 
 Each `input: "task"` agent declares which tasks it works on with a `taskFilter` over aven metadata:
 
-```yaml
-# vteam/agents/coder/AGENT.md: findings from the improver or the security analyst
-input: task
-taskFilter:
-  found-by: [improver, security-analyst]
+```jsonc
+// vteam/agents/coder/agent.json: findings from the improver or the security analyst
+{
+  "input": "task",
+  "taskFilter": { "found-by": ["improver", "security-analyst"] }
+}
 
-# vteam/agents/mr-reviewer/AGENT.md: tasks a human handed to it
-input: task
-taskFilter:
-  actor: mr-reviewer
+// vteam/agents/mr-reviewer/agent.json: tasks a human handed to it
+{
+  "input": "task",
+  "taskFilter": { "actor": "mr-reviewer" }
+}
 ```
 
-- Different keys must all match (AND). A list of values matches any of them (OR). `null` matches a key that is missing or empty, so `found-by: [improver, null]` also covers tasks you create yourself in aven.
+- Different keys must all match (AND). A list of values matches any of them (OR). `null` matches a key that is missing or empty, so `"found-by": ["improver", null]` also covers tasks you create yourself in aven.
 - An agent without `taskFilter` matches every task.
 - Filters may overlap. Picking happens under a claim lock shared by all agents, so only one agent gets a task. Once it is `active`, it is off every other agent's list.
 - vteam writes `found-by` (the creating agent) on every task. Any other key, like `actor`, is yours to set: `aven edit <ref> --metadata actor=mr-reviewer`.
@@ -364,15 +386,13 @@ Claude returns findings as structured JSON; the orchestrator creates the actual 
 
 Agents can maintain persistent memory across runs. Place a `MEMORY.md` file alongside `AGENT.md` to define a memory curation strategy — natural language rules for how the agent's memory should be maintained.
 
-```yaml
----
-model: haiku
----
-
+```markdown
 Keep a running list of areas scanned and key patterns observed.
 Record false positives to avoid repeating them.
 Maximum 30 lines — drop oldest entries first.
 ```
+
+The curation agent's model and tools go in the `memory` section of `agent.json`, e.g. `"memory": { "model": "haiku" }`.
 
 **How it works:**
 
@@ -383,17 +403,17 @@ Maximum 30 lines — drop oldest entries first.
 
 Memory files are stored in `vteam/.memory/` and are gitignored — they are local workflow state. The curation agent failure is non-fatal and does not affect the agent run's exit status.
 
-| Field             | Default | Description                                    |
+| `memory` field    | Default | Description                                    |
 | ----------------- | ------- | ---------------------------------------------- |
 | `model`           | —       | Claude model override for the curation agent   |
 | `allowedTools`    | —       | Tools the curation agent may use               |
 | `disallowedTools` | —       | Tools the curation agent may NOT use           |
 
-Memory is opt-in — agents without a `MEMORY.md` skip it entirely. `vteam init` scaffolds a default MEMORY.md for each built-in agent.
+Memory is opt-in — agents without a `MEMORY.md` skip it entirely, and a `memory` section without `MEMORY.md` is a load error. `vteam init` scaffolds a default MEMORY.md for each built-in agent.
 
 ## Agents
 
-vteam ships with four default agents (improver, coder, review-responder, test-writer). Add custom agents by creating `vteam/agents/<name>/AGENT.md` — no config changes needed.
+vteam ships with four default agents (improver, coder, review-responder, test-writer). Add custom agents by creating `vteam/agents/<name>/AGENT.md` (plus an optional `agent.json`) — no config changes needed.
 
 ### Improver
 
@@ -454,7 +474,7 @@ vteam uses advisory file locking via atomic `mkdir` (POSIX guarantees this is at
 - Requires `gh` (GitHub) or `glab` (GitLab) CLI installed and authenticated.
 - If the CLI is missing, the branch is still pushed — you just need to create the PR manually.
 - Labels are auto-created in the repository if they don't already exist.
-- Set `autoPR: false` in the agent's AGENT.md frontmatter to skip PR creation entirely.
+- Set `"autoPR": false` in the agent's `agent.json` to skip PR creation entirely.
 
 ### General
 
@@ -480,7 +500,7 @@ A non-interactive skill that injects full vteam knowledge into the current Claud
 
 ### `/create-vteam-agent` — agent scaffolding
 
-An interactive skill that scaffolds new vteam agents. It asks clarifying questions about the agent's purpose, input/output modes, worktree needs, tool permissions, memory, and hooks — then generates the `AGENT.md` (and optionally `MEMORY.md` / `ON_FINISH.md`) files.
+An interactive skill that scaffolds new vteam agents. It asks clarifying questions about the agent's purpose, input/output modes, worktree needs, tool permissions, memory, and hooks — then generates `agent.json` and `AGENT.md` (and optionally `MEMORY.md` / `ON_FINISH.md`).
 
 Invoke from any project with `/create-vteam-agent`.
 
@@ -500,7 +520,7 @@ This project has its own `vteam/` directory pointing the agents at `src/`. Run `
 
 ### Dependencies
 
-vteam aims to keep external dependencies to a minimum. YAML frontmatter parsing, slug generation, and other utilities are handled by internal modules with no external dependencies.
+vteam aims to keep external dependencies to a minimum. Slug generation and other utilities are handled by internal modules with no external dependencies.
 
 ### System dependencies
 

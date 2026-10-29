@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { resolve, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
+import { agentConfigJsonSchema } from "../config/schema.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -29,26 +30,20 @@ export async function initCommand(): Promise<void> {
 
   console.log("Scaffolding vteam/ directory...");
 
-  const dirs = [
-    resolve(vteamDir, "agents", "improver"),
-    resolve(vteamDir, "agents", "coder"),
-    resolve(vteamDir, "agents", "review-responder"),
-    resolve(vteamDir, "agents", "test-writer"),
-  ];
-
-  for (const dir of dirs) {
-    mkdirSync(dir, { recursive: true });
+  const agents = ["improver", "coder", "review-responder", "test-writer"];
+  for (const agent of agents) {
+    const agentDir = resolve(vteamDir, "agents", agent);
+    mkdirSync(agentDir, { recursive: true });
+    copyTemplate(`${agent}.agent.json`, resolve(agentDir, "agent.json"));
+    copyTemplate(`${agent}.agent.md`, resolve(agentDir, "AGENT.md"));
+    copyTemplate(`${agent}.memory.md`, resolve(agentDir, "MEMORY.md"));
   }
 
-  copyTemplate("improver.agent.md", resolve(vteamDir, "agents", "improver", "AGENT.md"));
-  copyTemplate("coder.agent.md", resolve(vteamDir, "agents", "coder", "AGENT.md"));
-  copyTemplate("review-responder.agent.md", resolve(vteamDir, "agents", "review-responder", "AGENT.md"));
-  copyTemplate("test-writer.agent.md", resolve(vteamDir, "agents", "test-writer", "AGENT.md"));
-
-  copyTemplate("improver.memory.md", resolve(vteamDir, "agents", "improver", "MEMORY.md"));
-  copyTemplate("coder.memory.md", resolve(vteamDir, "agents", "coder", "MEMORY.md"));
-  copyTemplate("review-responder.memory.md", resolve(vteamDir, "agents", "review-responder", "MEMORY.md"));
-  copyTemplate("test-writer.memory.md", resolve(vteamDir, "agents", "test-writer", "MEMORY.md"));
+  writeFileSync(
+    resolve(vteamDir, "agent.schema.json"),
+    `${JSON.stringify(agentConfigJsonSchema(), null, 2)}\n`,
+    "utf-8",
+  );
 
   const config = JSON.parse(readFileSync(resolve(templateDir(), "vteam.config.json"), "utf-8"));
   config.tasks.project = basename(cwd);
@@ -68,11 +63,10 @@ export async function initCommand(): Promise<void> {
     console.log("  Created .gitignore");
   }
 
-  console.log("  Created vteam/agents/improver/AGENT.md");
-  console.log("  Created vteam/agents/coder/AGENT.md");
-  console.log("  Created vteam/agents/review-responder/AGENT.md");
-  console.log("  Created vteam/agents/test-writer/AGENT.md");
-  console.log("  Created MEMORY.md for each agent");
+  for (const agent of agents) {
+    console.log(`  Created vteam/agents/${agent}/ (agent.json, AGENT.md, MEMORY.md)`);
+  }
+  console.log("  Created vteam/agent.schema.json");
   console.log(`  Created vteam/vteam.config.json (aven project: ${config.tasks.project})`);
-  console.log("\nDone. Edit the AGENT.md and MEMORY.md files and vteam.config.json to customize.");
+  console.log("\nDone. Edit each agent's agent.json, AGENT.md, and MEMORY.md, and vteam.config.json, to customize.");
 }

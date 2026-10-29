@@ -21,7 +21,7 @@ The TypeScript orchestrator handles state transitions — creating worktrees, up
 Each agent is invoked as a `claude -p` subprocess with:
 - `--append-system-prompt-file` — the agent's `AGENT.md` content (via temp file)
 - `--output-format stream-json` + `--verbose` — real-time streaming of tool calls; the runner accumulates `assistant` text events to extract the final result
-- `--allowedTools` / `--disallowedTools` — per-agent tool permissions from frontmatter (uses the same syntax as native Claude Code CLI flags)
+- `--allowedTools` / `--disallowedTools` — per-agent tool permissions from `agent.json` (uses the same syntax as native Claude Code CLI flags)
 - `--no-session-persistence` — no session clutter
 
 The orchestrator assembles a layered prompt: AGENT.md (role) → optional `--focus` context (priority section) → existing task titles (from aven) → task content (plus its aven notes, oldest first, under `## Task Notes`) or PR review comments → output format instructions. The prompt is passed via stdin. Claude returns structured JSON as its final output — the orchestrator parses this to create aven tasks, git commits, and PRs.
@@ -34,7 +34,7 @@ Claude's text output (extracted from the `result` field of the JSON envelope) mu
 { status, summary, content?, filesChanged?, commitMessage?, blockerReason?, memoryUpdate? }
 ```
 
-All fields except `status` and `summary` are optional. The `content` field is a discriminated union controlled by the `output` frontmatter field:
+All fields except `status` and `summary` are optional. The `content` field is a discriminated union controlled by the `output` field in `agent.json`:
 
 - **`output: "task"`** → `content: { type: "task", body: { title, severity, description, suggestedFix?, files } }` — the orchestrator creates an aven task from the finding.
 - **Default (no `output` field)** → `content: { type: "generic", body: "string" }` — a freeform deliverable (review, analysis, report). The orchestrator passes it through to the ON_FINISH hook via `RunOutcome.content`.
@@ -61,24 +61,27 @@ Agents with `input: "pr"` use `checkoutWorktree` to check out an existing PR bra
 
 ### Agent configuration
 
-Agents are defined at `vteam/agents/<name>/AGENT.md`. Each AGENT.md uses YAML frontmatter to declare orchestrator behavior:
+Each agent is a directory `vteam/agents/<name>/`. `AGENT.md` (required — its presence defines the agent) is the system prompt, plain markdown. All orchestrator behavior lives in an optional `agent.json` next to it:
 
-```yaml
----
-model: sonnet
-cron: "0 */6 * * *"
-worktree: true
-input: task
-autoPR: true
-prCreateLabels: [vteam]
----
+```json
+{
+  "$schema": "../../agent.schema.json",
+  "model": "sonnet",
+  "cron": "0 */6 * * *",
+  "worktree": true,
+  "input": "task",
+  "autoPR": true,
+  "prCreateLabels": ["vteam"],
+  "memory": { "model": "haiku" },
+  "onFinish": { "model": "haiku", "allowedTools": ["mcp__slack__send_message"] }
+}
 ```
 
 - `worktree` (default: `false`) — run in an isolated git worktree, push branch on commit
 - `readOnly` (default: `false`) — run in a worktree but skip commit/push/PR (requires `worktree: true`, incompatible with `autoPR: true`). The agent runs freely in the worktree — `readOnly` only prevents the orchestrator from committing and pushing afterward.
 - `output` (optional, `"task"`) — controls the `content` type in the unified `AgentOutput` schema. When `"task"`, the prompt instructs Claude to return `content: { type: "task", body: { title, severity, ... } }` and the orchestrator creates an aven task. When omitted, the prompt instructs `content: { type: "generic", body: "string" }`. Independent of `worktree`. Incompatible with `autoPR: true` and `readOnly: true`.
 - `input` (optional, `"task"` or `"pr"`) — `"task"`: pick a ready task routed to this agent (see Task manager → routing), manage task lifecycle; `"pr"`: pick a PR with pending review feedback, check out its branch (requires `worktree: true`)
-- `taskFilter` (optional, requires `input: "task"`) — map of aven metadata key → string, `null` (key missing/empty), or a non-empty list of those. Keys AND, list values OR. E.g. `found-by: [improver, security-analyst]` or `actor: mr-reviewer`. Omitted = matches every task.
+- `taskFilter` (optional, requires `input: "task"`) — map of aven metadata key → string, `null` (key missing/empty), or a non-empty list of those. Keys AND, list values OR. E.g. `{ "found-by": ["improver", "security-analyst"] }` or `{ "actor": "mr-reviewer" }`. Omitted = matches every task.
 - `prTriggerLabel` — label that signals "this PR needs work" (e.g. `vteam:changes-requested`); the orchestrator discovers PRs by this label and removes it after the agent pushes
 - `autoPR` (default: `false`) — create a pull request after pushing
 - `cron` — cron expression (5 fields: minute hour day month weekday) for scheduling via `vteam loop start`
@@ -86,8 +89,12 @@ prCreateLabels: [vteam]
 - `prCreateLabels` — labels applied to created PRs
 - `allowedTools` — Claude Code tools the agent may use (same syntax as the `--allowedTools` CLI flag, e.g. `["Read", "Bash(git *)"]`)
 - `disallowedTools` — Claude Code tools the agent may NOT use (same syntax as `--disallowedTools`)
+- `memory` / `onFinish` — `{ model?, allowedTools?, disallowedTools? }` for the memory curation agent and the on-finish hook. The `MEMORY.md` / `ON_FINISH.md` file enables the feature; the section only configures it, and a section without its markdown file is a load error.
+- `$schema` — ignored by vteam; points editors at the JSON Schema
 
-The frontmatter is validated via zod on agent load. The markdown body (after frontmatter) becomes the system prompt. `vteam.config.json` contains global settings (baseBranch, platform, worktreeDir, tasks). Add custom agents by creating `vteam/agents/<name>/AGENT.md` — no config changes needed.
+`resolveAgentConfig` (`src/config/agent.ts`) validates `agent.json` on load with `agentConfigSchema` (`src/config/schema.ts`). The schema is strict: unknown keys are rejected at every level, and cross-field rules (e.g. `readOnly` requires `worktree`) are zod refinements. A missing `agent.json` means all defaults. Any `AGENT.md`, `MEMORY.md`, or `ON_FINISH.md` that starts with `---` is a load error — YAML frontmatter is no longer supported and must be moved to `agent.json` by hand.
+
+`vteam init` writes `vteam/agent.schema.json`, generated from `agentConfigSchema` with `z.toJSONSchema`, for editor autocomplete and validation. The JSON Schema cannot express the refinements; only vteam enforces those. The dogfood copy at `vteam/agent.schema.json` is checked against the zod schema by `src/config/agent.test.ts` — regenerate it when the schema changes. `vteam.config.json` contains global settings (baseBranch, platform, worktreeDir, tasks). Add custom agents by creating `vteam/agents/<name>/AGENT.md` — no config changes needed.
 
 ### Task manager
 
@@ -103,7 +110,7 @@ All task operations go through the `TaskManager` interface (`src/tasks/task-mana
 - `tasks.label` (default `"vteam"`) — opt-in label. vteam only lists, picks, and dedups against tasks with this label, and creates the label on demand. Humans can queue their own aven tasks for the coder by adding the label.
 - `tasks.workspace` (optional) — passed as `--workspace` to every aven call.
 
-Routing (`matchesTaskFilter` in `task-manager.ts`): `listReady()` returns every ready labelled task with its metadata; `run` keeps the tasks matching the running agent's `taskFilter` (no filter = all). There is no fallback agent — a task no filter matches is never picked. Overlaps are allowed — picking runs under a global claim lock (see Lifecycle), so exactly one run gets each task. vteam only writes `found-by`; humans set other keys such as `actor` via `aven edit <ref> --metadata actor=<agent>`. `vteam status` loads every `input: "task"` agent (`listTaskWorkers`), shows each open task's matching agents, and warns about `todo` tasks no agent matches. The AGENT.md frontmatter parser (`src/frontmatter.ts`) supports one level of indented nested maps for `taskFilter`.
+Routing (`matchesTaskFilter` in `task-manager.ts`): `listReady()` returns every ready labelled task with its metadata; `run` keeps the tasks matching the running agent's `taskFilter` (no filter = all). There is no fallback agent — a task no filter matches is never picked. Overlaps are allowed — picking runs under a global claim lock (see Lifecycle), so exactly one run gets each task. vteam only writes `found-by`; humans set other keys such as `actor` via `aven edit <ref> --metadata actor=<agent>`. `vteam status` loads every `input: "task"` agent (`listTaskWorkers`), shows each open task's matching agents, and warns about `todo` tasks no agent matches.
 
 Mapping: severity `critical/high/medium/low` ↔ aven priority `urgent/high/medium/low` (priority `none` reads as `low`). `files`, `found-by`, `retry-count`, `completed`, `branch`, `pr-url`, `claimed-by`, `claimed-pid`, `claimed-host` are aven metadata (string values; `files` is comma-separated). The finding's description, suggested fix, and affected files become the aven description.
 
@@ -124,35 +131,20 @@ Whenever the agent returned output (every ending except an error or crash), the 
 
 An agent can optionally have an `ON_FINISH.md` file at `vteam/agents/<name>/ON_FINISH.md`. When present, the orchestrator spawns a second `claude -p` call after the agent run completes (both success and failure). The hook receives a structured summary of the run outcome (status, branch, PR URL, task info, content, error) as its user prompt. When the agent returned `content` in its output, the hook receives it in a `## Content` section — generic content as a string, task content as JSON. This allows hooks to act on the agent's primary deliverable (e.g. post a PR review as a comment).
 
-The ON_FINISH.md uses YAML frontmatter for its own configuration:
-
-```yaml
----
-model: haiku
-allowedTools: ["Bash(curl *)", "mcp__slack__send_message"]
----
-
-Post a notification to #eng-prs with the run result.
-```
-
-Supported frontmatter fields: `model`, `allowedTools`, `disallowedTools`. The markdown body becomes the hook's system prompt. The hook runs in the main project directory (not the worktree) and its failure does not affect the agent run's exit status.
+The ON_FINISH.md content is the hook's system prompt. Its `model`, `allowedTools`, and `disallowedTools` go in the `onFinish` section of `agent.json`. The hook runs in the main project directory (not the worktree) and its failure does not affect the agent run's exit status.
 
 ### Per-agent memory
 
 An agent can optionally have a `MEMORY.md` file at `vteam/agents/<name>/MEMORY.md`. This defines the memory curation strategy — how accumulated memory should be maintained across runs.
 
-The MEMORY.md uses YAML frontmatter for its own configuration:
+The MEMORY.md content is the curation agent's system prompt, e.g.:
 
-```yaml
----
-model: haiku
----
-
+```markdown
 Keep a running list of areas scanned. Record false positives to avoid repeating them.
 Maximum 30 lines — drop oldest entries first.
 ```
 
-Supported frontmatter fields: `model`, `allowedTools`, `disallowedTools`. The markdown body becomes the curation agent's system prompt. Memory data is stored in `vteam/.memory/<agent-name>/store.md` (gitignored). The curation agent runs after each agent run and its failure does not affect the agent run's exit status.
+Its `model`, `allowedTools`, and `disallowedTools` go in the `memory` section of `agent.json`. Memory data is stored in `vteam/.memory/<agent-name>/store.md` (gitignored). The curation agent runs after each agent run and its failure does not affect the agent run's exit status.
 
 ## Claude Code skills
 
@@ -164,13 +156,13 @@ A non-interactive skill (`skills/vteam/SKILL.md`) that injects full vteam knowle
 
 ### `/create-vteam-agent` — agent scaffolding
 
-An interactive skill (`skills/create-vteam-agent/SKILL.md`) that scaffolds new vteam agents. It walks through clarifying questions (input mode, output mode, worktree, tools, memory, hooks, model, cron) and generates the `AGENT.md` + optional `MEMORY.md` / `ON_FINISH.md` files.
+An interactive skill (`skills/create-vteam-agent/SKILL.md`) that scaffolds new vteam agents. It walks through clarifying questions (input mode, output mode, worktree, tools, memory, hooks, model, cron) and generates `agent.json` + `AGENT.md` + optional `MEMORY.md` / `ON_FINISH.md` files.
 
 **The skill must stay in sync with the codebase.** When any of the following change, update the skill accordingly:
-- Agent frontmatter fields (added, removed, renamed, new validation rules) in `src/config/schema.ts`
+- `agent.json` fields (added, removed, renamed, new validation rules) in `src/config/schema.ts`
 - The `AgentOutput` schema or `content` type union in `src/orchestrator/output-schema.ts`
 - How prompts are assembled in `src/orchestrator/prompt-builder.ts`
-- ON_FINISH.md or MEMORY.md frontmatter fields
+- `memory` / `onFinish` section fields
 - New agent capabilities or orchestrator behaviors that affect what questions the skill should ask
 
 ## Project structure
@@ -193,8 +185,8 @@ src/
 │   ├── clean.ts                  vteam clean — prune worktrees, stale locks, orphaned active tasks
 │   └── skill.ts                  vteam skill install/uninstall — manage Claude Code skill symlinks
 ├── config/
-│   ├── schema.ts                 Zod schemas for config and agent frontmatter
-│   ├── agent.ts                  Agent resolution and listing from AGENT.md files
+│   ├── schema.ts                 Zod schemas for vteam.config.json and agent.json
+│   ├── agent.ts                  Agent resolution (agent.json + AGENT.md/MEMORY.md/ON_FINISH.md) and listing
 │   └── load.ts                   Reads and validates vteam.config.json
 ├── orchestrator/
 │   ├── agent-runner.ts           Spawns claude -p, captures structured JSON output
@@ -212,9 +204,9 @@ src/
 │   ├── merge-request.ts          GitHub (gh) and GitLab (glab) MR creation
 │   └── pull-request.ts           PR review discovery, comment fetching, posting
 └── templates/                    Scaffolding templates copied by vteam init
-    ├── improver.agent.md
-    ├── coder.agent.md
-    ├── review-responder.agent.md
+    ├── <agent>.agent.json        agent.json for each default agent (improver, coder, review-responder, test-writer)
+    ├── <agent>.agent.md          AGENT.md prompt for each default agent
+    ├── <agent>.memory.md         MEMORY.md prompt for each default agent
     └── vteam.config.json
 ```
 
@@ -242,7 +234,7 @@ vteam skill install                     # symlink skills from skills/ into ~/.cl
 vteam skill uninstall                   # remove skill symlinks from ~/.claude/skills/
 ```
 
-`vteam loop start` runs a foreground Node.js process that schedules agents based on `cron` patterns in their frontmatter (parsed via `croner`). Each agent run spawns a subprocess (`vteam run <agent>`). If an agent is still running when its next cron tick fires, the tick is skipped. The loop discards the child's stdout/stderr because the child writes its own log. Stop with Ctrl+C.
+`vteam loop start` runs a foreground Node.js process that schedules agents based on `cron` patterns in their `agent.json` (parsed via `croner`). Each agent run spawns a subprocess (`vteam run <agent>`). If an agent is still running when its next cron tick fires, the tick is skipped. The loop discards the child's stdout/stderr because the child writes its own log. Stop with Ctrl+C.
 
 Every `vteam run <agent>` writes a log file for that run at `vteam/.logs/<agent>/<ISO-timestamp>.log` (`src/run-log.ts`), whether it was started by hand or by the loop. It copies `process.stdout`/`process.stderr` into the file with synchronous writes, so nothing is lost on `process.exit`, and it records the error stack if the run throws. Logging starts after the agent is resolved, so an unknown agent name creates no file.
 
@@ -278,14 +270,14 @@ All three must pass before any commit or PR:
 This file is the primary source of truth for how Claude understands vteam. `README.md` is the public-facing documentation for users. When you make changes that alter vteam's behavior, update the relevant sections of both files in the same commit. Specifically:
 
 - **New or removed CLI commands** — update Commands and project structure
-- **New or changed agent frontmatter fields** — update Agent configuration
+- **New or changed `agent.json` fields** — update Agent configuration
 - **Changes to prompt assembly, agent invocation flags, or orchestrator flow** — update Architecture subsections
 - **New or changed config options in `vteam.config.json`** — update Agent configuration or v1 scope
 - **New conventions (file naming, locking, task lifecycle)** — update Conventions
 - **New integrations or platform support** — update v1 scope and constraints
 - **Added, moved, or deleted source files** — update Project structure tree
 
-- **Changes to agent frontmatter, output schema, or orchestrator behavior** — update the `create-vteam-agent` skill (`skills/create-vteam-agent/SKILL.md`) so it generates correct agents, and the `vteam` knowledge skill (`skills/vteam/SKILL.md`) so its context stays accurate
+- **Changes to `agent.json` fields, output schema, or orchestrator behavior** — update the `create-vteam-agent` skill (`skills/create-vteam-agent/SKILL.md`) so it generates correct agents, and the `vteam` knowledge skill (`skills/vteam/SKILL.md`) so its context stays accurate
 
 Do not update CLAUDE.md or README.md for internal refactors that don't change external behavior, test additions, or bug fixes that don't alter documented behavior.
 

@@ -1,0 +1,25 @@
+{
+  "$schema": "../../agent.schema.json",
+  "model": "sonnet",
+  "worktree": true,
+  "autoPR": true,
+  "prCreateLabels": [
+    "vteam"
+  ],
+  "allowedTools": [
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "Bash(npm *)",
+    "Bash(npx *)",
+    "Bash(pnpm *)",
+    "Bash(just *)",
+    "Bash(cat *)",
+    "Bash(ls *)"
+  ],
+  "memory": {
+    "model": "haiku"
+  }
+}

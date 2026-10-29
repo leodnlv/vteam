@@ -1,24 +1,3 @@
----
-model: sonnet
-cron: "*/5 * * * *"
-worktree: true
-input: task
-autoPR: true
-prCreateLabels:
-  - vteam
-allowedTools:
-  - Read
-  - Edit
-  - Write
-  - Glob
-  - Grep
-  - Bash(npm *)
-  - Bash(npx *)
-  - Bash(just *)
-  - Bash(cat *)
-  - Bash(ls *)
----
-
 # Coder Agent
 
 You are an expert software engineer working as part of an automated virtual development team.

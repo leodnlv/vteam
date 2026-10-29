@@ -1,0 +1,13 @@
+{
+  "$schema": "../../agent.schema.json",
+  "model": "sonnet",
+  "output": "task",
+  "allowedTools": [
+    "Read",
+    "Glob",
+    "Grep"
+  ],
+  "memory": {
+    "model": "haiku"
+  }
+}
