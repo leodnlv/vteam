@@ -109,10 +109,6 @@ vteam/
 │   │   ├── agent.json
 │   │   ├── AGENT.md                # Coder prompt/personality
 │   │   └── MEMORY.md
-│   ├── review-responder/
-│   │   ├── agent.json
-│   │   ├── AGENT.md                # Review responder prompt/personality
-│   │   └── MEMORY.md
 │   └── test-writer/
 │       ├── agent.json
 │       ├── AGENT.md                # Test writer prompt/personality
@@ -181,22 +177,6 @@ The next coder run sees the task's `pr-url` metadata and works on the existing P
 - Otherwise the PR branch is checked out into the worktree, and the prompt gets the task, all its notes, and the PR's unresolved review threads. Resolved threads and top-level PR comments are left out. Claude applies the threads your note names, or all of them if the note doesn't say.
 - Changes are pushed to the PR branch, no new PR is opened, and the task goes back to `done`.
 - Claude returns a reply for each thread it addressed. After the push, vteam posts each reply in its thread, marked `🤖 **vteam coder:**` and ending with `Fixed in <sha>`. Threads Claude skipped get no reply, and nothing is posted if no commit was pushed. Set `"resolveThreads": true` in the agent's `agent.json` to also resolve the threads it replied to. The run's aven note records how many replies were posted.
-
-### `vteam run review-responder`
-
-1. Acquires an advisory lock (`vteam/.locks/review-responder.lock`)
-2. Discovers open PRs that have the `prTriggerLabel` (e.g. `vteam:changes-requested`) applied
-3. Checks out the PR branch into an isolated git worktree
-4. Builds a prompt containing all unresolved review comments from the PR
-5. Spawns `claude -p` in the worktree — Claude addresses the feedback, replies to each comment thread, and returns a commit message as structured JSON
-6. If Claude reported changes:
-   - The orchestrator commits and force-pushes the branch to origin
-   - Posts a summary comment on the PR
-   - Removes the `prTriggerLabel` so the agent won't re-process the PR on the next run
-7. Cleans up the worktree
-8. Releases the lock
-
-The intended loop: a reviewer leaves comments on a PR, adds the `vteam:changes-requested` label, and runs `vteam run review-responder`. The agent addresses the feedback, pushes an updated commit, and replies to threads. The reviewer re-reviews the updated PR.
 
 ### `vteam status`
 
@@ -430,7 +410,7 @@ Memory is opt-in — agents without a `MEMORY.md` skip it entirely, and a `memor
 
 ## Agents
 
-vteam ships with four default agents (improver, coder, review-responder, test-writer). Add custom agents by creating `vteam/agents/<name>/AGENT.md` (plus an optional `agent.json`) — no config changes needed.
+vteam ships with three default agents (improver, coder, test-writer). Add custom agents by creating `vteam/agents/<name>/AGENT.md` (plus an optional `agent.json`) — no config changes needed.
 
 ### Improver
 
@@ -446,14 +426,6 @@ vteam ships with four default agents (improver, coder, review-responder, test-wr
 - Works in an isolated git worktree (never touches the main working tree)
 - Makes minimal, focused changes following existing code style
 - Does not commit or push — the orchestrator handles all git operations and PR creation
-
-### Review responder
-
-- Triggered by the `prTriggerLabel` label on an open PR (e.g. `vteam:changes-requested`)
-- Checks out the PR branch in an isolated worktree
-- Reads all unresolved review comments and addresses the feedback
-- Replies to each comment thread with an explanation
-- Does not commit or push — the orchestrator handles all git operations
 
 ### Test writer
 

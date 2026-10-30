@@ -374,7 +374,7 @@ describe("buildOnFinishPrompt", () => {
   it("includes reviewed PR details", () => {
     const path = setupOnFinish();
     const outcome: RunOutcome = {
-      agent: "review-responder",
+      agent: "coder",
       status: "completed",
       startedAt: "2026-04-21T10:00:00Z",
       completedAt: "2026-04-21T10:05:00Z",

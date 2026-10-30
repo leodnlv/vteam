@@ -49,7 +49,6 @@ vteam/
 │   │   ├── MEMORY.md               # Optional: memory curation prompt; its existence enables memory
 │   │   └── ON_FINISH.md            # Optional: post-run hook prompt; its existence enables the hook
 │   ├── coder/
-│   ├── review-responder/
 │   └── test-writer/
 ```
 
@@ -268,7 +267,6 @@ vteam run coder --focus "the issue about XYZ"
 | -------------------- | --------------------------------- | ----------------------------------------------- |
 | **improver**         | Scans codebase for issues         | Read-only, `output: task`, no worktree          |
 | **coder**            | Picks a task and implements a fix | `input: task`, `worktree: true`, `autoPR: true` |
-| **review-responder** | Addresses PR review comments      | `input: pr`, `worktree: true`, `prTriggerLabel` |
 | **test-writer**      | Adds tests for untested code      | `worktree: true`, `autoPR: true`                |
 
 ## Creating a custom agent

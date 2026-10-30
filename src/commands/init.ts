@@ -30,7 +30,7 @@ export async function initCommand(): Promise<void> {
 
   console.log("Scaffolding vteam/ directory...");
 
-  const agents = ["improver", "coder", "review-responder", "test-writer"];
+  const agents = ["improver", "coder", "test-writer"];
   for (const agent of agents) {
     const agentDir = resolve(vteamDir, "agents", agent);
     mkdirSync(agentDir, { recursive: true });

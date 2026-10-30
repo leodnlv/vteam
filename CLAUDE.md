@@ -208,7 +208,7 @@ src/
 │   ├── merge-request.ts          GitHub (gh) and GitLab (glab) MR creation
 │   └── pull-request.ts           PR review discovery, comment fetching, posting
 └── templates/                    Scaffolding templates copied by vteam init
-    ├── <agent>.agent.json        agent.json for each default agent (improver, coder, review-responder, test-writer)
+    ├── <agent>.agent.json        agent.json for each default agent (improver, coder, test-writer)
     ├── <agent>.agent.md          AGENT.md prompt for each default agent
     ├── <agent>.memory.md         MEMORY.md prompt for each default agent
     └── vteam.config.json
@@ -252,7 +252,7 @@ All three must pass before any commit or PR:
 
 ## v1 scope and constraints
 
-- Ships with four default agents (`improver`, `coder`, `review-responder`, `test-writer`). Custom agents supported by creating `vteam/agents/<name>/AGENT.md`.
+- Ships with three default agents (`improver`, `coder`, `test-writer`). Custom agents supported by creating `vteam/agents/<name>/AGENT.md`.
 - Supports both GitHub (`gh`) and GitLab (`glab`) — configured via `platform` in `vteam.config.json`.
 - No Slack integration yet.
 - No `--max-budget-usd` caps on agent runs.

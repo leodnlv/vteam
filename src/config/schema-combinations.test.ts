@@ -84,13 +84,6 @@ describe("agent config combinations", () => {
         prCreateLabels: ["vteam"],
       }));
 
-    it("review-responder: worktree, input pr, trigger label", () =>
-      valid({
-        worktree: true,
-        input: "pr",
-        prTriggerLabel: "vteam:changes-requested",
-      }));
-
     it("test-writer: worktree, input task, autoPR", () =>
       valid({
         worktree: true,
