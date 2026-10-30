@@ -865,7 +865,7 @@ describe("pipeline: follow-up on a task's existing PR", () => {
     });
   }
 
-  function makeGitWorktree(branch: string): { path: string; branch: string } {
+  function makeGitWorktree(branch: string, remoteSha = "pr-head-sha"): { path: string; branch: string; remoteSha: string } {
     const path = resolve(tmp, ".worktrees", branch);
     mkdirSync(path, { recursive: true });
     const git = (...args: string[]) => execFileSync("git", args, { cwd: path, stdio: "pipe" });
@@ -873,7 +873,7 @@ describe("pipeline: follow-up on a task's existing PR", () => {
     git("config", "user.email", "test@example.com");
     git("config", "user.name", "test");
     git("commit", "-q", "--allow-empty", "-m", "init");
-    return { path, branch };
+    return { path, branch, remoteSha };
   }
 
   function mockPR(state: PullRequestInfo["state"], mergeable: PullRequestInfo["mergeable"] = "mergeable"): void {
@@ -931,7 +931,7 @@ describe("pipeline: follow-up on a task's existing PR", () => {
     expect(prompt).toContain("**alice:** Missing null check here.");
     expect(prompt).toContain("Apply the null-check thread, skip the rename.");
 
-    expect(pushBranch).toHaveBeenCalledWith(expect.any(String), prBranch);
+    expect(pushBranch).toHaveBeenCalledWith(expect.any(String), prBranch, "pr-head-sha");
     expect(createMergeRequest).not.toHaveBeenCalled();
 
     const done = taskStore.updates.find((u) => u.changes.status === "done");
@@ -968,11 +968,12 @@ describe("pipeline: follow-up on a task's existing PR", () => {
       notes: [],
       createdAt: "2026-10-01T00:00:00Z",
     });
-    vi.mocked(createWorktree).mockImplementation(() => makeGitWorktree("vteam/fix-the-thing-new"));
+    vi.mocked(createWorktree).mockImplementation(() => makeGitWorktree("vteam/fix-the-thing-new", ""));
     mockAgentEditing();
 
     await runCommand("test-agent", {});
 
+    expect(pushBranch).toHaveBeenCalledWith(expect.any(String), "vteam/fix-the-thing-new", "");
     expect(getPullRequest).not.toHaveBeenCalled();
     expect(checkoutWorktree).not.toHaveBeenCalled();
     expect(createMergeRequest).toHaveBeenCalledOnce();
@@ -1013,7 +1014,7 @@ describe("pipeline: follow-up on a task's existing PR", () => {
       const prompt = mockRunClaude.mock.calls[0][0].userPrompt;
       expect(prompt).toContain("## Merge Conflicts");
       expect(prompt).toContain("- `thing.ts`");
-      expect(pushBranch).toHaveBeenCalledWith(expect.any(String), prBranch);
+      expect(pushBranch).toHaveBeenCalledWith(expect.any(String), prBranch, "pr-head-sha");
       expect(taskStore.updates.at(-1)?.changes.status).toBe("done");
     });
 
@@ -1044,7 +1045,7 @@ describe("pipeline: follow-up on a task's existing PR", () => {
       await runCommand("test-agent", {});
 
       expect(mockRunClaude.mock.calls[0][0].userPrompt).toContain("without conflicts");
-      expect(pushBranch).toHaveBeenCalledWith(expect.any(String), prBranch);
+      expect(pushBranch).toHaveBeenCalledWith(expect.any(String), prBranch, "pr-head-sha");
       expect(taskStore.updates.at(-1)?.changes.status).toBe("done");
     });
   });

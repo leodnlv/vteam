@@ -146,6 +146,7 @@ async function runAgent(
   let agentLock: FileLock | undefined;
   let worktreePath: string | undefined;
   let branchName: string | undefined;
+  let remoteSha = "";
   let task: Task | undefined;
   let taskSettled = false;
   let reviewContext: PRReviewContext | undefined;
@@ -222,6 +223,7 @@ async function runAgent(
         );
         worktreePath = wt.path;
         branchName = wt.branch;
+        remoteSha = wt.remoteSha;
       } else {
         console.log("Creating worktree...");
         const slug = task
@@ -235,6 +237,7 @@ async function runAgent(
         );
         worktreePath = wt.path;
         branchName = wt.branch;
+        remoteSha = wt.remoteSha;
       }
       if (followUp?.pr.mergeable === "conflicting") {
         const { baseBranch } = followUp.pr;
@@ -333,7 +336,7 @@ async function runAgent(
       runState.commitSha = getCommitSha(worktreePath);
 
       console.log(`Pushing...`);
-      pushBranch(worktreePath, branchName);
+      await pushBranch(worktreePath, branchName, remoteSha);
 
       if (reviewContext) {
         try {

@@ -250,7 +250,7 @@ The hook receives: agent name, status, timestamps, task details, branch, PR URL,
 
 ## Worktrees
 
-Agents with `worktree: true` get an isolated git worktree. Claude edits files there but does NOT commit — it returns a commit message in its JSON output. The orchestrator runs `git add -A` + `git commit`, pushes the branch, and optionally creates a PR. Worktrees are cleaned up after each run. Force-push is used on `vteam/*` branches (they are ephemeral and tool-owned).
+Agents with `worktree: true` get an isolated git worktree, branched from a freshly fetched `origin/<baseBranch>`. Claude edits files there but does NOT commit — it returns a commit message in its JSON output. The orchestrator runs `git add -A` + `git commit`, pushes the branch, and optionally creates a PR. Worktrees are cleaned up after each run. Pushes use `--force-with-lease` against the remote sha at worktree creation (new branch: must not exist; PR branch: the checked-out sha), so a human's concurrent pushes are never overwritten. Network errors are retried twice.
 
 ## Locking
 

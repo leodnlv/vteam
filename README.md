@@ -148,12 +148,12 @@ Claude is read-only — it scans and reports. The orchestrator owns all file cre
 
 1. Acquires an advisory lock (`vteam/.locks/coder.lock`)
 2. Under a short-lived claim lock shared by all agents (`vteam/.locks/task-claim.lock`), picks the highest-severity ready task routed to it from aven (`aven list --status todo --ready` filtered by its `taskFilter`, see [Routing tasks to agents](#routing-tasks-to-agents); oldest first within a severity; skips tasks that have failed `maxRetries` times) and sets it to `active` with `claimed-*` metadata
-3. Creates a git worktree at `.vteam-worktrees/vteam/<task-title-slug>-<runId>` branched from the base branch
+3. Fetches the base branch and creates a git worktree at `.vteam-worktrees/vteam/<task-title-slug>-<runId>` branched from `origin/<baseBranch>`, so the branch starts from the latest remote code and never picks up unpushed local commits
 4. Builds the prompt with the task description, the task's aven notes (including summaries from earlier attempts), existing task titles, and agent instructions
 5. Spawns `claude -p` in the worktree — Claude implements the fix and returns a commit message as structured JSON
 6. If Claude reported changes:
    - The orchestrator commits (`git add -A` + `git commit` using Claude's commit message)
-   - Force-pushes the branch to origin
+   - Pushes the branch to origin with `--force-with-lease`, retrying network errors
    - Creates a pull request via `gh` or `glab` (falls back gracefully if CLI is missing or labels don't exist)
    - Sets the task to `done` with completion metadata
 7. If Claude reported no changes: returns the task to `todo` and increments its `retry-count` metadata
@@ -477,7 +477,7 @@ vteam uses advisory file locking via atomic `mkdir` (POSIX guarantees this is at
 
 - **Crash cleanup**: If the coder crashes after creating a worktree but before cleanup, the worktree and its branch persist. Run `vteam clean` to remove orphans.
 - **Stale branches**: Task branch names include the run ID (`vteam/<title-slug>-<runId>`), so a retried task never reuses an earlier attempt's branch. If a local branch with the same name exists, `createWorktree` deletes it before creating a new worktree.
-- **Force push**: vteam force-pushes to its own branches (`vteam/*`). This is safe because these branches are ephemeral and owned by the tool — no human should be pushing to them. But if you manually commit to a `vteam/*` branch, those commits will be lost on the next coder run.
+- **Pushing**: vteam pushes with `--force-with-lease` against the commit it started from. A new branch must not exist on the remote yet. A PR branch must still be where vteam checked it out, so if someone pushes to the PR while the coder runs, the push is rejected instead of overwriting their commits, and the task goes back to `todo`. Network errors (connection reset, broken pipe, remote hung up, timeouts) are retried twice, after 5s and 15s. Before each retry vteam checks whether the dropped push actually reached the remote.
 - **Disk space**: Each worktree is a full checkout. On large repos, this can be significant. Worktrees are cleaned up after each run.
 
 ### PR creation

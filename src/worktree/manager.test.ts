@@ -11,6 +11,8 @@ import {
   listWorktrees,
   mergeBaseBranch,
   findUnresolvedConflicts,
+  pushBranch,
+  isTransientPushError,
 } from "./manager.js";
 
 const WT_DIR = ".vteam-worktrees";
@@ -59,40 +61,77 @@ afterEach(() => {
 });
 
 describe("createWorktree", () => {
+  let local: string;
+  let origin: string;
+
+  beforeEach(() => {
+    ({ local, origin } = initRepoWithOrigin());
+  });
+
+  afterEach(() => {
+    for (const wt of listWorktrees(local)) {
+      if (wt.path.startsWith(resolve(local, WT_DIR))) removeWorktree(local, wt.path);
+    }
+    rmSync(local, { recursive: true, force: true });
+    rmSync(origin, { recursive: true, force: true });
+  });
+
+  function commitTo(dir: string, file: string): void {
+    writeFileSync(resolve(dir, file), `${file}\n`);
+    execFileSync("git", ["add", "-A"], { cwd: dir, stdio: "pipe" });
+    execFileSync("git", ["commit", "-m", file], { cwd: dir, stdio: "pipe" });
+  }
+
   it("creates a worktree from scratch", () => {
-    const wt = createWorktree(repo, "my-task", "main", WT_DIR);
+    const wt = createWorktree(local, "my-task", "main", WT_DIR);
     expect(existsSync(wt.path)).toBe(true);
     expect(wt.branch).toBe("vteam/my-task");
     expect(existsSync(resolve(wt.path, "file.txt"))).toBe(true);
   });
 
   it("succeeds when worktree already exists at the same path", () => {
-    const wt1 = createWorktree(repo, "my-task", "main", WT_DIR);
+    const wt1 = createWorktree(local, "my-task", "main", WT_DIR);
     expect(existsSync(wt1.path)).toBe(true);
 
-    const wt2 = createWorktree(repo, "my-task", "main", WT_DIR);
+    const wt2 = createWorktree(local, "my-task", "main", WT_DIR);
     expect(existsSync(wt2.path)).toBe(true);
     expect(wt2.branch).toBe("vteam/my-task");
   });
 
   it("succeeds when orphaned directory exists without git metadata", () => {
-    const expectedPath = resolve(repo, WT_DIR, "vteam/my-task");
+    const expectedPath = resolve(local, WT_DIR, "vteam/my-task");
     mkdirSync(expectedPath, { recursive: true });
     writeFileSync(resolve(expectedPath, "stale.txt"), "leftover");
 
-    const wt = createWorktree(repo, "my-task", "main", WT_DIR);
+    const wt = createWorktree(local, "my-task", "main", WT_DIR);
     expect(existsSync(wt.path)).toBe(true);
     expect(existsSync(resolve(wt.path, "file.txt"))).toBe(true);
     expect(existsSync(resolve(wt.path, "stale.txt"))).toBe(false);
   });
 
   it("succeeds when git metadata is stale (directory manually deleted)", () => {
-    const wt1 = createWorktree(repo, "my-task", "main", WT_DIR);
+    const wt1 = createWorktree(local, "my-task", "main", WT_DIR);
     rmSync(wt1.path, { recursive: true, force: true });
 
-    const wt2 = createWorktree(repo, "my-task", "main", WT_DIR);
+    const wt2 = createWorktree(local, "my-task", "main", WT_DIR);
     expect(existsSync(wt2.path)).toBe(true);
     expect(wt2.branch).toBe("vteam/my-task");
+  });
+
+  it("branches from the latest remote base branch when local main is behind", () => {
+    commitTo(origin, "upstream.txt");
+
+    const wt = createWorktree(local, "my-task", "main", WT_DIR);
+
+    expect(existsSync(resolve(wt.path, "upstream.txt"))).toBe(true);
+  });
+
+  it("leaves out unpushed commits on local main", () => {
+    commitTo(local, "local-only.txt");
+
+    const wt = createWorktree(local, "my-task", "main", WT_DIR);
+
+    expect(existsSync(resolve(wt.path, "local-only.txt"))).toBe(false);
   });
 });
 
@@ -261,5 +300,126 @@ describe("merging the base branch into a PR branch", { timeout: 20_000 }, () => 
     writeFileSync(join(clone, "doc.md"), "Title\n=======\n<<<<<<<not a marker\n");
 
     expect(findUnresolvedConflicts(clone, ["doc.md", "deleted.ts"])).toEqual([]);
+  });
+});
+
+describe("pushBranch", { timeout: 20_000 }, () => {
+  let local: string;
+  let origin: string;
+
+  beforeEach(() => {
+    ({ local, origin } = initRepoWithOrigin());
+  });
+
+  afterEach(() => {
+    for (const wt of listWorktrees(local)) {
+      if (wt.path.startsWith(resolve(local, WT_DIR))) removeWorktree(local, wt.path);
+    }
+    rmSync(local, { recursive: true, force: true });
+    rmSync(origin, { recursive: true, force: true });
+  });
+
+  function commitIn(dir: string, file: string): string {
+    writeFileSync(resolve(dir, file), `${file}\n`);
+    execFileSync("git", ["add", "-A"], { cwd: dir, stdio: "pipe" });
+    execFileSync("git", ["commit", "-m", file], { cwd: dir, stdio: "pipe" });
+    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf-8" }).trim();
+  }
+
+  function originSha(branch: string): string {
+    return execFileSync("git", ["rev-parse", branch], { cwd: origin, encoding: "utf-8" }).trim();
+  }
+
+  function installPrePushHook(script: string): void {
+    const hooksDir = execFileSync("git", ["rev-parse", "--git-path", "hooks"], { cwd: local, encoding: "utf-8" }).trim();
+    const hook = resolve(local, hooksDir, "pre-push");
+    writeFileSync(hook, `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+  }
+
+  it("pushes a new branch", async () => {
+    const wt = createWorktree(local, "new-task", "main", WT_DIR);
+    const head = commitIn(wt.path, "change.txt");
+
+    await pushBranch(wt.path, wt.branch, wt.remoteSha);
+
+    expect(originSha(wt.branch)).toBe(head);
+  });
+
+  it("refuses to overwrite a new branch that already exists on the remote", async () => {
+    const wt = createWorktree(local, "new-task", "main", WT_DIR);
+    commitIn(wt.path, "change.txt");
+    execFileSync("git", ["branch", wt.branch, "feature-branch"], { cwd: origin, stdio: "pipe" });
+
+    await expect(pushBranch(wt.path, wt.branch, wt.remoteSha, [])).rejects.toThrow(/stale info|rejected/);
+    expect(originSha(wt.branch)).toBe(originSha("feature-branch"));
+  });
+
+  it("pushes to an existing PR branch", async () => {
+    const wt = checkoutWorktree(local, "feature-branch", WT_DIR);
+    const head = commitIn(wt.path, "fix.txt");
+
+    await pushBranch(wt.path, wt.branch, wt.remoteSha);
+
+    expect(originSha("feature-branch")).toBe(head);
+  });
+
+  it("refuses to overwrite commits pushed to the PR branch after checkout", async () => {
+    const wt = checkoutWorktree(local, "feature-branch", WT_DIR);
+    commitIn(wt.path, "fix.txt");
+    execFileSync("git", ["checkout", "feature-branch"], { cwd: origin, stdio: "pipe" });
+    const humanSha = commitIn(origin, "human.txt");
+    execFileSync("git", ["checkout", "main"], { cwd: origin, stdio: "pipe" });
+
+    await expect(pushBranch(wt.path, wt.branch, wt.remoteSha, [])).rejects.toThrow(/stale info|rejected/);
+    expect(originSha("feature-branch")).toBe(humanSha);
+  });
+
+  it("retries after a network error", async () => {
+    const wt = createWorktree(local, "new-task", "main", WT_DIR);
+    const head = commitIn(wt.path, "change.txt");
+    const marker = resolve(local, "push-failed-once");
+    installPrePushHook(
+      `[ -f "${marker}" ] && exit 0\ntouch "${marker}"\necho "Read from remote host: Connection reset by peer" >&2\nexit 1`,
+    );
+
+    await pushBranch(wt.path, wt.branch, wt.remoteSha, [0]);
+
+    expect(originSha(wt.branch)).toBe(head);
+  });
+
+  it("treats a dropped connection as success when the push already landed", async () => {
+    const wt = createWorktree(local, "new-task", "main", WT_DIR);
+    const head = commitIn(wt.path, "change.txt");
+    installPrePushHook(
+      `git push --no-verify origin "HEAD:refs/heads/${wt.branch}" 2>/dev/null\necho "fatal: the remote end hung up unexpectedly" >&2\nexit 1`,
+    );
+
+    await pushBranch(wt.path, wt.branch, wt.remoteSha, [0]);
+
+    expect(originSha(wt.branch)).toBe(head);
+  });
+
+  it("gives up after the last retry", async () => {
+    const wt = createWorktree(local, "new-task", "main", WT_DIR);
+    commitIn(wt.path, "change.txt");
+    installPrePushHook(`echo "client_loop: send disconnect: Broken pipe" >&2\nexit 1`);
+
+    await expect(pushBranch(wt.path, wt.branch, wt.remoteSha, [0, 0])).rejects.toThrow(/Broken pipe/);
+  });
+});
+
+describe("isTransientPushError", () => {
+  it("recognises network failures from git push", () => {
+    const err = Object.assign(new Error("Command failed: git push"), {
+      stderr: Buffer.from("send-pack: unexpected disconnect while reading sideband packet\nfatal: the remote end hung up unexpectedly"),
+    });
+    expect(isTransientPushError(err)).toBe(true);
+  });
+
+  it("does not retry lease rejections", () => {
+    const err = Object.assign(new Error("Command failed: git push"), {
+      stderr: Buffer.from(" ! [rejected]        HEAD -> feature (stale info)\nerror: failed to push some refs"),
+    });
+    expect(isTransientPushError(err)).toBe(false);
   });
 });

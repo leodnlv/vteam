@@ -6,6 +6,7 @@ import { slugify } from "../slugify.js";
 export interface WorktreeSession {
   path: string;
   branch: string;
+  remoteSha: string;
 }
 
 export function createWorktree(
@@ -25,13 +26,15 @@ export function createWorktree(
     // Branch doesn't exist — expected path
   }
 
+  execFileSync("git", ["fetch", "origin", baseBranch], { cwd: repoRoot, stdio: "pipe" });
+
   execFileSync(
     "git",
-    ["worktree", "add", "-b", branch, worktreePath, baseBranch],
+    ["worktree", "add", "--no-track", "-b", branch, worktreePath, `origin/${baseBranch}`],
     { cwd: repoRoot, stdio: "pipe" },
   );
 
-  return { path: worktreePath, branch };
+  return { path: worktreePath, branch, remoteSha: "" };
 }
 
 export function checkoutWorktree(
@@ -54,7 +57,12 @@ export function checkoutWorktree(
     { cwd: repoRoot, stdio: "pipe" },
   );
 
-  return { path: worktreePath, branch: remoteBranch };
+  const remoteSha = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: worktreePath,
+    encoding: "utf-8",
+  }).trim();
+
+  return { path: worktreePath, branch: remoteBranch, remoteSha };
 }
 
 export function mergeBaseBranch(worktreePath: string, baseBranch: string): string[] {
@@ -155,14 +163,51 @@ export function cleanupOrphanedWorktrees(
   return cleaned;
 }
 
-export function pushBranch(
+const TRANSIENT_PUSH_ERROR =
+  /connection reset|broken pipe|remote end hung up|unexpected disconnect|early EOF|RPC failed|timed out|could not resolve host|connection closed by|kex_exchange_identification/i;
+
+export function isTransientPushError(err: unknown): boolean {
+  const stderr = (err as { stderr?: Buffer | string } | null)?.stderr?.toString() ?? "";
+  const message = err instanceof Error ? err.message : String(err);
+  return TRANSIENT_PUSH_ERROR.test(`${message}\n${stderr}`);
+}
+
+function remoteBranchSha(worktreePath: string, branch: string): string | undefined {
+  try {
+    const line = execFileSync("git", ["ls-remote", "origin", `refs/heads/${branch}`], {
+      cwd: worktreePath,
+      encoding: "utf-8",
+      stdio: "pipe",
+    });
+    return line.split(/\s/)[0] || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function pushBranch(
   worktreePath: string,
   branch: string,
-): void {
-  execFileSync("git", ["push", "--force", "origin", `HEAD:${branch}`], {
-    cwd: worktreePath,
-    stdio: "pipe",
-  });
+  expectedRemoteSha: string,
+  retryDelaysMs: number[] = [5_000, 15_000],
+): Promise<void> {
+  const head = getCommitSha(worktreePath);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      execFileSync(
+        "git",
+        ["push", `--force-with-lease=refs/heads/${branch}:${expectedRemoteSha}`, "origin", `HEAD:refs/heads/${branch}`],
+        { cwd: worktreePath, stdio: "pipe" },
+      );
+      return;
+    } catch (err) {
+      if (attempt >= retryDelaysMs.length || !isTransientPushError(err)) throw err;
+      console.warn(`Push failed with a network error, retrying in ${retryDelaysMs[attempt] / 1000}s...`);
+      await new Promise((r) => setTimeout(r, retryDelaysMs[attempt]));
+      // A dropped connection can still land the push, and the lease would then reject the retry.
+      if (remoteBranchSha(worktreePath, branch) === head) return;
+    }
+  }
 }
 
 export function getCommitSha(worktreePath: string): string {
