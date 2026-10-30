@@ -9,9 +9,10 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
 import type { AgentRunResult } from "../orchestrator/agent-runner.js";
 import type { TaskManager, TaskUpdate } from "../tasks/task-manager.js";
-import type { Task, TaskContentBody } from "../types.js";
+import type { PullRequestInfo, ReviewThread, Task, TaskContentBody } from "../types.js";
 
 vi.mock("../orchestrator/agent-runner.js", () => ({
   runClaudeAgent: vi.fn(),
@@ -55,7 +56,39 @@ vi.mock("../tasks/aven-manager.js", () => ({
   },
 }));
 
+vi.mock("../worktree/manager.js", () => ({
+  createWorktree: vi.fn(),
+  checkoutWorktree: vi.fn(),
+  removeWorktree: vi.fn(),
+  pushBranch: vi.fn(),
+  getCommitSha: vi.fn(() => "abc1234def"),
+}));
+
+vi.mock("../integrations/pull-request.js", () => ({
+  findReviewablePR: vi.fn(),
+  getReviewComments: vi.fn(),
+  getRepoSlug: vi.fn(),
+  postPRComment: vi.fn(),
+  removePRLabel: vi.fn(),
+  getPullRequest: vi.fn(),
+  getOpenReviewThreads: vi.fn(),
+  replyToReviewThread: vi.fn(),
+  resolveReviewThread: vi.fn(),
+}));
+
+vi.mock("../integrations/merge-request.js", () => ({
+  createMergeRequest: vi.fn(() => "https://github.com/org/repo/pull/99"),
+}));
+
 import { runClaudeAgent } from "../orchestrator/agent-runner.js";
+import { checkoutWorktree, createWorktree, pushBranch } from "../worktree/manager.js";
+import {
+  getOpenReviewThreads,
+  getPullRequest,
+  replyToReviewThread,
+  resolveReviewThread,
+} from "../integrations/pull-request.js";
+import { createMergeRequest } from "../integrations/merge-request.js";
 import { runCommand } from "./run.js";
 
 const mockRunClaude = vi.mocked(runClaudeAgent);
@@ -141,6 +174,14 @@ beforeEach(() => {
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
   mockRunClaude.mockReset();
+  vi.mocked(checkoutWorktree).mockReset();
+  vi.mocked(createWorktree).mockReset();
+  vi.mocked(pushBranch).mockReset();
+  vi.mocked(getPullRequest).mockReset();
+  vi.mocked(getOpenReviewThreads).mockReset();
+  vi.mocked(replyToReviewThread).mockReset();
+  vi.mocked(resolveReviewThread).mockReset();
+  vi.mocked(createMergeRequest).mockClear();
   taskStore.tasks = [];
   taskStore.created = [];
   taskStore.updates = [];
@@ -795,5 +836,219 @@ describe("pipeline: existing memory flows to agent prompt", () => {
     const agentCall = mockRunClaude.mock.calls[0][0];
     expect(agentCall.userPrompt).toContain("Previous run: scanned auth/");
     expect(agentCall.userPrompt).toContain("Agent Memory");
+  });
+});
+
+describe("pipeline: follow-up on a task's existing PR", () => {
+  const prUrl = "https://github.com/org/repo/pull/7";
+  const prBranch = "vteam/fix-the-thing-20261001-000000-coder";
+
+  function seedDoneTaskReopened(): void {
+    taskStore.tasks.push({
+      ref: "VTM-FLUP",
+      title: "Fix the thing",
+      status: "todo",
+      severity: "high",
+      files: ["src/thing.ts"],
+      retryCount: 0,
+      metadata: { branch: prBranch, "pr-url": prUrl, completed: "2026-10-01T00:00:00Z" },
+      description: "It is broken.",
+      notes: [{ body: "Apply the null-check thread, skip the rename.", createdAt: "2026-10-02T00:00:00Z" }],
+      createdAt: "2026-10-01T00:00:00Z",
+    });
+  }
+
+  function makeGitWorktree(branch: string): { path: string; branch: string } {
+    const path = resolve(tmp, ".worktrees", branch);
+    mkdirSync(path, { recursive: true });
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: path, stdio: "pipe" });
+    git("init", "-q");
+    git("config", "user.email", "test@example.com");
+    git("config", "user.name", "test");
+    git("commit", "-q", "--allow-empty", "-m", "init");
+    return { path, branch };
+  }
+
+  function mockPR(state: PullRequestInfo["state"]): void {
+    vi.mocked(getPullRequest).mockReturnValue({
+      number: 7,
+      title: "vteam: coder: Fix the thing",
+      branch: prBranch,
+      url: prUrl,
+      state,
+    });
+  }
+
+  function mockAgentEditing(extra: Record<string, unknown> = {}, edits = true): void {
+    mockRunClaude.mockImplementationOnce(async ({ cwd }) => {
+      if (edits) writeFileSync(resolve(cwd, "thing.ts"), "fixed");
+      return makeResult(JSON.stringify({
+        status: "completed",
+        summary: "Added the null check.",
+        filesChanged: ["thing.ts"],
+        commitMessage: { subject: "vteam: guard null email", body: "Review follow-up." },
+        ...extra,
+      }));
+    });
+  }
+
+  const threads: ReviewThread[] = [
+    {
+      id: "PRRT_null",
+      path: "src/thing.ts",
+      line: 12,
+      comments: [{ author: "alice", body: "Missing null check here.", createdAt: "2026-10-01T12:00:00Z" }],
+    },
+  ];
+
+  it("checks out the PR branch, prompts with open threads, and pushes without opening a new PR", async () => {
+    setupProject({ agentConfig: { model: "sonnet", input: "task", worktree: true, autoPR: true } });
+    seedDoneTaskReopened();
+    mockPR("open");
+    vi.mocked(getOpenReviewThreads).mockReturnValue(threads);
+    vi.mocked(checkoutWorktree).mockImplementation((_root, branch) => makeGitWorktree(branch));
+    mockAgentEditing();
+
+    await runCommand("test-agent", {});
+
+    expect(getPullRequest).toHaveBeenCalledWith("github", prUrl, tmp);
+    expect(checkoutWorktree).toHaveBeenCalledWith(tmp, prBranch, ".worktrees");
+    expect(createWorktree).not.toHaveBeenCalled();
+
+    const prompt = mockRunClaude.mock.calls[0][0].userPrompt;
+    expect(prompt).toContain("## Existing Pull Request");
+    expect(prompt).toContain("**alice:** Missing null check here.");
+    expect(prompt).toContain("Apply the null-check thread, skip the rename.");
+
+    expect(pushBranch).toHaveBeenCalledWith(expect.any(String), prBranch);
+    expect(createMergeRequest).not.toHaveBeenCalled();
+
+    const done = taskStore.updates.find((u) => u.changes.status === "done");
+    expect(done?.changes.metadata).toMatchObject({ branch: prBranch, "pr-url": prUrl });
+    expect(taskStore.notes[0].text).toContain(`PR: ${prUrl}`);
+  });
+
+  it.each(["merged", "closed"] as const)("moves the task to backlog without running when the PR is %s", async (state) => {
+    setupProject({ agentConfig: { model: "sonnet", input: "task", worktree: true, autoPR: true } });
+    seedDoneTaskReopened();
+    mockPR(state);
+
+    await runCommand("test-agent", {});
+
+    expect(mockRunClaude).not.toHaveBeenCalled();
+    expect(checkoutWorktree).not.toHaveBeenCalled();
+    expect(taskStore.updates.map((u) => u.changes.status)).toEqual(["active", "backlog"]);
+    expect(taskStore.updates[1].changes.removeMetadata).toEqual(["claimed-by", "claimed-pid", "claimed-host"]);
+    expect(taskStore.notes[0].text).toContain(`PR ${prUrl} is ${state}`);
+    expect(process.exit).not.toHaveBeenCalled();
+  });
+
+  it("starts a new branch and PR when the task has no pr-url", async () => {
+    setupProject({ agentConfig: { model: "sonnet", input: "task", worktree: true, autoPR: true } });
+    taskStore.tasks.push({
+      ref: "VTM-NEW1",
+      title: "Fix the thing",
+      status: "todo",
+      severity: "high",
+      files: [],
+      retryCount: 0,
+      metadata: {},
+      description: "It is broken.",
+      notes: [],
+      createdAt: "2026-10-01T00:00:00Z",
+    });
+    vi.mocked(createWorktree).mockImplementation(() => makeGitWorktree("vteam/fix-the-thing-new"));
+    mockAgentEditing();
+
+    await runCommand("test-agent", {});
+
+    expect(getPullRequest).not.toHaveBeenCalled();
+    expect(checkoutWorktree).not.toHaveBeenCalled();
+    expect(createMergeRequest).toHaveBeenCalledOnce();
+    expect(mockRunClaude.mock.calls[0][0].userPrompt).not.toContain("Existing Pull Request");
+  });
+
+  describe("thread replies", () => {
+    const replies = {
+      threadReplies: [
+        { thread: "T1", body: "Added the null check." },
+        { thread: "T9", body: "No such thread." },
+      ],
+    };
+
+    function setupFollowUp(agentConfig: Record<string, unknown> = {}): void {
+      setupProject({ agentConfig: { model: "sonnet", input: "task", worktree: true, ...agentConfig } });
+      seedDoneTaskReopened();
+      mockPR("open");
+      vi.mocked(getOpenReviewThreads).mockReturnValue(threads);
+      vi.mocked(checkoutWorktree).mockImplementation((_root, branch) => makeGitWorktree(branch));
+    }
+
+    it("asks for replies by thread label", async () => {
+      setupFollowUp();
+      mockAgentEditing();
+
+      await runCommand("test-agent", {});
+
+      const prompt = mockRunClaude.mock.calls[0][0].userPrompt;
+      expect(prompt).toContain("### T1 · `src/thing.ts:12`");
+      expect(prompt).toContain('"threadReplies"');
+    });
+
+    it("posts annotated replies to known threads after pushing, and notes the count", async () => {
+      setupFollowUp();
+      mockAgentEditing(replies);
+
+      await runCommand("test-agent", {});
+
+      expect(replyToReviewThread).toHaveBeenCalledOnce();
+      expect(replyToReviewThread).toHaveBeenCalledWith(
+        "github",
+        7,
+        "PRRT_null",
+        "🤖 **vteam test-agent:** Added the null check.\n\nFixed in abc1234.",
+        tmp,
+      );
+      expect(vi.mocked(pushBranch).mock.invocationCallOrder[0])
+        .toBeLessThan(vi.mocked(replyToReviewThread).mock.invocationCallOrder[0]);
+      expect(resolveReviewThread).not.toHaveBeenCalled();
+      expect(taskStore.notes[0].text).toContain("Replied to 1 of 2 review threads.");
+    });
+
+    it("resolves replied threads when resolveThreads is on", async () => {
+      setupFollowUp({ resolveThreads: true });
+      mockAgentEditing(replies);
+
+      await runCommand("test-agent", {});
+
+      expect(resolveReviewThread).toHaveBeenCalledOnce();
+      expect(resolveReviewThread).toHaveBeenCalledWith("github", 7, "PRRT_null", tmp);
+    });
+
+    it("posts no replies when nothing was committed", async () => {
+      setupFollowUp({ resolveThreads: true });
+      mockAgentEditing(replies, false);
+
+      await runCommand("test-agent", {});
+
+      expect(pushBranch).not.toHaveBeenCalled();
+      expect(replyToReviewThread).not.toHaveBeenCalled();
+      expect(resolveReviewThread).not.toHaveBeenCalled();
+    });
+
+    it("finishes the task when a reply cannot be posted", async () => {
+      setupFollowUp({ resolveThreads: true });
+      vi.mocked(replyToReviewThread).mockImplementation(() => {
+        throw new Error("gh: forbidden");
+      });
+      mockAgentEditing(replies);
+
+      await runCommand("test-agent", {});
+
+      expect(resolveReviewThread).not.toHaveBeenCalled();
+      expect(taskStore.updates.at(-1)?.changes.status).toBe("done");
+      expect(taskStore.notes[0].text).toContain("Replied to 0 of 2 review threads.");
+      expect(process.exit).not.toHaveBeenCalled();
+    });
   });
 });

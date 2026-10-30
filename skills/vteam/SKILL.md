@@ -108,6 +108,7 @@ All fields are optional.
   "autoPR": true,                            // create a PR after pushing
   "prTriggerLabel": "vteam:changes-requested", // label to discover PRs needing work
   "prCreateLabels": ["vteam"],               // labels applied to created PRs
+  "resolveThreads": true,                    // PR follow-ups: resolve threads the agent replied to (requires input: "task" + worktree)
   "allowedTools": ["Read", "Grep"],          // Claude Code tools the agent may use
   "disallowedTools": [],                     // Claude Code tools the agent may NOT use
   "memory": { "model": "haiku" },            // curation agent: model, allowedTools, disallowedTools (requires MEMORY.md)
@@ -128,6 +129,7 @@ This lists every field, not a valid combination. The comments are illustrative �
 - `input: "pr"` requires `worktree: true`
 - `readOnly: true` requires `worktree: true`
 - `readOnly: true` is incompatible with `autoPR: true`
+- `resolveThreads: true` requires `input: "task"` and `worktree: true`
 - `output: "task"` is incompatible with `autoPR: true`
 - `output: "task"` is incompatible with `readOnly: true`
 - `taskFilter` requires `input: "task"`
@@ -164,9 +166,12 @@ Claude returns structured JSON matching the unified `AgentOutput` schema:
   "filesChanged": ["path/to/file.ts"],
   "commitMessage": { "subject": "vteam: ...", "body": "..." },
   "blockerReason": "only if blocked/failed",
-  "memoryUpdate": "optional notes for future runs"
+  "memoryUpdate": "optional notes for future runs",
+  "threadReplies": [{ "thread": "T1", "body": "what changed" }]
 }
 ```
+
+`threadReplies` is only requested on PR follow-ups with open review threads (labelled `T1`, `T2`, … in the prompt). Claude replies only to threads it addressed.
 
 The orchestrator then:
 
@@ -174,6 +179,7 @@ The orchestrator then:
 - Commits + pushes from `commitMessage` when the agent modified files
 - Creates a PR if `autoPR: true`
 - Sets the task to `done` (metadata `completed`, `branch`, `pr-url`) if a commit was pushed
+- Follows up on an existing PR when a worktree agent picks a task that already has `pr-url` metadata: checks out the PR branch, adds the PR's unresolved review threads to the prompt (`## Existing Pull Request`), pushes to that branch and skips `autoPR`. After the push it posts the agent's `threadReplies` to their threads (`🤖 **vteam <agent>:** …` + `Fixed in <sha>`) and resolves them if `resolveThreads: true`; reply failures are non-fatal. If the PR is merged or closed, moves the task to `backlog` with a note instead of running
 - Returns the task to `todo` and increments `retry-count` metadata if the agent produced no changes
 - Returns the task to `todo` without incrementing on any other ending (crash, error, readOnly or non-worktree agent)
 - Appends an aven note to the task (`<agent>: <status>`, `summary`, `Blocker: …`, `PR: …`) whenever the agent returned output; a failed note write is non-fatal
@@ -186,6 +192,7 @@ improver finds issue → aven task in inbox
 human triages → todo
 coder picks task → active → implements fix → branch + PR → done
 no changes / crash / error → active → back to todo
+review comments to apply → human moves done task to todo + adds a note → coder pushes to the same PR → done
 ```
 
 Tasks live in aven, scoped to `tasks.project` + `tasks.label`. Refs look like `APP-7KQ9` (recorded as `taskRef` in `vteam/.runs/*.json`).
@@ -195,6 +202,7 @@ Tasks live in aven, scoped to `tasks.project` + `tasks.label`. Refs look like `A
 - **Picking** (`input: "task"`): `aven list --project P --label L --status todo --ready` (one `aven show` per ready task), then routed in-process as above, so aven dependency blocking and `available_at` deferral are respected. Tasks with `retry-count` >= `maxRetries` are skipped. Sorted by severity (`critical` > `high` > `medium` > `low`), then oldest first. The picked task is set to `active` immediately with metadata `claimed-by` (runId), `claimed-pid`, `claimed-host`. The whole list → pick → `active` step holds `vteam/.locks/task-claim` (shared by all agents, released before Claude runs), so concurrent agents with overlapping filters never get the same task. Claim metadata is removed whenever the task leaves `active`. Local to one machine only.
 - **Branch names**: `vteam/<slugified-title>-<runId>` — aven refs are local and are kept out of remote systems.
 - **Human triage**: users can manage tasks in aven (`aven tui` or CLI) — move findings to backlog/canceled, reprioritize, add dependencies, or add the `vteam` label to their own tasks to queue them for the coder. Canceled tasks still appear in the dedup list, so canceling marks a finding as rejected/false positive.
+- **PR follow-ups**: to have the coder apply review comments, `aven edit <ref> --status todo` plus `aven note <ref> "<which comments to apply>"`. The task's `pr-url` makes the run check out the PR branch and see its unresolved review threads. A merged or closed PR parks the task in `backlog`; remove `pr-url` (`aven edit <ref> --remove-metadata pr-url`) to start over on a new branch.
 - **Hard kill**: if the vteam process is killed, the task may remain `active`. `vteam clean` returns it to `todo` when `claimed-host` is this machine and `claimed-pid` is dead; otherwise reset it with `aven edit <ref> --status todo`.
 
 ## Optional agent files

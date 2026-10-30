@@ -71,6 +71,7 @@ export interface AgentConfig {
   prTriggerLabel?: string;
   autoPR?: boolean;
   prCreateLabels?: string[];
+  resolveThreads?: boolean;
   allowedTools?: string[];
   disallowedTools?: string[];
   onFinish?: OnFinishConfig;
@@ -112,6 +113,24 @@ export interface PRReviewContext {
   pr: ReviewablePR;
   comments: ReviewComment[];
   repoSlug: string;
+}
+
+export type PRState = "open" | "closed" | "merged";
+
+export interface PullRequestInfo extends ReviewablePR {
+  state: PRState;
+}
+
+export interface ReviewThread {
+  id: string;
+  path?: string;
+  line?: number;
+  comments: ReviewComment[];
+}
+
+export interface PRFollowUpContext {
+  pr: ReviewablePR;
+  threads: ReviewThread[];
 }
 
 export interface TasksConfig {
@@ -161,6 +180,12 @@ export interface AgentOutput {
   commitMessage?: CommitMessage;
   blockerReason?: string;
   memoryUpdate?: string;
+  threadReplies?: ThreadReply[];
+}
+
+export interface ThreadReply {
+  thread: string;
+  body: string;
 }
 
 export interface RunState {

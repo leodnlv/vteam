@@ -24,7 +24,7 @@ Use the `AskUserQuestion` tool to ask the following questions. Ask them all in a
 | Option | When to use |
 |--------|-------------|
 | No input (scan) | The agent scans the codebase on its own (e.g., improver, test writer) |
-| Task queue (`input: "task"`) | The agent picks a task from the aven todo queue and implements it (e.g., coder) |
+| Task queue (`input: "task"`) | The agent picks a task from the aven todo queue and implements it (e.g., coder). With `worktree: true`, a task that already has `pr-url` metadata is a follow-up: the agent works on that PR's branch, sees its unresolved review threads, and returns `threadReplies` that vteam posts after the push |
 | PR review (`input: "pr"`) | The agent responds to review comments on a pull request |
 
 **2. Output mode** — What does the agent produce?
@@ -77,6 +77,7 @@ Map the user's answers to `agent.json` fields (annotated here; the written file 
   "autoPR": true,                          // only if code changes should become PRs
   "prTriggerLabel": "<label>",             // only if input: "pr"
   "prCreateLabels": ["vteam"],             // only if autoPR: true
+  "resolveThreads": true,                  // only with input: "task" + worktree: true — resolve PR threads it replied to on follow-ups
   "allowedTools": ["..."],                 // always set — principle of least privilege
   "disallowedTools": ["..."],              // only if needed
   "memory": { "model": "haiku" },          // only if MEMORY.md is created; may also set allowedTools / disallowedTools
@@ -93,6 +94,7 @@ Map the user's answers to `agent.json` fields (annotated here; the written file 
 - `readOnly: true` is incompatible with `autoPR: true`
 - `output: "task"` is incompatible with `autoPR: true`
 - `output: "task"` is incompatible with `readOnly: true`
+- `resolveThreads: true` requires `input: "task"` and `worktree: true`
 - `taskFilter` requires `input: "task"`; values are non-empty strings, `null`, or non-empty lists of those
 - Unknown keys are rejected, including inside `memory` / `onFinish` (which accept only `model`, `allowedTools`, `disallowedTools`)
 - A `memory` / `onFinish` section requires the matching `MEMORY.md` / `ON_FINISH.md` file

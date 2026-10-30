@@ -1,5 +1,12 @@
-import { execSync } from "node:child_process";
-import type { Platform, ReviewablePR, ReviewComment } from "../types.js";
+import { execFileSync, execSync } from "node:child_process";
+import type {
+  Platform,
+  PRState,
+  PullRequestInfo,
+  ReviewablePR,
+  ReviewComment,
+  ReviewThread,
+} from "../types.js";
 
 export function findReviewablePR(
   platform: Platform,
@@ -21,6 +28,73 @@ export function getReviewComments(
   return platform === "github"
     ? getGitHubReviewComments(prNumber, cwd)
     : getGitLabReviewComments(prNumber, cwd);
+}
+
+export function getPullRequest(
+  platform: Platform,
+  url: string,
+  cwd: string,
+): PullRequestInfo {
+  return platform === "github"
+    ? getGitHubPR(url, cwd)
+    : getGitLabMR(url, cwd);
+}
+
+export function getOpenReviewThreads(
+  platform: Platform,
+  prNumber: number,
+  cwd: string,
+): ReviewThread[] {
+  return platform === "github"
+    ? getGitHubOpenThreads(prNumber, cwd)
+    : getGitLabOpenThreads(prNumber, cwd);
+}
+
+export function replyToReviewThread(
+  platform: Platform,
+  prNumber: number,
+  threadId: string,
+  body: string,
+  cwd: string,
+): void {
+  if (platform === "github") {
+    githubGraphQL(
+      `mutation($id: ID!, $body: String!) {
+        addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $id, body: $body }) { comment { id } }
+      }`,
+      { id: threadId, body },
+      cwd,
+    );
+  } else {
+    execFileSync(
+      "glab",
+      ["api", `projects/:id/merge_requests/${prNumber}/discussions/${threadId}/notes`, "-f", `body=${body}`],
+      { cwd, stdio: "pipe" },
+    );
+  }
+}
+
+export function resolveReviewThread(
+  platform: Platform,
+  prNumber: number,
+  threadId: string,
+  cwd: string,
+): void {
+  if (platform === "github") {
+    githubGraphQL(
+      `mutation($id: ID!) {
+        resolveReviewThread(input: { threadId: $id }) { thread { isResolved } }
+      }`,
+      { id: threadId },
+      cwd,
+    );
+  } else {
+    execFileSync(
+      "glab",
+      ["api", "-X", "PUT", `projects/:id/merge_requests/${prNumber}/discussions/${threadId}`, "-f", "resolved=true"],
+      { cwd, stdio: "pipe" },
+    );
+  }
 }
 
 export function postPRComment(
@@ -182,6 +256,103 @@ function getGitHubReviewComments(
   return comments.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
+function getGitHubPR(url: string, cwd: string): PullRequestInfo {
+  const result = execFileSync(
+    "gh",
+    ["pr", "view", url, "--json", "number,title,headRefName,url,state"],
+    { cwd, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
+  );
+  const pr = JSON.parse(result) as {
+    number: number;
+    title: string;
+    headRefName: string;
+    url: string;
+    state: "OPEN" | "CLOSED" | "MERGED";
+  };
+  return {
+    number: pr.number,
+    title: pr.title,
+    branch: pr.headRefName,
+    url: pr.url,
+    state: pr.state.toLowerCase() as PRState,
+  };
+}
+
+const GITHUB_REVIEW_THREADS_QUERY = `
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          id
+          isResolved
+          path
+          line
+          originalLine
+          comments(first: 100) {
+            nodes { author { login } body createdAt }
+          }
+        }
+      }
+    }
+  }
+}`;
+
+function githubGraphQL(
+  query: string,
+  variables: Record<string, string | number>,
+  cwd: string,
+): string {
+  const args = ["api", "graphql", "-f", `query=${query}`];
+  for (const [key, value] of Object.entries(variables)) {
+    args.push(typeof value === "number" ? "-F" : "-f", `${key}=${value}`);
+  }
+  return execFileSync("gh", args, { cwd, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
+}
+
+function getGitHubOpenThreads(prNumber: number, cwd: string): ReviewThread[] {
+  const [owner, name] = getRepoSlug("github", cwd).split("/");
+  const result = githubGraphQL(GITHUB_REVIEW_THREADS_QUERY, { owner, name, number: prNumber }, cwd);
+
+  const data = JSON.parse(result) as {
+    data: {
+      repository: {
+        pullRequest: {
+          reviewThreads: {
+            nodes: Array<{
+              id: string;
+              isResolved: boolean;
+              path: string;
+              line: number | null;
+              originalLine: number | null;
+              comments: {
+                nodes: Array<{
+                  author: { login: string } | null;
+                  body: string;
+                  createdAt: string;
+                }>;
+              };
+            }>;
+          };
+        };
+      };
+    };
+  };
+
+  return data.data.repository.pullRequest.reviewThreads.nodes
+    .filter((thread) => !thread.isResolved)
+    .map((thread) => ({
+      id: thread.id,
+      path: thread.path,
+      line: thread.line ?? thread.originalLine ?? undefined,
+      comments: thread.comments.nodes.map((c) => ({
+        author: c.author?.login ?? "ghost",
+        body: c.body,
+        createdAt: c.createdAt,
+      })),
+    }));
+}
+
 // ---- GitLab ----
 
 function findGitLabMRsByLabels(
@@ -251,6 +422,72 @@ function getGitLabReviewComments(
   }
 
   return comments.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+function getGitLabMR(url: string, cwd: string): PullRequestInfo {
+  const iid = /\/merge_requests\/(\d+)/.exec(url)?.[1];
+  if (!iid) {
+    throw new Error(`Not a GitLab merge request URL: ${url}`);
+  }
+
+  const result = execFileSync(
+    "glab",
+    ["api", `projects/:id/merge_requests/${iid}`],
+    { cwd, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
+  );
+  const mr = JSON.parse(result) as {
+    iid: number;
+    title: string;
+    source_branch: string;
+    web_url: string;
+    state: "opened" | "closed" | "locked" | "merged";
+  };
+  return {
+    number: mr.iid,
+    title: mr.title,
+    branch: mr.source_branch,
+    url: mr.web_url,
+    state: mr.state === "opened" ? "open" : mr.state === "merged" ? "merged" : "closed",
+  };
+}
+
+function getGitLabOpenThreads(mrIid: number, cwd: string): ReviewThread[] {
+  const result = execFileSync(
+    "glab",
+    ["api", `projects/:id/merge_requests/${mrIid}/discussions?per_page=100`],
+    { cwd, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
+  );
+
+  const discussions = JSON.parse(result.trim() || "[]") as Array<{
+    id: string;
+    notes: Array<{
+      author: { username: string };
+      body: string;
+      system: boolean;
+      resolvable: boolean;
+      resolved: boolean;
+      position?: { new_path: string; new_line: number | null };
+      created_at: string;
+    }>;
+  }>;
+
+  return discussions
+    .filter((d) => d.notes.some((n) => n.resolvable && !n.resolved))
+    .map((d) => {
+      const position = d.notes[0].position;
+      return {
+        id: d.id,
+        path: position?.new_path,
+        line: position?.new_line ?? undefined,
+        comments: d.notes
+          .filter((n) => !n.system)
+          .map((n) => ({
+            author: n.author.username,
+            body: n.body,
+            createdAt: n.created_at,
+          })),
+      };
+    });
 }
 
 function shellEscape(s: string): string {

@@ -7,7 +7,7 @@ import {
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { acquireLock, type FileLock } from "../memory/lock.js";
-import { buildPrompt, buildOnFinishPrompt, buildMemoryCurationPrompt } from "../orchestrator/prompt-builder.js";
+import { buildPrompt, buildOnFinishPrompt, buildMemoryCurationPrompt, threadRef } from "../orchestrator/prompt-builder.js";
 import { runClaudeAgent } from "../orchestrator/agent-runner.js";
 import { parseAgentOutput } from "../orchestrator/output-schema.js";
 import { AvenTaskManager } from "../tasks/aven-manager.js";
@@ -23,10 +23,14 @@ import {
 import { createMergeRequest } from "../integrations/merge-request.js";
 import {
   findReviewablePR,
+  getOpenReviewThreads,
+  getPullRequest,
   getReviewComments,
   getRepoSlug,
   postPRComment,
   removePRLabel,
+  replyToReviewThread,
+  resolveReviewThread,
 } from "../integrations/pull-request.js";
 import { loadConfig } from "../config/load.js";
 import { resolveAgentConfig, listAgentNames } from "../config/agent.js";
@@ -38,7 +42,9 @@ import type {
   RunState,
   Task,
   PRReviewContext,
+  PRFollowUpContext,
   RunOutcome,
+  ThreadReply,
 } from "../types.js";
 
 function writeRunState(cwd: string, state: RunState): void {
@@ -141,6 +147,8 @@ async function runAgent(
   let task: Task | undefined;
   let taskSettled = false;
   let reviewContext: PRReviewContext | undefined;
+  let followUp: PRFollowUpContext | undefined;
+  let threadReplyNote: string | undefined;
   let prUrl: string | undefined;
   let memoryUpdate: string | undefined;
   let runOutcome: RunOutcome | undefined;
@@ -159,6 +167,21 @@ async function runAgent(
         return;
       }
       console.log(`Picked task: ${task.ref} ${task.title} (${task.severity})`);
+
+      const existingPrUrl = task.metadata["pr-url"];
+      if (agent.worktree && existingPrUrl) {
+        const pr = getPullRequest(config.platform, existingPrUrl, cwd);
+        if (pr.state !== "open") {
+          await parkTaskWithClosedPR(taskManager, task, agent.name, pr.url, pr.state);
+          taskSettled = true;
+          return;
+        }
+        followUp = { pr, threads: getOpenReviewThreads(config.platform, pr.number, cwd) };
+        prUrl = pr.url;
+        console.log(
+          `Following up on PR #${pr.number} (${followUp.threads.length} open review threads)`,
+        );
+      }
     }
 
     if (agent.input === "pr") {
@@ -187,11 +210,12 @@ async function runAgent(
 
     let agentCwd = cwd;
     if (agent.worktree) {
-      if (reviewContext) {
-        console.log(`Checking out PR branch: ${reviewContext.pr.branch}...`);
+      const existingPR = reviewContext?.pr ?? followUp?.pr;
+      if (existingPR) {
+        console.log(`Checking out PR branch: ${existingPR.branch}...`);
         const wt = checkoutWorktree(
           cwd,
-          reviewContext.pr.branch,
+          existingPR.branch,
           config.worktreeDir,
         );
         worktreePath = wt.path;
@@ -228,7 +252,7 @@ async function runAgent(
       agent,
       taskManager,
       task,
-      reviewContext,
+      reviewContext ?? followUp,
       focus,
       memoryContent,
     );
@@ -323,7 +347,14 @@ async function runAgent(
         }
       }
 
-      if (agent.autoPR) {
+      if (followUp) {
+        console.log(`Pushed to existing PR: ${followUp.pr.url}`);
+        if (output.threadReplies?.length) {
+          const posted = postThreadReplies(config, agent, followUp, output.threadReplies, runState.commitSha, cwd);
+          threadReplyNote = `Replied to ${posted} of ${output.threadReplies.length} review threads.`;
+          console.log(threadReplyNote);
+        }
+      } else if (agent.autoPR) {
         console.log("Creating pull request...");
         try {
           const prBody = output.commitMessage.body || `Automated by vteam (${agent.name}).${task ? `\n\nTask: ${task.title}` : ""}`;
@@ -381,7 +412,7 @@ async function runAgent(
     }
 
     if (task) {
-      await addRunNote(taskManager, task, formatRunNote(agent.name, output, prUrl));
+      await addRunNote(taskManager, task, formatRunNote(agent.name, output, prUrl, threadReplyNote));
     }
 
     writeRunState(cwd, runState);
@@ -475,6 +506,22 @@ async function claimTask(
   }
 }
 
+async function parkTaskWithClosedPR(
+  taskManager: TaskManager,
+  task: Task,
+  agentName: string,
+  prUrl: string,
+  state: string,
+): Promise<void> {
+  console.log(`PR ${prUrl} is ${state}. Moving task to backlog.`);
+  await taskManager.update(task.ref, { status: "backlog", removeMetadata: [...CLAIM_KEYS] });
+  await addRunNote(
+    taskManager,
+    task,
+    `${agentName}: skipped\n\nPR ${prUrl} is ${state}, so there is no branch to push to. Remove the pr-url metadata and move the task to todo to start over on a new branch.`,
+  );
+}
+
 async function releaseTask(taskManager: TaskManager, task: Task): Promise<void> {
   try {
     await taskManager.update(task.ref, { status: "todo", removeMetadata: [...CLAIM_KEYS] });
@@ -486,11 +533,67 @@ async function releaseTask(taskManager: TaskManager, task: Task): Promise<void> 
   }
 }
 
-function formatRunNote(agentName: string, output: AgentOutput, prUrl: string | undefined): string {
+function postThreadReplies(
+  config: VteamConfig,
+  agent: AgentConfig,
+  followUp: PRFollowUpContext,
+  replies: ThreadReply[],
+  commitSha: string,
+  cwd: string,
+): number {
+  const threadsByRef = new Map(followUp.threads.map((thread, index) => [threadRef(index), thread]));
+  let posted = 0;
+
+  for (const reply of replies) {
+    const thread = threadsByRef.get(reply.thread);
+    if (!thread) {
+      console.error(`Skipping reply to unknown review thread ${reply.thread}.`);
+      continue;
+    }
+
+    try {
+      replyToReviewThread(
+        config.platform,
+        followUp.pr.number,
+        thread.id,
+        `🤖 **vteam ${agent.name}:** ${reply.body}\n\nFixed in ${commitSha.slice(0, 7)}.`,
+        cwd,
+      );
+      posted++;
+    } catch (err) {
+      console.error(
+        `Failed to reply to review thread ${reply.thread}:`,
+        err instanceof Error ? err.message : err,
+      );
+      continue;
+    }
+
+    if (agent.resolveThreads) {
+      try {
+        resolveReviewThread(config.platform, followUp.pr.number, thread.id, cwd);
+      } catch (err) {
+        console.error(
+          `Failed to resolve review thread ${reply.thread}:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+  }
+
+  return posted;
+}
+
+function formatRunNote(
+  agentName: string,
+  output: AgentOutput,
+  prUrl: string | undefined,
+  threadReplyNote: string | undefined,
+): string {
   return [
     `${agentName}: ${output.status}`,
     output.summary,
     output.blockerReason ? `Blocker: ${output.blockerReason}` : "",
+    threadReplyNote ?? "",
     prUrl ? `PR: ${prUrl}` : "",
   ]
     .filter(Boolean)

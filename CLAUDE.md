@@ -31,7 +31,7 @@ The orchestrator assembles a layered prompt: AGENT.md (role) → optional `--foc
 Claude's text output (extracted from the `result` field of the JSON envelope) must be valid JSON matching a single unified `AgentOutput` schema:
 
 ```
-{ status, summary, content?, filesChanged?, commitMessage?, blockerReason?, memoryUpdate? }
+{ status, summary, content?, filesChanged?, commitMessage?, blockerReason?, memoryUpdate?, threadReplies? }
 ```
 
 All fields except `status` and `summary` are optional. The `content` field is a discriminated union controlled by the `output` field in `agent.json`:
@@ -42,6 +42,8 @@ All fields except `status` and `summary` are optional. The `content` field is a 
 The `filesChanged` and `commitMessage` fields are present only when the agent modified files. The orchestrator commits when `commitMessage` is present and `readOnly` is false.
 
 The optional `memoryUpdate` field is included in the output format instructions only when the agent has a `MEMORY.md` strategy file. Agents without memory configuration never see this field.
+
+The optional `threadReplies` field (`[{ thread, body }]`) is included only when the run is a follow-up on an existing PR with unresolved review threads. The prompt labels the threads `T1`, `T2`, …; Claude replies by label, and the orchestrator maps labels back to platform thread IDs, so Claude never handles real IDs.
 
 The output format instructions are injected into every agent's user prompt by the prompt builder (`buildOutputInstruction`). The orchestrator validates the output via a single zod schema (`agentOutputSchema`) in `orchestrator/output-schema.ts`. Markdown fences are stripped before parsing as a fallback.
 
@@ -87,6 +89,7 @@ Each agent is a directory `vteam/agents/<name>/`. `AGENT.md` (required — its p
 - `cron` — cron expression (5 fields: minute hour day month weekday) for scheduling via `vteam loop start`
 - `model` — Claude model override passed to `claude --model` (alias or full model ID); omit to use Claude Code's default
 - `prCreateLabels` — labels applied to created PRs
+- `resolveThreads` (default: `false`, requires `input: "task"` and `worktree: true`) — resolve each review thread the agent replied to on a PR follow-up
 - `allowedTools` — Claude Code tools the agent may use (same syntax as the `--allowedTools` CLI flag, e.g. `["Read", "Bash(git *)"]`)
 - `disallowedTools` — Claude Code tools the agent may NOT use (same syntax as `--disallowedTools`)
 - `memory` / `onFinish` — `{ model?, allowedTools?, disallowedTools? }` for the memory curation agent and the on-finish hook. The `MEMORY.md` / `ON_FINISH.md` file enables the feature; the section only configures it, and a section without its markdown file is a load error.
@@ -121,7 +124,8 @@ Lifecycle for `input: "task"` agents:
 2. Commit pushed → `done` with `completed`/`branch`/`pr-url` metadata.
 3. Worktree agent produced no changes → back to `todo` with `retry-count` incremented.
 4. Any other ending (error, crash, readOnly or non-worktree agent) → back to `todo` in `finally`, retries unchanged.
-5. Every transition out of `active` removes the claim metadata. A hard-killed process can leave a task `active`; `vteam clean` returns `active` tasks to `todo` when their `claimed-host` is this machine and `claimed-pid` is dead. Tasks claimed on another host, or `active` without a claim (e.g. set by a human), are left alone.
+5. Follow-up on an existing PR: when a worktree agent picks a task that already has `pr-url` metadata (typically a `done` task a human moved back to `todo`, with a note saying which review comments to apply), the orchestrator looks the PR up (`getPullRequest`). If it is merged or closed, the task goes to `backlog` with a note and the agent does not run (remove `pr-url` to start over on a new branch). If it is open, the orchestrator checks out the PR branch with `checkoutWorktree`, adds an `## Existing Pull Request` section with the PR's unresolved review threads (`getOpenReviewThreads`; resolved threads and top-level comments are left out) to the prompt, pushes to that branch, skips `autoPR`, and settles the task as in steps 2–4 with `pr-url` kept. After the push, the orchestrator posts each of the agent's `threadReplies` to its thread (`replyToReviewThread`) as `🤖 **vteam <agent>:** <body>` followed by `Fixed in <sha>`, and resolves the thread (`resolveReviewThread`) when the agent has `resolveThreads: true`. Replies to unknown labels are skipped, replies are dropped when nothing was pushed, and failed replies are logged without failing the run. The run note records `Replied to N of M review threads.` Threads Claude skipped get no reply.
+6. Every transition out of `active` removes the claim metadata. A hard-killed process can leave a task `active`; `vteam clean` returns `active` tasks to `todo` when their `claimed-host` is this machine and `claimed-pid` is dead. Tasks claimed on another host, or `active` without a claim (e.g. set by a human), are left alone.
 
 Whenever the agent returned output (every ending except an error or crash), the orchestrator appends an aven note to the task: `<agent>: <status>`, the agent's `summary`, `Blocker: <blockerReason>` if present, and `PR: <url>` if one was created. A failed note write is logged and does not fail the run. Notes (from runs and from humans) are injected into the prompt the next time an agent picks the task, so retries see why earlier attempts failed.
 

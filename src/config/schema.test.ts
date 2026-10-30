@@ -83,6 +83,15 @@ describe("agentConfigSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts resolveThreads on a worktree task agent", () => {
+    expect(agentConfigSchema.safeParse({ input: "task", worktree: true, resolveThreads: true }).success).toBe(true);
+  });
+
+  it("rejects resolveThreads without input: task and worktree", () => {
+    expect(agentConfigSchema.safeParse({ input: "task", resolveThreads: true }).success).toBe(false);
+    expect(agentConfigSchema.safeParse({ input: "pr", worktree: true, resolveThreads: true }).success).toBe(false);
+  });
+
   it("rejects non-string taskFilter values and empty lists", () => {
     expect(agentConfigSchema.safeParse({ input: "task", taskFilter: { n: 1 } }).success).toBe(false);
     expect(agentConfigSchema.safeParse({ input: "task", taskFilter: { n: [] } }).success).toBe(false);

@@ -39,6 +39,9 @@ export const agentOutputSchema = z.object({
   commitMessage: commitMessageSchema.optional(),
   blockerReason: z.string().optional(),
   memoryUpdate: z.string().optional(),
+  threadReplies: z
+    .array(z.object({ thread: z.string().min(1), body: z.string().min(1) }))
+    .optional(),
 });
 
 function stripMarkdownFences(text: string): string {

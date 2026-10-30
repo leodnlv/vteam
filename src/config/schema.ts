@@ -45,6 +45,7 @@ export const agentConfigSchema = z
     prTriggerLabel: z.string().optional(),
     autoPR: z.boolean().optional(),
     prCreateLabels: z.array(z.string()).optional(),
+    resolveThreads: z.boolean().optional(),
     allowedTools: z.array(z.string()).optional(),
     disallowedTools: z.array(z.string()).optional(),
     memory: subagentConfigSchema.optional(),
@@ -67,6 +68,9 @@ export const agentConfigSchema = z
   })
   .refine((agent) => !agent.taskFilter || agent.input === "task", {
     message: 'taskFilter requires input: "task"',
+  })
+  .refine((agent) => !agent.resolveThreads || (agent.input === "task" && agent.worktree), {
+    message: 'resolveThreads requires input: "task" and worktree: true',
   });
 
 export function agentConfigJsonSchema(): Record<string, unknown> {

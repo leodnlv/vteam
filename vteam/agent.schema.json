@@ -79,6 +79,9 @@
         "type": "string"
       }
     },
+    "resolveThreads": {
+      "type": "boolean"
+    },
     "allowedTools": {
       "type": "array",
       "items": {

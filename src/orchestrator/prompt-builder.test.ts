@@ -5,7 +5,7 @@ import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 import { buildPrompt, buildOnFinishPrompt, buildMemoryCurationPrompt } from "./prompt-builder.js";
 import type { TaskManager } from "../tasks/task-manager.js";
-import type { AgentConfig, Task, PRReviewContext, RunOutcome } from "../types.js";
+import type { AgentConfig, Task, PRReviewContext, PRFollowUpContext, RunOutcome } from "../types.js";
 
 let tmp: string;
 
@@ -197,6 +197,50 @@ describe("buildPrompt", () => {
     expect(userPrompt).toContain("#42");
     expect(userPrompt).toContain("org/repo");
     expect(userPrompt).not.toContain("Review Comments");
+  });
+
+  it("includes open review threads for a follow-up on an existing PR", async () => {
+    const { agentConfig, taskManager } = setup();
+    const followUp: PRFollowUpContext = {
+      pr: {
+        number: 42,
+        title: "vteam: coder: Fix null check in auth",
+        branch: "vteam/fix-null-check",
+        url: "https://github.com/org/repo/pull/42",
+      },
+      threads: [
+        {
+          id: "PRRT_1",
+          path: "src/auth.ts",
+          line: 45,
+          comments: [
+            { author: "reviewer1", body: "Guard against an empty email too.", createdAt: "2026-04-19T10:00:00Z" },
+            { author: "reviewer2", body: "Agreed.", createdAt: "2026-04-19T11:00:00Z" },
+          ],
+        },
+      ],
+    };
+
+    const { userPrompt } = await buildPrompt(agentConfig, taskManager, makeTask({}), followUp);
+    expect(userPrompt).toContain("## Existing Pull Request");
+    expect(userPrompt).toContain("Branch: vteam/fix-null-check");
+    expect(userPrompt).toContain("If the task notes say which of them to apply, apply only those.");
+    expect(userPrompt).toContain("### T1 · `src/auth.ts:45`\n\n**reviewer1:** Guard against an empty email too.\n\n**reviewer2:** Agreed.");
+    expect(userPrompt.indexOf("## Your Task")).toBeLessThan(userPrompt.indexOf("## Existing Pull Request"));
+    expect(userPrompt).toContain('"threadReplies": [{ "thread": "T1"');
+    expect(userPrompt).toContain("Do not reply to threads you skipped.");
+  });
+
+  it("tells a follow-up to work from the task notes when no review threads are open", async () => {
+    const { agentConfig, taskManager } = setup();
+    const followUp: PRFollowUpContext = {
+      pr: { number: 42, title: "t", branch: "b", url: "https://github.com/org/repo/pull/42" },
+      threads: [],
+    };
+
+    const { userPrompt } = await buildPrompt(agentConfig, taskManager, makeTask({}), followUp);
+    expect(userPrompt).toContain("no unresolved review threads. Work from the task notes.");
+    expect(userPrompt).not.toContain("threadReplies");
   });
 
   it("omits review section when no review provided", async () => {

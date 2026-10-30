@@ -166,6 +166,22 @@ Claude is read-only — it scans and reports. The orchestrator owns all file cre
 10. Cleans up the worktree
 11. Releases the lock
 
+#### Following up on review comments
+
+When review comments on a coder PR need work, reopen the task in aven and leave a note saying which comments to apply:
+
+```sh
+aven edit <ref> --status todo
+aven note <ref> "Apply the null-check and retry comments. Ignore the rename suggestion."
+```
+
+The next coder run sees the task's `pr-url` metadata and works on the existing PR instead of starting fresh:
+
+- If the PR is merged or closed, the task moves to `backlog` with a note and Claude does not run. To start over on a new branch, remove the metadata (`aven edit <ref> --remove-metadata pr-url`) and move the task back to `todo`.
+- Otherwise the PR branch is checked out into the worktree, and the prompt gets the task, all its notes, and the PR's unresolved review threads. Resolved threads and top-level PR comments are left out. Claude applies the threads your note names, or all of them if the note doesn't say.
+- Changes are pushed to the PR branch, no new PR is opened, and the task goes back to `done`.
+- Claude returns a reply for each thread it addressed. After the push, vteam posts each reply in its thread, marked `🤖 **vteam coder:**` and ending with `Fixed in <sha>`. Threads Claude skipped get no reply, and nothing is posted if no commit was pushed. Set `"resolveThreads": true` in the agent's `agent.json` to also resolve the threads it replied to. The run's aven note records how many replies were posted.
+
 ### `vteam run review-responder`
 
 1. Acquires an advisory lock (`vteam/.locks/review-responder.lock`)
@@ -261,6 +277,7 @@ Validation is strict: unknown keys are rejected everywhere, including inside `me
 | `prTriggerLabel`  | —          | Label signalling "this PR needs work" (e.g. `vteam:changes-requested`); the orchestrator discovers PRs by this label and removes it after the agent pushes |
 | `autoPR`          | `false`    | Create a pull request after pushing                                                                              |
 | `prCreateLabels`  | —          | Labels applied to created PRs (auto-created if they don't exist)                                                 |
+| `resolveThreads`  | `false`    | Requires `input: "task"` and `worktree: true`. On a [PR follow-up](#following-up-on-review-comments), resolve each review thread the agent replied to |
 | `allowedTools`    | —          | Claude Code tools the agent may use (same syntax as `--allowedTools` CLI flag, e.g. `["Read", "Bash(git *)"]`)   |
 | `disallowedTools` | —          | Claude Code tools the agent may NOT use (same syntax as `--disallowedTools` CLI flag)                            |
 | `memory`          | —          | Curation agent settings: `model`, `allowedTools`, `disallowedTools`. Requires `MEMORY.md`. See [Per-agent memory](#per-agent-memory-memorymd). |
@@ -358,13 +375,13 @@ Because tasks live in aven, you can triage them with `aven tui` or the `aven` CL
 | ---------------------- | ------------------------------------------------------------------------------- |
 | title                  | The finding's title                                                             |
 | project / label        | `tasks.project` / `tasks.label`                                                 |
-| status                 | `inbox` on creation; `active` while being worked on; `done` on success          |
+| status                 | `inbox` on creation; `active` while being worked on; `done` on success; `backlog` when a reopened task's PR is merged or closed |
 | priority               | From severity: `critical`→`urgent`, `high`→`high`, `medium`→`medium`, `low`→`low` (aven `none` reads back as `low`) |
 | description            | Markdown with `## Description`, `## Suggested Fix` (optional), `## Affected Files` |
 | metadata `found-by`    | Name of the agent that created the task (usable in `taskFilter`)                |
 | metadata `files`       | Comma-separated affected files                                                  |
 | metadata `retry-count` | Incremented each time the coder finishes with no changes                        |
-| metadata `completed`, `branch`, `pr-url` | Added when the task is set to `done` (`pr-url` only if a PR was created) |
+| metadata `completed`, `branch`, `pr-url` | Added when the task is set to `done` (`pr-url` only if a PR was created). A `todo` task with `pr-url` is a [follow-up](#following-up-on-review-comments) on that PR |
 | notes                  | One per run that returned output: `<agent>: <status>`, the agent's summary, blocker reason and PR URL if any. All notes, yours included, are shown to the agent that next picks the task |
 | metadata `claimed-by`, `claimed-pid`, `claimed-host` | Run ID, process ID and hostname of the run working the task. Set with `active`, removed when the task leaves `active` |
 

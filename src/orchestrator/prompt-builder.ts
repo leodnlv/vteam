@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { TaskManager } from "../tasks/task-manager.js";
-import type { AgentConfig, Task, TaskNote, PRReviewContext, OnFinishConfig, MemoryConfig, RunOutcome } from "../types.js";
+import type { AgentConfig, Task, TaskNote, PRReviewContext, PRFollowUpContext, OnFinishConfig, MemoryConfig, RunOutcome } from "../types.js";
 
 interface PromptParts {
   systemPrompt: string;
@@ -11,7 +11,7 @@ export async function buildPrompt(
   agent: AgentConfig,
   taskManager: TaskManager,
   task?: Task,
-  review?: PRReviewContext,
+  review?: PRReviewContext | PRFollowUpContext,
   focus?: string,
   memoryContent?: string,
 ): Promise<PromptParts> {
@@ -52,10 +52,11 @@ export async function buildPrompt(
   }
 
   if (review) {
-    sections.push(buildReviewSection(review));
+    sections.push("threads" in review ? buildFollowUpSection(review) : buildReviewSection(review));
   }
 
-  sections.push(buildOutputInstruction(agent));
+  const replyableThreads = review && "threads" in review && review.threads.length > 0;
+  sections.push(buildOutputInstruction(agent, replyableThreads));
 
   const userPrompt = sections.join("\n\n");
   return { systemPrompt, userPrompt };
@@ -151,9 +152,19 @@ export function buildMemoryCurationPrompt(
   return { systemPrompt, userPrompt: sections.join("\n\n") };
 }
 
-function buildOutputInstruction(agent: AgentConfig): string {
+export function threadRef(index: number): string {
+  return `T${index + 1}`;
+}
+
+function buildOutputInstruction(agent: AgentConfig, replyableThreads = false): string {
   const memoryNote = agent.memory
     ? `,\n  "memoryUpdate": "optional: brief notes about this run to remember for future runs (patterns noticed, decisions made, areas covered)"`
+    : "";
+  const threadRepliesField = replyableThreads
+    ? `,\n  "threadReplies": [{ "thread": "T1", "body": "what you changed to address this thread" }]`
+    : "";
+  const threadRepliesNote = replyableThreads
+    ? `\n- "threadReplies" is optional. Add one entry per review thread you addressed in this change, using the thread's label (T1, T2, ...) from "Open Review Threads". Do not reply to threads you skipped. Do not post replies yourself; the orchestrator posts them after your change is pushed.`
     : "";
 
   const contentInstruction = agent.output === "task"
@@ -189,12 +200,12 @@ ${contentInstruction},
     "subject": "vteam: <short subject>",
     "body": "PR-ready description of the change"
   },
-  "blockerReason": "only if status is blocked or failed"${memoryNote}
+  "blockerReason": "only if status is blocked or failed"${memoryNote}${threadRepliesField}
 }
 
 - "content" is optional. Include it when you have a primary deliverable (finding, review, analysis).
 - "filesChanged" and "commitMessage" are optional. Include them only when you modified files.
-- "blockerReason" is optional. Include it only when status is "blocked" or "failed".`;
+- "blockerReason" is optional. Include it only when status is "blocked" or "failed".${threadRepliesNote}`;
 }
 
 function buildTaskNotesSection(notes: TaskNote[]): string {
@@ -237,4 +248,40 @@ function buildReviewSection(review: PRReviewContext): string {
   }
 
   return lines.join("\n");
+}
+
+function buildFollowUpSection(followUp: PRFollowUpContext): string {
+  const lines: string[] = [
+    `## Existing Pull Request`,
+    "",
+    "This task already has an open pull request. You are working on its branch, and your changes will be pushed to it. Build on the work that is already there instead of starting over.",
+    "",
+    `Title: ${followUp.pr.title}`,
+    `URL: ${followUp.pr.url}`,
+    `Branch: ${followUp.pr.branch}`,
+    "",
+    `## Open Review Threads`,
+    "",
+  ];
+
+  if (followUp.threads.length === 0) {
+    lines.push("The pull request has no unresolved review threads. Work from the task notes.");
+    return lines.join("\n");
+  }
+
+  lines.push(
+    "Unresolved review threads on the pull request. If the task notes say which of them to apply, apply only those. Otherwise address them all.",
+    "",
+  );
+  for (const [index, thread] of followUp.threads.entries()) {
+    const location = thread.path
+      ? `\`${thread.path}${thread.line ? `:${thread.line}` : ""}\``
+      : "General";
+    lines.push(`### ${threadRef(index)} · ${location}`, "");
+    for (const comment of thread.comments) {
+      lines.push(`**${comment.author}:** ${comment.body}`, "");
+    }
+  }
+
+  return lines.join("\n").trimEnd();
 }
