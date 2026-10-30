@@ -2,6 +2,7 @@ import { execFileSync, execSync } from "node:child_process";
 import type {
   Platform,
   PRMergeability,
+  PRReviewStatus,
   PRState,
   PullRequestInfo,
   ReviewablePR,
@@ -250,7 +251,7 @@ function getGitHubReviewComments(
 function getGitHubPR(url: string, cwd: string): PullRequestInfo {
   const result = execFileSync(
     "gh",
-    ["pr", "view", url, "--json", "number,title,headRefName,baseRefName,url,state,labels,mergeable"],
+    ["pr", "view", url, "--json", "number,title,headRefName,baseRefName,url,state,labels,mergeable,reviewDecision,latestReviews"],
     { cwd, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
   );
   const pr = JSON.parse(result) as {
@@ -262,6 +263,8 @@ function getGitHubPR(url: string, cwd: string): PullRequestInfo {
     state: "OPEN" | "CLOSED" | "MERGED";
     labels: Array<{ name: string }>;
     mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
+    reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | "" | null;
+    latestReviews: Array<{ state: string }>;
   };
   return {
     number: pr.number,
@@ -272,7 +275,20 @@ function getGitHubPR(url: string, cwd: string): PullRequestInfo {
     state: pr.state.toLowerCase() as PRState,
     labels: pr.labels.map((label) => label.name),
     mergeable: pr.mergeable.toLowerCase() as PRMergeability,
+    review: gitHubReviewStatus(pr.reviewDecision, pr.latestReviews),
   };
+}
+
+export function gitHubReviewStatus(
+  decision: string | null,
+  latestReviews: Array<{ state: string }>,
+): PRReviewStatus {
+  if (decision) return decision.toLowerCase() as PRReviewStatus;
+  // reviewDecision is empty when the base branch requires no reviews; fall back to each reviewer's latest review.
+  const states = latestReviews.map((review) => review.state);
+  if (states.includes("CHANGES_REQUESTED")) return "changes_requested";
+  if (states.includes("APPROVED")) return "approved";
+  return "none";
 }
 
 const GITHUB_REVIEW_THREADS_QUERY = `
@@ -442,7 +458,15 @@ function getGitLabMR(url: string, cwd: string): PullRequestInfo {
     labels: string[];
     has_conflicts: boolean;
     merge_status: string;
+    detailed_merge_status: string;
   };
+  const approvals = JSON.parse(
+    execFileSync("glab", ["api", `projects/:id/merge_requests/${iid}/approvals`], {
+      cwd,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    }),
+  ) as { approved: boolean; approved_by: unknown[] };
   return {
     number: mr.iid,
     title: mr.title,
@@ -452,12 +476,22 @@ function getGitLabMR(url: string, cwd: string): PullRequestInfo {
     state: mr.state === "opened" ? "open" : mr.state === "merged" ? "merged" : "closed",
     labels: mr.labels,
     mergeable: gitLabMergeability(mr.has_conflicts, mr.merge_status),
+    review: gitLabReviewStatus(mr.detailed_merge_status, approvals),
   };
 }
 
 function gitLabMergeability(hasConflicts: boolean, mergeStatus: string): PRMergeability {
   if (hasConflicts) return "conflicting";
   return ["unchecked", "checking", "cannot_be_merged_recheck"].includes(mergeStatus) ? "unknown" : "mergeable";
+}
+
+export function gitLabReviewStatus(
+  detailedMergeStatus: string,
+  approvals: { approved: boolean; approved_by: unknown[] },
+): PRReviewStatus {
+  if (detailedMergeStatus === "requested_changes") return "changes_requested";
+  if (approvals.approved_by.length > 0 && approvals.approved) return "approved";
+  return approvals.approved ? "none" : "review_required";
 }
 
 function getGitLabOpenThreads(mrIid: number, cwd: string): ReviewThread[] {

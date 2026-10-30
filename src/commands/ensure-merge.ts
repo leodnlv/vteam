@@ -92,7 +92,7 @@ async function ensureMerge(
   const changesRequested = pr.labels.includes(config.mergeEnsurer.label);
   const conflicting = pr.mergeable === "conflicting";
   if (!changesRequested && !conflicting) {
-    log(task, pr, `open, no "${config.mergeEnsurer.label}" label, ${MERGEABILITY[pr.mergeable]}. Waiting.`);
+    log(task, pr, `open, ${REVIEW[pr.review]}, no "${config.mergeEnsurer.label}" label, ${MERGEABILITY[pr.mergeable]}. Waiting.`);
     return "waiting";
   }
 
@@ -104,9 +104,16 @@ async function ensureMerge(
   await taskManager.update(task.ref, { status: "todo", removeMetadata: ["retry-count"] });
   await addNote(taskManager, task, reopenNote(pr, config.mergeEnsurer.label, changesRequested, conflicting));
   const reasons = [changesRequested ? `has the "${config.mergeEnsurer.label}" label` : "", conflicting ? `conflicts with ${pr.baseBranch}` : ""];
-  log(task, pr, `open, ${reasons.filter(Boolean).join(" and ")}. Task moved to todo.`);
+  log(task, pr, `open, ${REVIEW[pr.review]}, ${reasons.filter(Boolean).join(" and ")}. Task moved to todo.`);
   return "reopened";
 }
+
+const REVIEW: Record<PullRequestInfo["review"], string> = {
+  approved: "approved",
+  changes_requested: "changes requested",
+  review_required: "awaiting approval",
+  none: "no reviews yet",
+};
 
 const MERGEABILITY: Record<PullRequestInfo["mergeable"], string> = {
   mergeable: "no conflicts",

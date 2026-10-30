@@ -120,11 +120,14 @@ export type PRState = "open" | "closed" | "merged";
 
 export type PRMergeability = "mergeable" | "conflicting" | "unknown";
 
+export type PRReviewStatus = "approved" | "changes_requested" | "review_required" | "none";
+
 export interface PullRequestInfo extends ReviewablePR {
   state: PRState;
   baseBranch: string;
   labels: string[];
   mergeable: PRMergeability;
+  review: PRReviewStatus;
 }
 
 export interface ReviewThread {

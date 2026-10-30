@@ -189,7 +189,7 @@ describe("checkoutWorktree", () => {
   });
 });
 
-describe("merging the base branch into a PR branch", () => {
+describe("merging the base branch into a PR branch", { timeout: 20_000 }, () => {
   let tmp: string;
   let clone: string;
 

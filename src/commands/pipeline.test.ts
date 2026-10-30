@@ -886,6 +886,7 @@ describe("pipeline: follow-up on a task's existing PR", () => {
       state,
       labels: [],
       mergeable,
+      review: "none",
     });
   }
 

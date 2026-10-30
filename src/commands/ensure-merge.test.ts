@@ -43,6 +43,7 @@ function pr(overrides: Partial<PullRequestInfo> = {}): PullRequestInfo {
     state: "open",
     labels: [],
     mergeable: "mergeable",
+    review: "none",
     ...overrides,
   };
 }
@@ -107,13 +108,13 @@ describe("ensureMerges", () => {
   });
 
   it("logs why a task is still waiting", async () => {
-    vi.mocked(getPullRequest).mockReturnValue(pr({ mergeable: "unknown" }));
+    vi.mocked(getPullRequest).mockReturnValue(pr({ mergeable: "unknown", review: "approved" }));
 
     await ensureMerges(fakeManager([doneTask("A", { "pr-url": prUrl })]), config, "/repo");
 
     const output = vi.mocked(console.log).mock.calls.map((call) => call.join(" ")).join("\n");
     expect(output).toContain(`A "Task A"\n  PR #7 ${prUrl}`);
-    expect(output).toContain('open, no "vteam:changes-requested" label, mergeability not computed yet. Waiting.');
+    expect(output).toContain('open, approved, no "vteam:changes-requested" label, mergeability not computed yet. Waiting.');
   });
 
   it("treats unknown mergeability as nothing to do yet", async () => {
