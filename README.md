@@ -422,7 +422,7 @@ vteam ships with three default agents (improver, coder, test-writer). Add custom
 
 ### Coder
 
-- Picks one ready task per run from the aven `todo` queue
+- Picks one ready task per run from the aven `todo` queue, limited to improver findings and tasks you created yourself (`"taskFilter": { "found-by": ["improver", null] }`)
 - Works in an isolated git worktree (never touches the main working tree)
 - Makes minimal, focused changes following existing code style
 - Does not commit or push — the orchestrator handles all git operations and PR creation

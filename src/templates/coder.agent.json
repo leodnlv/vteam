@@ -3,6 +3,12 @@
   "model": "sonnet",
   "worktree": true,
   "input": "task",
+  "taskFilter": {
+    "found-by": [
+      "improver",
+      null
+    ]
+  },
   "autoPR": true,
   "prCreateLabels": [
     "vteam"

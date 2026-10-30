@@ -266,7 +266,7 @@ vteam run coder --focus "the issue about XYZ"
 | Agent                | Purpose                           | Key traits                                      |
 | -------------------- | --------------------------------- | ----------------------------------------------- |
 | **improver**         | Scans codebase for issues         | Read-only, `output: task`, no worktree          |
-| **coder**            | Picks a task and implements a fix | `input: task`, `worktree: true`, `autoPR: true` |
+| **coder**            | Picks a task and implements a fix | `input: task`, `worktree: true`, `autoPR: true`, `taskFilter: { "found-by": ["improver", null] }` |
 | **test-writer**      | Adds tests for untested code      | `worktree: true`, `autoPR: true`                |
 
 ## Creating a custom agent
