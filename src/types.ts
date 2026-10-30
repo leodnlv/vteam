@@ -38,6 +38,7 @@ export interface TaskMetadata {
   "claimed-by"?: string;
   "claimed-pid"?: string;
   "claimed-host"?: string;
+  merged?: string;
 }
 
 export type TaskFilterValue = string | null;
@@ -117,8 +118,13 @@ export interface PRReviewContext {
 
 export type PRState = "open" | "closed" | "merged";
 
+export type PRMergeability = "mergeable" | "conflicting" | "unknown";
+
 export interface PullRequestInfo extends ReviewablePR {
   state: PRState;
+  baseBranch: string;
+  labels: string[];
+  mergeable: PRMergeability;
 }
 
 export interface ReviewThread {
@@ -128,9 +134,15 @@ export interface ReviewThread {
   comments: ReviewComment[];
 }
 
+export interface BaseBranchMerge {
+  baseBranch: string;
+  conflictedFiles: string[];
+}
+
 export interface PRFollowUpContext {
-  pr: ReviewablePR;
+  pr: PullRequestInfo;
   threads: ReviewThread[];
+  baseMerge?: BaseBranchMerge;
 }
 
 export interface TasksConfig {
@@ -140,11 +152,17 @@ export interface TasksConfig {
   workspace?: string;
 }
 
+export interface MergeEnsurerConfig {
+  cron?: string;
+  label: string;
+}
+
 export interface VteamConfig {
   baseBranch: string;
   platform: Platform;
   worktreeDir: string;
   tasks: TasksConfig;
+  mergeEnsurer: MergeEnsurerConfig;
 }
 
 export interface CommitMessage {

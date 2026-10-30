@@ -118,6 +118,10 @@ export class AvenTaskManager implements TaskManager {
     return this.list(["--status", "todo", "--ready"]);
   }
 
+  listDone(): Promise<Task[]> {
+    return this.list(["--status", "done"]);
+  }
+
   async getIndex(): Promise<TaskIndex> {
     const all = await this.list([]);
     const byStatus = new Map<TaskStatus, Task[]>();

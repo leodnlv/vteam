@@ -1,5 +1,5 @@
 import { execFileSync, execSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { slugify } from "../slugify.js";
 
@@ -55,6 +55,32 @@ export function checkoutWorktree(
   );
 
   return { path: worktreePath, branch: remoteBranch };
+}
+
+export function mergeBaseBranch(worktreePath: string, baseBranch: string): string[] {
+  execFileSync("git", ["fetch", "origin", baseBranch], { cwd: worktreePath, stdio: "pipe" });
+  try {
+    execFileSync("git", ["merge", "--no-edit", `origin/${baseBranch}`], { cwd: worktreePath, stdio: "pipe" });
+    return [];
+  } catch (err) {
+    const conflicted = execFileSync("git", ["diff", "--name-only", "--diff-filter=U"], {
+      cwd: worktreePath,
+      encoding: "utf-8",
+    })
+      .split("\n")
+      .filter(Boolean);
+    if (conflicted.length === 0) throw err;
+    return conflicted;
+  }
+}
+
+const CONFLICT_MARKER = /^(<{7}|>{7})(?: |$)/m;
+
+export function findUnresolvedConflicts(worktreePath: string, files: string[]): string[] {
+  return files.filter((file) => {
+    const path = resolve(worktreePath, file);
+    return existsSync(path) && CONFLICT_MARKER.test(readFileSync(path, "utf-8"));
+  });
 }
 
 function ensureCleanWorktreePath(repoRoot: string, worktreePath: string): void {

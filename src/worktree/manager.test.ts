@@ -9,6 +9,8 @@ import {
   checkoutWorktree,
   removeWorktree,
   listWorktrees,
+  mergeBaseBranch,
+  findUnresolvedConflicts,
 } from "./manager.js";
 
 const WT_DIR = ".vteam-worktrees";
@@ -184,5 +186,80 @@ describe("checkoutWorktree", () => {
       encoding: "utf-8",
     });
     expect(log).toContain("feature commit");
+  });
+});
+
+describe("merging the base branch into a PR branch", () => {
+  let tmp: string;
+  let clone: string;
+
+  function git(...args: string[]): string {
+    return execFileSync("git", args, { cwd: clone, encoding: "utf-8", stdio: "pipe" }).trim();
+  }
+
+  function commitFile(file: string, content: string, message: string): void {
+    writeFileSync(join(clone, file), content);
+    git("add", file);
+    git("commit", "-q", "-m", message);
+  }
+
+  function parentCount(): number {
+    return git("rev-list", "--parents", "-n", "1", "HEAD").split(" ").length - 1;
+  }
+
+  function advanceMain(file: string, content: string): void {
+    git("checkout", "-q", "main");
+    commitFile(file, content, "main moves on");
+    git("push", "-q", "origin", "main");
+    git("checkout", "-q", "feature");
+  }
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "vteam-merge-test-"));
+    const origin = join(tmp, "origin.git");
+    clone = join(tmp, "clone");
+    execFileSync("git", ["init", "-q", "--bare", "-b", "main", origin]);
+    execFileSync("git", ["clone", "-q", origin, clone], { stdio: "pipe" });
+    git("config", "user.email", "test@test.com");
+    git("config", "user.name", "Test");
+    git("checkout", "-q", "-b", "main");
+    commitFile("thing.ts", "one\n", "init");
+    commitFile("other.ts", "a\n", "other");
+    git("push", "-q", "origin", "main");
+    git("checkout", "-q", "-b", "feature");
+    commitFile("thing.ts", "feature\n", "feature change");
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("merges the base branch and reports no conflicts when it applies cleanly", () => {
+    advanceMain("other.ts", "b\n");
+
+    expect(mergeBaseBranch(clone, "main")).toEqual([]);
+    expect(parentCount()).toBe(2);
+  });
+
+  it("leaves the merge in progress and lists conflicted files, which commit as a merge once resolved", () => {
+    advanceMain("thing.ts", "main\n");
+
+    const conflicted = mergeBaseBranch(clone, "main");
+
+    expect(conflicted).toEqual(["thing.ts"]);
+    expect(findUnresolvedConflicts(clone, conflicted)).toEqual(["thing.ts"]);
+
+    writeFileSync(join(clone, "thing.ts"), "feature and main\n");
+    expect(findUnresolvedConflicts(clone, conflicted)).toEqual([]);
+
+    git("add", "-A");
+    git("commit", "-q", "-m", "vteam: resolve conflicts", "-m", "Merged main.");
+    expect(parentCount()).toBe(2);
+  });
+
+  it("ignores missing files and lines that only resemble conflict markers", () => {
+    writeFileSync(join(clone, "doc.md"), "Title\n=======\n<<<<<<<not a marker\n");
+
+    expect(findUnresolvedConflicts(clone, ["doc.md", "deleted.ts"])).toEqual([]);
   });
 });

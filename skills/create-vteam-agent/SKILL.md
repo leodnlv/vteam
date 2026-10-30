@@ -24,7 +24,7 @@ Use the `AskUserQuestion` tool to ask the following questions. Ask them all in a
 | Option | When to use |
 |--------|-------------|
 | No input (scan) | The agent scans the codebase on its own (e.g., improver, test writer) |
-| Task queue (`input: "task"`) | The agent picks a task from the aven todo queue and implements it (e.g., coder). With `worktree: true`, a task that already has `pr-url` metadata is a follow-up: the agent works on that PR's branch, sees its unresolved review threads, and returns `threadReplies` that vteam posts after the push |
+| Task queue (`input: "task"`) | The agent picks a task from the aven todo queue and implements it (e.g., coder). With `worktree: true`, a task that already has `pr-url` metadata is a follow-up: the agent works on that PR's branch, sees its unresolved review threads, and returns `threadReplies` that vteam posts after the push. If the PR conflicts with its base, vteam merges the base into the worktree first and the agent must resolve the conflict markers. `vteam ensure-merge` reopens such tasks when a human adds the `vteam:changes-requested` label or the PR conflicts |
 | PR review (`input: "pr"`) | The agent responds to review comments on a pull request |
 
 **2. Output mode** — What does the agent produce?

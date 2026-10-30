@@ -43,6 +43,29 @@ describe("loadConfig", () => {
     expect(config.tasks.maxRetries).toBe(3);
   });
 
+  it("defaults the merge ensurer to the changes-requested label with no schedule", () => {
+    writeConfig({
+      baseBranch: "main",
+      platform: "github",
+      worktreeDir: ".vteam-worktrees",
+      tasks: { maxRetries: 3, project: "app" },
+    });
+
+    expect(loadConfig(tmp).mergeEnsurer).toEqual({ label: "vteam:changes-requested" });
+  });
+
+  it("rejects an invalid merge ensurer cron", () => {
+    writeConfig({
+      baseBranch: "main",
+      platform: "github",
+      worktreeDir: ".vteam-worktrees",
+      tasks: { maxRetries: 3, project: "app" },
+      mergeEnsurer: { cron: "every minute" },
+    });
+
+    expect(() => loadConfig(tmp)).toThrow("mergeEnsurer.cron");
+  });
+
   it("throws with field path on missing required field", () => {
     writeConfig({
       platform: "github",

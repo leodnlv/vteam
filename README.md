@@ -78,7 +78,7 @@ vteam run coder
 
 ### Running on a schedule
 
-Agents with a `cron` field in their `agent.json` can be scheduled via the loop command:
+Agents with a `cron` field in their `agent.json`, and the [merge ensurer](#vteam-ensure-merge) when `mergeEnsurer.cron` is set, can be scheduled via the loop command:
 
 ```bash
 # Start the scheduler — runs agents on their cron schedules
@@ -164,7 +164,7 @@ Claude is read-only — it scans and reports. The orchestrator owns all file cre
 
 #### Following up on review comments
 
-When review comments on a coder PR need work, reopen the task in aven and leave a note saying which comments to apply:
+When review comments on a coder PR need work, add the `mergeEnsurer.label` label (default `vteam:changes-requested`) to the PR. The next [`vteam ensure-merge`](#vteam-ensure-merge) moves the task back to `todo`. You can also reopen the task in aven yourself and leave a note saying which comments to apply:
 
 ```sh
 aven edit <ref> --status todo
@@ -175,8 +175,23 @@ The next coder run sees the task's `pr-url` metadata and works on the existing P
 
 - If the PR is merged or closed, the task moves to `backlog` with a note and Claude does not run. To start over on a new branch, remove the metadata (`aven edit <ref> --remove-metadata pr-url`) and move the task back to `todo`.
 - Otherwise the PR branch is checked out into the worktree, and the prompt gets the task, all its notes, and the PR's unresolved review threads. Resolved threads and top-level PR comments are left out. Claude applies the threads your note names, or all of them if the note doesn't say.
+- If the PR conflicts with its base branch, vteam merges `origin/<base>` into the worktree before Claude runs and lists the conflicted files in the prompt. Claude resolves the conflicts and vteam commits the merge with Claude's commit message. If any conflict marker is left, nothing is committed and the task's `retry-count` goes up. If the merge applies cleanly, it is pushed even when Claude changes nothing else.
 - Changes are pushed to the PR branch, no new PR is opened, and the task goes back to `done`.
 - Claude returns a reply for each thread it addressed. After the push, vteam posts each reply in its thread, marked `🤖 **vteam coder:**` and ending with `Fixed in <sha>`. Threads Claude skipped get no reply, and nothing is posted if no commit was pushed. Set `"resolveThreads": true` in the agent's `agent.json` to also resolve the threads it replied to. The run's aven note records how many replies were posted.
+
+### `vteam ensure-merge`
+
+A coder task is `done` once its PR is open, but the PR still has to get through review. The merge ensurer checks every `done` task that has `pr-url` metadata and no `merged=true` metadata. It does not run Claude:
+
+| PR state | What happens |
+| --- | --- |
+| merged | Sets metadata `merged=true`. The task stays `done` and is not checked again |
+| closed without merging | Sets the task to `canceled` with a note. Canceled tasks stay in the dedup list, so the finding is not reported again |
+| open, with the `mergeEnsurer.label` label | Removes the label, moves the task to `todo`, clears `retry-count`, and adds a note. The coder then follows up on the PR |
+| open, conflicting with its base branch | Moves the task to `todo` with a note. The coder [merges the base branch and resolves the conflicts](#following-up-on-review-comments) |
+| open, otherwise | Nothing. Review comments alone never reopen a task; only the label you add does |
+
+The label is removed before the task is reopened. If that removal fails, the task stays `done` and the next run tries again. Removing it first means a label left behind can never reopen the task over and over. While GitHub or GitLab is still working out whether a PR is mergeable, conflicts are skipped until a later run. Set `mergeEnsurer.cron` to run the ensurer from `vteam loop start`. Each run writes a log to `vteam/.logs/merge-ensurer/`.
 
 ### `vteam status`
 
@@ -211,6 +226,10 @@ Global settings live in `vteam/vteam.config.json`:
     "maxRetries": 3,
     "project": "my-app",
     "label": "vteam"
+  },
+  "mergeEnsurer": {
+    "cron": "*/15 * * * *",
+    "label": "vteam:changes-requested"
   }
 }
 ```
@@ -224,6 +243,8 @@ Global settings live in `vteam/vteam.config.json`:
 | `tasks.project`    | Required. The aven project vteam's tasks live in. aven creates it on the first task. `vteam init` sets it to the current directory name. |
 | `tasks.label`      | Default `"vteam"`. vteam only sees and picks up tasks carrying this label. Created automatically. |
 | `tasks.workspace`  | Optional. aven workspace, passed to every `aven` call as `--workspace`.                 |
+| `mergeEnsurer.cron` | Optional. Cron expression for running [`vteam ensure-merge`](#vteam-ensure-merge) from `vteam loop start`. Without it, the ensurer only runs when you call it. |
+| `mergeEnsurer.label` | Default `"vteam:changes-requested"`. The PR label you add to approve the review feedback on a coder PR. Create it in GitHub/GitLab once. |
 
 ### Agent configuration (agent.json)
 
@@ -355,13 +376,14 @@ Because tasks live in aven, you can triage them with `aven tui` or the `aven` CL
 | ---------------------- | ------------------------------------------------------------------------------- |
 | title                  | The finding's title                                                             |
 | project / label        | `tasks.project` / `tasks.label`                                                 |
-| status                 | `inbox` on creation; `active` while being worked on; `done` on success; `backlog` when a reopened task's PR is merged or closed |
+| status                 | `inbox` on creation; `active` while being worked on; `done` on success; `todo` again when the merge ensurer reopens it; `canceled` when the merge ensurer finds its PR closed; `backlog` when a reopened task's PR is merged or closed |
 | priority               | From severity: `critical`→`urgent`, `high`→`high`, `medium`→`medium`, `low`→`low` (aven `none` reads back as `low`) |
 | description            | Markdown with `## Description`, `## Suggested Fix` (optional), `## Affected Files` |
 | metadata `found-by`    | Name of the agent that created the task (usable in `taskFilter`)                |
 | metadata `files`       | Comma-separated affected files                                                  |
 | metadata `retry-count` | Incremented each time the coder finishes with no changes                        |
 | metadata `completed`, `branch`, `pr-url` | Added when the task is set to `done` (`pr-url` only if a PR was created). A `todo` task with `pr-url` is a [follow-up](#following-up-on-review-comments) on that PR |
+| metadata `merged`      | `true` once the merge ensurer sees the task's PR merged                          |
 | notes                  | One per run that returned output: `<agent>: <status>`, the agent's summary, blocker reason and PR URL if any. All notes, yours included, are shown to the agent that next picks the task |
 | metadata `claimed-by`, `claimed-pid`, `claimed-host` | Run ID, process ID and hostname of the run working the task. Set with `active`, removed when the task leaves `active` |
 

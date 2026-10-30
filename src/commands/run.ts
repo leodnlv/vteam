@@ -19,6 +19,8 @@ import {
   removeWorktree,
   pushBranch,
   getCommitSha,
+  mergeBaseBranch,
+  findUnresolvedConflicts,
 } from "../worktree/manager.js";
 import { createMergeRequest } from "../integrations/merge-request.js";
 import {
@@ -148,7 +150,7 @@ async function runAgent(
   let taskSettled = false;
   let reviewContext: PRReviewContext | undefined;
   let followUp: PRFollowUpContext | undefined;
-  let threadReplyNote: string | undefined;
+  const extraNotes: string[] = [];
   let prUrl: string | undefined;
   let memoryUpdate: string | undefined;
   let runOutcome: RunOutcome | undefined;
@@ -234,6 +236,13 @@ async function runAgent(
         worktreePath = wt.path;
         branchName = wt.branch;
       }
+      if (followUp?.pr.mergeable === "conflicting") {
+        const { baseBranch } = followUp.pr;
+        console.log(`PR conflicts with ${baseBranch}. Merging origin/${baseBranch}...`);
+        const conflictedFiles = mergeBaseBranch(worktreePath, baseBranch);
+        followUp.baseMerge = { baseBranch, conflictedFiles };
+        console.log(conflictedFiles.length ? `Conflicts in: ${conflictedFiles.join(", ")}` : "Merged cleanly.");
+      }
       agentCwd = worktreePath;
       runState.worktreePath = worktreePath;
       runState.branchName = branchName;
@@ -292,29 +301,35 @@ async function runAgent(
       console.log(`Created task: ${taskId} ${output.content.body.title} (${output.content.body.severity})`);
     }
 
+    const unresolvedConflicts = worktreePath && followUp?.baseMerge
+      ? findUnresolvedConflicts(worktreePath, followUp.baseMerge.conflictedFiles)
+      : [];
+    if (unresolvedConflicts.length > 0) {
+      extraNotes.push(`Unresolved merge conflicts in: ${unresolvedConflicts.join(", ")}. Nothing was committed.`);
+    }
+    const commitMessage = worktreePath && commitsAgentChanges(worktreePath, output, unresolvedConflicts)
+      ? output.commitMessage
+      : undefined;
+
     if (agent.worktree && agent.readOnly && worktreePath) {
       console.log(`\n${agent.name} finished (readOnly). No commit/push.`);
 
-      if (reviewContext && agent.prTriggerLabel) {
-        removePRLabel(
-          config.platform,
-          reviewContext.pr.number,
-          agent.prTriggerLabel,
-          cwd,
-        );
-        console.log(`Removed label "${agent.prTriggerLabel}" from PR #${reviewContext.pr.number}.`);
+      if (reviewContext) {
+        removeTriggerLabel(config, agent, reviewContext.pr.number, cwd);
       }
     } else if (agent.worktree && worktreePath && branchName &&
-      output.commitMessage &&
-      (output.status === "completed" || output.status === "partial") &&
-      hasUncommittedChanges(worktreePath)) {
-      console.log(`\n${agent.name} made changes. Committing...`);
-      execFileSync("git", ["add", "-A"], { cwd: worktreePath, stdio: "pipe" });
-      execFileSync(
-        "git",
-        ["commit", "-m", output.commitMessage.subject, "-m", output.commitMessage.body],
-        { cwd: worktreePath, stdio: "pipe" },
-      );
+      (commitMessage || mergedBaseCleanly(followUp))) {
+      if (commitMessage) {
+        console.log(`\n${agent.name} made changes. Committing...`);
+        execFileSync("git", ["add", "-A"], { cwd: worktreePath, stdio: "pipe" });
+        execFileSync(
+          "git",
+          ["commit", "-m", commitMessage.subject, "-m", commitMessage.body],
+          { cwd: worktreePath, stdio: "pipe" },
+        );
+      } else {
+        console.log(`\n${agent.name} made no changes. Pushing the merge of ${followUp?.baseMerge?.baseBranch}...`);
+      }
       runState.commitSha = getCommitSha(worktreePath);
 
       console.log(`Pushing...`);
@@ -336,29 +351,22 @@ async function runAgent(
           );
         }
 
-        if (agent.prTriggerLabel) {
-          removePRLabel(
-            config.platform,
-            reviewContext.pr.number,
-            agent.prTriggerLabel,
-            cwd,
-          );
-          console.log(`Removed label "${agent.prTriggerLabel}" from PR #${reviewContext.pr.number}.`);
-        }
+        removeTriggerLabel(config, agent, reviewContext.pr.number, cwd);
       }
 
       if (followUp) {
         console.log(`Pushed to existing PR: ${followUp.pr.url}`);
         if (output.threadReplies?.length) {
           const posted = postThreadReplies(config, agent, followUp, output.threadReplies, runState.commitSha, cwd);
-          threadReplyNote = `Replied to ${posted} of ${output.threadReplies.length} review threads.`;
+          const threadReplyNote = `Replied to ${posted} of ${output.threadReplies.length} review threads.`;
+          extraNotes.push(threadReplyNote);
           console.log(threadReplyNote);
         }
       } else if (agent.autoPR) {
         console.log("Creating pull request...");
         try {
-          const prBody = output.commitMessage.body || `Automated by vteam (${agent.name}).${task ? `\n\nTask: ${task.title}` : ""}`;
-          const summary = task?.title || output.commitMessage.subject.replace(/^vteam:\s*/i, "") || "";
+          const prBody = output.commitMessage?.body || `Automated by vteam (${agent.name}).${task ? `\n\nTask: ${task.title}` : ""}`;
+          const summary = task?.title || output.commitMessage?.subject.replace(/^vteam:\s*/i, "") || "";
           const prTitle = summary
             ? `vteam: ${agent.name}: ${summary}`
             : `vteam: ${agent.name}`;
@@ -399,6 +407,9 @@ async function runAgent(
       if (output.status === "blocked" || output.status === "failed") {
         console.log(`Reason: ${output.blockerReason ?? output.summary}`);
       }
+      if (unresolvedConflicts.length > 0) {
+        console.log(`Unresolved merge conflicts in: ${unresolvedConflicts.join(", ")}`);
+      }
       if (task) {
         const retryCount = task.retryCount + 1;
         await taskManager.update(task.ref, {
@@ -412,7 +423,7 @@ async function runAgent(
     }
 
     if (task) {
-      await addRunNote(taskManager, task, formatRunNote(agent.name, output, prUrl, threadReplyNote));
+      await addRunNote(taskManager, task, formatRunNote(agent.name, output, prUrl, extraNotes));
     }
 
     writeRunState(cwd, runState);
@@ -476,6 +487,34 @@ async function runAgent(
     if (runOutcome?.status === "failed") {
       process.exit(1);
     }
+  }
+}
+
+function commitsAgentChanges(
+  worktreePath: string,
+  output: AgentOutput,
+  unresolvedConflicts: string[],
+): boolean {
+  return Boolean(output.commitMessage) &&
+    (output.status === "completed" || output.status === "partial") &&
+    unresolvedConflicts.length === 0 &&
+    hasUncommittedChanges(worktreePath);
+}
+
+function mergedBaseCleanly(followUp: PRFollowUpContext | undefined): boolean {
+  return followUp?.baseMerge?.conflictedFiles.length === 0;
+}
+
+function removeTriggerLabel(config: VteamConfig, agent: AgentConfig, prNumber: number, cwd: string): void {
+  if (!agent.prTriggerLabel) return;
+  try {
+    removePRLabel(config.platform, prNumber, agent.prTriggerLabel, cwd);
+    console.log(`Removed label "${agent.prTriggerLabel}" from PR #${prNumber}.`);
+  } catch (err) {
+    console.error(
+      `Failed to remove label "${agent.prTriggerLabel}" from PR #${prNumber}:`,
+      err instanceof Error ? err.message : err,
+    );
   }
 }
 
@@ -587,13 +626,13 @@ function formatRunNote(
   agentName: string,
   output: AgentOutput,
   prUrl: string | undefined,
-  threadReplyNote: string | undefined,
+  extraNotes: string[],
 ): string {
   return [
     `${agentName}: ${output.status}`,
     output.summary,
     output.blockerReason ? `Blocker: ${output.blockerReason}` : "",
-    threadReplyNote ?? "",
+    ...extraNotes,
     prUrl ? `PR: ${prUrl}` : "",
   ]
     .filter(Boolean)

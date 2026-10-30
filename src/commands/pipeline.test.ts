@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import type { AgentRunResult } from "../orchestrator/agent-runner.js";
 import type { TaskManager, TaskUpdate } from "../tasks/task-manager.js";
 import type { PullRequestInfo, ReviewThread, Task, TaskContentBody } from "../types.js";
+import type * as WorktreeManager from "../worktree/manager.js";
 
 vi.mock("../orchestrator/agent-runner.js", () => ({
   runClaudeAgent: vi.fn(),
@@ -32,6 +33,9 @@ vi.mock("../tasks/aven-manager.js", () => ({
       const ready = taskStore.tasks.filter((t) => t.status === "todo");
       await new Promise((r) => setTimeout(r, 10));
       return ready;
+    }
+    async listDone() {
+      return taskStore.tasks.filter((t) => t.status === "done");
     }
     async getIndex() {
       return {
@@ -56,12 +60,14 @@ vi.mock("../tasks/aven-manager.js", () => ({
   },
 }));
 
-vi.mock("../worktree/manager.js", () => ({
+vi.mock("../worktree/manager.js", async (importOriginal) => ({
   createWorktree: vi.fn(),
   checkoutWorktree: vi.fn(),
   removeWorktree: vi.fn(),
   pushBranch: vi.fn(),
   getCommitSha: vi.fn(() => "abc1234def"),
+  mergeBaseBranch: vi.fn(),
+  findUnresolvedConflicts: (await importOriginal<typeof WorktreeManager>()).findUnresolvedConflicts,
 }));
 
 vi.mock("../integrations/pull-request.js", () => ({
@@ -81,7 +87,7 @@ vi.mock("../integrations/merge-request.js", () => ({
 }));
 
 import { runClaudeAgent } from "../orchestrator/agent-runner.js";
-import { checkoutWorktree, createWorktree, pushBranch } from "../worktree/manager.js";
+import { checkoutWorktree, createWorktree, mergeBaseBranch, pushBranch } from "../worktree/manager.js";
 import {
   getOpenReviewThreads,
   getPullRequest,
@@ -177,6 +183,7 @@ beforeEach(() => {
   vi.mocked(checkoutWorktree).mockReset();
   vi.mocked(createWorktree).mockReset();
   vi.mocked(pushBranch).mockReset();
+  vi.mocked(mergeBaseBranch).mockReset();
   vi.mocked(getPullRequest).mockReset();
   vi.mocked(getOpenReviewThreads).mockReset();
   vi.mocked(replyToReviewThread).mockReset();
@@ -869,13 +876,16 @@ describe("pipeline: follow-up on a task's existing PR", () => {
     return { path, branch };
   }
 
-  function mockPR(state: PullRequestInfo["state"]): void {
+  function mockPR(state: PullRequestInfo["state"], mergeable: PullRequestInfo["mergeable"] = "mergeable"): void {
     vi.mocked(getPullRequest).mockReturnValue({
       number: 7,
       title: "vteam: coder: Fix the thing",
       branch: prBranch,
+      baseBranch: "main",
       url: prUrl,
       state,
+      labels: [],
+      mergeable,
     });
   }
 
@@ -966,6 +976,76 @@ describe("pipeline: follow-up on a task's existing PR", () => {
     expect(checkoutWorktree).not.toHaveBeenCalled();
     expect(createMergeRequest).toHaveBeenCalledOnce();
     expect(mockRunClaude.mock.calls[0][0].userPrompt).not.toContain("Existing Pull Request");
+  });
+
+  describe("merge conflicts", () => {
+    function setupConflictingFollowUp(conflictedFiles: string[]): void {
+      setupProject({ agentConfig: { model: "sonnet", input: "task", worktree: true } });
+      seedDoneTaskReopened();
+      mockPR("open", "conflicting");
+      vi.mocked(getOpenReviewThreads).mockReturnValue([]);
+      vi.mocked(checkoutWorktree).mockImplementation((_root, branch) => makeGitWorktree(branch));
+      vi.mocked(mergeBaseBranch).mockReturnValue(conflictedFiles);
+    }
+
+    it("does not merge the base branch when the PR is mergeable", async () => {
+      setupProject({ agentConfig: { model: "sonnet", input: "task", worktree: true } });
+      seedDoneTaskReopened();
+      mockPR("open");
+      vi.mocked(getOpenReviewThreads).mockReturnValue([]);
+      vi.mocked(checkoutWorktree).mockImplementation((_root, branch) => makeGitWorktree(branch));
+      mockAgentEditing();
+
+      await runCommand("test-agent", {});
+
+      expect(mergeBaseBranch).not.toHaveBeenCalled();
+      expect(mockRunClaude.mock.calls[0][0].userPrompt).not.toContain("## Merge Conflicts");
+    });
+
+    it("merges the base branch, lists conflicted files in the prompt, and pushes the resolution", async () => {
+      setupConflictingFollowUp(["thing.ts"]);
+      mockAgentEditing();
+
+      await runCommand("test-agent", {});
+
+      expect(mergeBaseBranch).toHaveBeenCalledWith(expect.stringContaining(prBranch), "main");
+      const prompt = mockRunClaude.mock.calls[0][0].userPrompt;
+      expect(prompt).toContain("## Merge Conflicts");
+      expect(prompt).toContain("- `thing.ts`");
+      expect(pushBranch).toHaveBeenCalledWith(expect.any(String), prBranch);
+      expect(taskStore.updates.at(-1)?.changes.status).toBe("done");
+    });
+
+    it("commits nothing and counts a retry when conflict markers are left", async () => {
+      setupConflictingFollowUp(["thing.ts"]);
+      mockRunClaude.mockImplementationOnce(async ({ cwd }) => {
+        writeFileSync(resolve(cwd, "thing.ts"), "<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> origin/main\n");
+        return makeResult(JSON.stringify({
+          status: "completed",
+          summary: "Resolved conflicts.",
+          commitMessage: { subject: "vteam: merge main", body: "" },
+        }));
+      });
+
+      await runCommand("test-agent", {});
+
+      expect(pushBranch).not.toHaveBeenCalled();
+      const last = taskStore.updates.at(-1)?.changes;
+      expect(last?.status).toBe("todo");
+      expect(last?.metadata).toEqual({ "retry-count": "1" });
+      expect(taskStore.notes[0].text).toContain("Unresolved merge conflicts in: thing.ts.");
+    });
+
+    it("pushes a clean merge of the base branch even when the agent changes nothing", async () => {
+      setupConflictingFollowUp([]);
+      mockAgentEditing({}, false);
+
+      await runCommand("test-agent", {});
+
+      expect(mockRunClaude.mock.calls[0][0].userPrompt).toContain("without conflicts");
+      expect(pushBranch).toHaveBeenCalledWith(expect.any(String), prBranch);
+      expect(taskStore.updates.at(-1)?.changes.status).toBe("done");
+    });
   });
 
   describe("thread replies", () => {

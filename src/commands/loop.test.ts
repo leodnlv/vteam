@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
-import { findCronAgents, buildChildArgs } from "./loop.js";
+import { findCronAgents, findScheduledJobs, buildChildArgs } from "./loop.js";
+import type { VteamConfig } from "../types.js";
 import { isValidCronExpression } from "../config/schema.js";
 
 describe("findCronAgents", () => {
@@ -80,7 +81,7 @@ describe("buildChildArgs", () => {
       "/usr/local/bin/node",
       [],
       "/project/dist/bin.js",
-      "improver",
+      ["run", "improver"],
     );
     expect(result.command).toBe("/usr/local/bin/node");
     expect(result.args).toEqual(["/project/dist/bin.js", "run", "improver"]);
@@ -91,7 +92,7 @@ describe("buildChildArgs", () => {
       "/usr/local/bin/node",
       ["--import", "tsx/esm/register"],
       "src/bin.ts",
-      "improver",
+      ["run", "improver"],
     );
     expect(result.args).toEqual([
       "--import",
@@ -100,5 +101,44 @@ describe("buildChildArgs", () => {
       "run",
       "improver",
     ]);
+  });
+});
+
+describe("findScheduledJobs", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = join(tmpdir(), `vteam-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const agentDir = resolve(dir, "vteam", "agents", "coder");
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(resolve(agentDir, "agent.json"), JSON.stringify({ cron: "0 * * * *" }));
+    writeFileSync(resolve(agentDir, "AGENT.md"), "Agent prompt.");
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  function config(mergeEnsurer: VteamConfig["mergeEnsurer"]): VteamConfig {
+    return {
+      baseBranch: "main",
+      platform: "github",
+      worktreeDir: ".worktrees",
+      tasks: { maxRetries: 3, project: "app", label: "vteam" },
+      mergeEnsurer,
+    };
+  }
+
+  it("schedules the merge ensurer next to cron agents when it has a cron", () => {
+    const jobs = findScheduledJobs(dir, config({ cron: "*/15 * * * *", label: "vteam:changes-requested" }));
+    expect(jobs).toEqual([
+      { name: "coder", cron: "0 * * * *", command: ["run", "coder"] },
+      { name: "merge-ensurer", cron: "*/15 * * * *", command: ["ensure-merge"] },
+    ]);
+  });
+
+  it("leaves the merge ensurer out without a cron", () => {
+    const jobs = findScheduledJobs(dir, config({ label: "vteam:changes-requested" }));
+    expect(jobs.map((job) => job.name)).toEqual(["coder"]);
   });
 });

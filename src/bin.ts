@@ -5,6 +5,7 @@ import { initCommand } from "./commands/init.js";
 import { runCommand } from "./commands/run.js";
 import { statusCommand } from "./commands/status.js";
 import { cleanCommand } from "./commands/clean.js";
+import { ensureMergeCommand } from "./commands/ensure-merge.js";
 import { loopStartCommand, loopStatusCommand } from "./commands/loop.js";
 import { skillInstallCommand, skillUninstallCommand } from "./commands/skill.js";
 
@@ -36,6 +37,11 @@ program
   .command("clean")
   .description("Remove orphaned worktrees, break stale locks")
   .action(cleanCommand);
+
+program
+  .command("ensure-merge")
+  .description("Record merged PRs, cancel tasks with closed PRs, and reopen tasks whose PRs need changes or conflict")
+  .action(ensureMergeCommand);
 
 const loopCmd = program
   .command("loop")

@@ -6,5 +6,9 @@
     "maxRetries": 3,
     "project": "vteam",
     "label": "vteam"
+  },
+  "mergeEnsurer": {
+    "cron": "*/15 * * * *",
+    "label": "vteam:changes-requested"
   }
 }

@@ -1,14 +1,22 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { Cron } from "croner";
 import { resolveAgentConfig, listAgentNames } from "../config/agent.js";
+import { loadConfig } from "../config/load.js";
+import { MERGE_ENSURER } from "./ensure-merge.js";
 import { agentLogsDir } from "../run-log.js";
-import type { AgentConfig } from "../types.js";
+import type { AgentConfig, VteamConfig } from "../types.js";
+
+export interface ScheduledJob {
+  name: string;
+  cron: string;
+  command: string[];
+}
 
 export async function loopStartCommand(): Promise<void> {
   const cwd = process.cwd();
-  const agents = findCronAgents(cwd);
+  const scheduled = findScheduledJobs(cwd, loadConfig(cwd));
 
-  if (agents.length === 0) {
+  if (scheduled.length === 0) {
     console.log("No agents with cron patterns found.");
     return;
   }
@@ -16,24 +24,22 @@ export async function loopStartCommand(): Promise<void> {
   const jobs: Cron[] = [];
   const running = new Map<string, ChildProcess>();
 
-  console.log(`Starting loop with ${agents.length} agent(s):\n`);
+  console.log(`Starting loop with ${scheduled.length} job(s):\n`);
 
-  for (const agent of agents) {
-    if (!agent.cron) continue;
-
-    const job = new Cron(agent.cron, () => {
-      if (running.has(agent.name)) {
-        console.log(`[${ts()}] ${agent.name} skipped (still running)`);
+  for (const scheduledJob of scheduled) {
+    const job = new Cron(scheduledJob.cron, () => {
+      if (running.has(scheduledJob.name)) {
+        console.log(`[${ts()}] ${scheduledJob.name} skipped (still running)`);
         return;
       }
-      spawnAgentRun(cwd, agent, running);
+      spawnRun(cwd, scheduledJob, running);
     });
 
     jobs.push(job);
 
     const next = job.nextRun();
     console.log(
-      `  ${agent.name}  ${agent.cron}  next: ${next?.toISOString() ?? "—"}`,
+      `  ${scheduledJob.name}  ${scheduledJob.cron}  next: ${next?.toISOString() ?? "—"}`,
     );
   }
 
@@ -55,45 +61,44 @@ export async function loopStartCommand(): Promise<void> {
 
 export async function loopStatusCommand(): Promise<void> {
   const cwd = process.cwd();
-  const agents = findCronAgents(cwd);
+  const scheduled = findScheduledJobs(cwd, loadConfig(cwd));
 
-  if (agents.length === 0) {
+  if (scheduled.length === 0) {
     console.log("No agents with cron patterns found.");
     return;
   }
 
-  console.log(`${agents.length} agent(s) with cron schedules:\n`);
+  console.log(`${scheduled.length} job(s) with cron schedules:\n`);
 
-  for (const agent of agents) {
-    if (!agent.cron) continue;
-    const job = new Cron(agent.cron);
+  for (const scheduledJob of scheduled) {
+    const job = new Cron(scheduledJob.cron);
     const next = job.nextRun();
     job.stop();
     console.log(
-      `  ${agent.name}  ${agent.cron}  next: ${next?.toISOString() ?? "—"}`,
+      `  ${scheduledJob.name}  ${scheduledJob.cron}  next: ${next?.toISOString() ?? "—"}`,
     );
   }
 }
 
-function spawnAgentRun(
+function spawnRun(
   cwd: string,
-  agent: AgentConfig,
+  job: ScheduledJob,
   running: Map<string, ChildProcess>,
 ): void {
   const { command, args } = buildChildArgs(
     process.execPath,
     process.execArgv,
     process.argv[1],
-    agent.name,
+    job.command,
   );
   const child = spawn(command, args, { cwd, stdio: "ignore" });
 
-  running.set(agent.name, child);
-  console.log(`[${ts()}] ${agent.name} started → ${agentLogsDir(cwd, agent.name)}/`);
+  running.set(job.name, child);
+  console.log(`[${ts()}] ${job.name} started → ${agentLogsDir(cwd, job.name)}/`);
 
   child.on("close", (code) => {
-    running.delete(agent.name);
-    console.log(`[${ts()}] ${agent.name} finished (exit ${code})`);
+    running.delete(job.name);
+    console.log(`[${ts()}] ${job.name} finished (exit ${code})`);
   });
 }
 
@@ -101,12 +106,22 @@ export function buildChildArgs(
   execPath: string,
   execArgv: string[],
   scriptPath: string,
-  agentName: string,
+  command: string[],
 ): { command: string; args: string[] } {
   return {
     command: execPath,
-    args: [...execArgv, scriptPath, "run", agentName],
+    args: [...execArgv, scriptPath, ...command],
   };
+}
+
+export function findScheduledJobs(cwd: string, config: VteamConfig): ScheduledJob[] {
+  const jobs: ScheduledJob[] = findCronAgents(cwd).flatMap((agent) =>
+    agent.cron ? [{ name: agent.name, cron: agent.cron, command: ["run", agent.name] }] : [],
+  );
+  if (config.mergeEnsurer.cron) {
+    jobs.push({ name: MERGE_ENSURER, cron: config.mergeEnsurer.cron, command: ["ensure-merge"] });
+  }
+  return jobs;
 }
 
 export function findCronAgents(cwd: string): AgentConfig[] {

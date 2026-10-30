@@ -1,6 +1,7 @@
 import { execFileSync, execSync } from "node:child_process";
 import type {
   Platform,
+  PRMergeability,
   PRState,
   PullRequestInfo,
   ReviewablePR,
@@ -122,20 +123,10 @@ export function removePRLabel(
   label: string,
   cwd: string,
 ): void {
-  try {
-    if (platform === "github") {
-      execSync(
-        `gh pr edit ${prNumber} --remove-label ${shellEscape(label)}`,
-        { cwd, stdio: "pipe" },
-      );
-    } else {
-      execSync(
-        `glab mr update ${prNumber} --unlabel ${shellEscape(label)}`,
-        { cwd, stdio: "pipe" },
-      );
-    }
-  } catch {
-    // Best-effort — label removal failing shouldn't block the run
+  if (platform === "github") {
+    execFileSync("gh", ["pr", "edit", String(prNumber), "--remove-label", label], { cwd, stdio: "pipe" });
+  } else {
+    execFileSync("glab", ["mr", "update", String(prNumber), "--unlabel", label], { cwd, stdio: "pipe" });
   }
 }
 
@@ -259,22 +250,28 @@ function getGitHubReviewComments(
 function getGitHubPR(url: string, cwd: string): PullRequestInfo {
   const result = execFileSync(
     "gh",
-    ["pr", "view", url, "--json", "number,title,headRefName,url,state"],
+    ["pr", "view", url, "--json", "number,title,headRefName,baseRefName,url,state,labels,mergeable"],
     { cwd, encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
   );
   const pr = JSON.parse(result) as {
     number: number;
     title: string;
     headRefName: string;
+    baseRefName: string;
     url: string;
     state: "OPEN" | "CLOSED" | "MERGED";
+    labels: Array<{ name: string }>;
+    mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
   };
   return {
     number: pr.number,
     title: pr.title,
     branch: pr.headRefName,
+    baseBranch: pr.baseRefName,
     url: pr.url,
     state: pr.state.toLowerCase() as PRState,
+    labels: pr.labels.map((label) => label.name),
+    mergeable: pr.mergeable.toLowerCase() as PRMergeability,
   };
 }
 
@@ -439,16 +436,28 @@ function getGitLabMR(url: string, cwd: string): PullRequestInfo {
     iid: number;
     title: string;
     source_branch: string;
+    target_branch: string;
     web_url: string;
     state: "opened" | "closed" | "locked" | "merged";
+    labels: string[];
+    has_conflicts: boolean;
+    merge_status: string;
   };
   return {
     number: mr.iid,
     title: mr.title,
     branch: mr.source_branch,
+    baseBranch: mr.target_branch,
     url: mr.web_url,
     state: mr.state === "opened" ? "open" : mr.state === "merged" ? "merged" : "closed",
+    labels: mr.labels,
+    mergeable: gitLabMergeability(mr.has_conflicts, mr.merge_status),
   };
+}
+
+function gitLabMergeability(hasConflicts: boolean, mergeStatus: string): PRMergeability {
+  if (hasConflicts) return "conflicting";
+  return ["unchecked", "checking", "cannot_be_merged_recheck"].includes(mergeStatus) ? "unknown" : "mergeable";
 }
 
 function getGitLabOpenThreads(mrIid: number, cwd: string): ReviewThread[] {

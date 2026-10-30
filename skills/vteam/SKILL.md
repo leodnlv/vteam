@@ -30,7 +30,8 @@ vteam run <agent> --focus "..."         # run with priority context injected int
 vteam run                               # (no agent) list available agents
 vteam status                            # show aven project/label, counts per aven status, active/todo tasks with refs + retries, worktrees
 vteam clean                             # prune orphaned worktrees, break stale locks, release orphaned active tasks
-vteam loop start                        # start long-lived scheduler for agents with cron patterns
+vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen done tasks whose PR is labelled or conflicting
+vteam loop start                        # start long-lived scheduler for agents with cron patterns (and the merge ensurer)
 vteam loop status                       # show agents with cron schedules and next fire times
 vteam skill install                     # symlink skills from skills/ into ~/.claude/skills/
 vteam skill uninstall                   # remove skill symlinks from ~/.claude/skills/
@@ -70,6 +71,10 @@ vteam/
     "project": "my-app",
     "label": "vteam",
     "workspace": "optional"
+  },
+  "mergeEnsurer": {
+    "cron": "*/15 * * * *",
+    "label": "vteam:changes-requested"
   }
 }
 ```
@@ -83,6 +88,8 @@ vteam/
 | `tasks.project`    | Required, non-empty. aven project for vteam's tasks; aven auto-creates it on the first task |
 | `tasks.label`      | Default `"vteam"`. Opt-in label — vteam only sees/picks up tasks carrying it. Auto-created |
 | `tasks.workspace`  | Optional. aven workspace, passed as `--workspace` to every `aven` call                  |
+| `mergeEnsurer.cron` | Optional. Schedules `vteam ensure-merge` in `vteam loop start`                        |
+| `mergeEnsurer.label` | Default `"vteam:changes-requested"`. PR label a human adds to approve review feedback; the ensurer reopens the task and removes it |
 
 ## Agent configuration (agent.json)
 
@@ -178,7 +185,7 @@ The orchestrator then:
 - Commits + pushes from `commitMessage` when the agent modified files
 - Creates a PR if `autoPR: true`
 - Sets the task to `done` (metadata `completed`, `branch`, `pr-url`) if a commit was pushed
-- Follows up on an existing PR when a worktree agent picks a task that already has `pr-url` metadata: checks out the PR branch, adds the PR's unresolved review threads to the prompt (`## Existing Pull Request`), pushes to that branch and skips `autoPR`. After the push it posts the agent's `threadReplies` to their threads (`🤖 **vteam <agent>:** …` + `Fixed in <sha>`) and resolves them if `resolveThreads: true`; reply failures are non-fatal. If the PR is merged or closed, moves the task to `backlog` with a note instead of running
+- Follows up on an existing PR when a worktree agent picks a task that already has `pr-url` metadata: checks out the PR branch, adds the PR's unresolved review threads to the prompt (`## Existing Pull Request`), pushes to that branch and skips `autoPR`. If the PR conflicts with its base, merges `origin/<base>` into the worktree first and lists the conflicted files in a `## Merge Conflicts` prompt section; leftover conflict markers block the commit (counted as no changes), and a clean merge is pushed even without other changes. After the push it posts the agent's `threadReplies` to their threads (`🤖 **vteam <agent>:** …` + `Fixed in <sha>`) and resolves them if `resolveThreads: true`; reply failures are non-fatal. If the PR is merged or closed, moves the task to `backlog` with a note instead of running
 - Returns the task to `todo` and increments `retry-count` metadata if the agent produced no changes
 - Returns the task to `todo` without incrementing on any other ending (crash, error, readOnly or non-worktree agent)
 - Appends an aven note to the task (`<agent>: <status>`, `summary`, `Blocker: …`, `PR: …`) whenever the agent returned output; a failed note write is non-fatal
@@ -191,7 +198,9 @@ improver finds issue → aven task in inbox
 human triages → todo
 coder picks task → active → implements fix → branch + PR → done
 no changes / crash / error → active → back to todo
-review comments to apply → human moves done task to todo + adds a note → coder pushes to the same PR → done
+review comments to apply → human adds the vteam:changes-requested PR label → vteam ensure-merge moves the task to todo → coder pushes to the same PR → done
+PR conflicts with base → vteam ensure-merge moves the task to todo → coder merges base, resolves conflicts → done
+PR merged → vteam ensure-merge sets merged=true; PR closed → task canceled
 ```
 
 Tasks live in aven, scoped to `tasks.project` + `tasks.label`. Refs look like `APP-7KQ9` (recorded as `taskRef` in `vteam/.runs/*.json`).
@@ -201,7 +210,8 @@ Tasks live in aven, scoped to `tasks.project` + `tasks.label`. Refs look like `A
 - **Picking** (`input: "task"`): `aven list --project P --label L --status todo --ready` (one `aven show` per ready task), then routed in-process as above, so aven dependency blocking and `available_at` deferral are respected. Tasks with `retry-count` >= `maxRetries` are skipped. Sorted by severity (`critical` > `high` > `medium` > `low`), then oldest first. The picked task is set to `active` immediately with metadata `claimed-by` (runId), `claimed-pid`, `claimed-host`. The whole list → pick → `active` step holds `vteam/.locks/task-claim` (shared by all agents, released before Claude runs), so concurrent agents with overlapping filters never get the same task. Claim metadata is removed whenever the task leaves `active`. Local to one machine only.
 - **Branch names**: `vteam/<slugified-title>-<runId>` — aven refs are local and are kept out of remote systems.
 - **Human triage**: users can manage tasks in aven (`aven tui` or CLI) — move findings to backlog/canceled, reprioritize, add dependencies, or add the `vteam` label to their own tasks to queue them for the coder. Canceled tasks still appear in the dedup list, so canceling marks a finding as rejected/false positive.
-- **PR follow-ups**: to have the coder apply review comments, `aven edit <ref> --status todo` plus `aven note <ref> "<which comments to apply>"`. The task's `pr-url` makes the run check out the PR branch and see its unresolved review threads. A merged or closed PR parks the task in `backlog`; remove `pr-url` (`aven edit <ref> --remove-metadata pr-url`) to start over on a new branch.
+- **Merge ensurer** (`vteam ensure-merge`, no Claude): for each `done` task with `pr-url` and without `merged=true`, looks the PR up. Merged → metadata `merged=true`. Closed → `canceled` + note. Open with `mergeEnsurer.label` → removes the label first (if that fails the task stays done), then `todo`, clears `retry-count`, adds a note. Open and conflicting → `todo` + note. Otherwise nothing; comments alone never reopen a task. Unknown mergeability is skipped. Holds `vteam/.locks/merge-ensurer`, logs to `vteam/.logs/merge-ensurer/`.
+- **PR follow-ups**: add the `mergeEnsurer.label` to the PR, or reopen by hand with `aven edit <ref> --status todo` plus `aven note <ref> "<which comments to apply>"`. The task's `pr-url` makes the run check out the PR branch and see its unresolved review threads. A merged or closed PR parks the task in `backlog`; remove `pr-url` (`aven edit <ref> --remove-metadata pr-url`) to start over on a new branch.
 - **Hard kill**: if the vteam process is killed, the task may remain `active`. `vteam clean` returns it to `todo` when `claimed-host` is this machine and `claimed-pid` is dead; otherwise reset it with `aven edit <ref> --status todo`.
 
 ## Optional agent files
@@ -248,7 +258,7 @@ Advisory file locking via atomic `mkdir`. Each lock contains PID + timestamp. St
 
 ## Scheduling
 
-Agents with a `cron` field run on schedule via `vteam loop start` (foreground process, stop with Ctrl+C). If an agent is still running when its next tick fires, the tick is skipped.
+Agents with a `cron` field, plus `vteam ensure-merge` when `mergeEnsurer.cron` is set, run on schedule via `vteam loop start` (foreground process, stop with Ctrl+C). If an agent is still running when its next tick fires, the tick is skipped.
 
 Every `vteam run <agent>`, whether started by hand or by the loop, writes its full output to `vteam/.logs/<agent>/<ISO-timestamp>.log` and still prints to the terminal. Check there first when troubleshooting a run.
 

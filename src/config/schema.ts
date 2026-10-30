@@ -13,6 +13,12 @@ export function isValidCronExpression(expr: string): boolean {
   }
 }
 
+const cronSchema = z.string().refine(isValidCronExpression, {
+  message: "Invalid cron expression (expected 5 fields: minute hour day month weekday)",
+});
+
+export const DEFAULT_CHANGES_REQUESTED_LABEL = "vteam:changes-requested";
+
 const taskFilterValueSchema = z.string().min(1).nullable();
 
 export const subagentConfigSchema = z.strictObject({
@@ -25,13 +31,7 @@ export const agentConfigSchema = z
   .strictObject({
     $schema: z.string().optional(),
     model: z.string().optional(),
-    cron: z
-      .string()
-      .refine(isValidCronExpression, {
-        message:
-          "Invalid cron expression (expected 5 fields: minute hour day month weekday)",
-      })
-      .optional(),
+    cron: cronSchema.optional(),
     worktree: z.boolean().optional(),
     readOnly: z.boolean().optional(),
     output: z.enum(["task"]).optional(),
@@ -87,4 +87,10 @@ export const vteamConfigSchema = z.object({
     label: z.string().min(1).default("vteam"),
     workspace: z.string().min(1).optional(),
   }),
+  mergeEnsurer: z
+    .object({
+      cron: cronSchema.optional(),
+      label: z.string().min(1).default(DEFAULT_CHANGES_REQUESTED_LABEL),
+    })
+    .default({ label: DEFAULT_CHANGES_REQUESTED_LABEL }),
 });

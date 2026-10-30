@@ -21,6 +21,7 @@ export interface TaskUpdate {
 
 export interface TaskManager {
   listReady(): Promise<Task[]>;
+  listDone(): Promise<Task[]>;
   getIndex(): Promise<TaskIndex>;
   create(body: TaskContentBody, foundBy: string): Promise<string>;
   update(ref: string, changes: TaskUpdate): Promise<void>;

@@ -23,6 +23,7 @@ function fakeManager(tasks: Task[]) {
   const updates: { ref: string; changes: TaskUpdate }[] = [];
   const manager: TaskManager = {
     listReady: async () => [],
+    listDone: async () => [],
     getIndex: async (): Promise<TaskIndex> => ({
       all: tasks,
       byStatus: new Map([["active", tasks.filter((t) => t.status === "active")]]),

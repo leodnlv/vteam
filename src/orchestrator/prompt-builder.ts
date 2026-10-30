@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { TaskManager } from "../tasks/task-manager.js";
-import type { AgentConfig, Task, TaskNote, PRReviewContext, PRFollowUpContext, OnFinishConfig, MemoryConfig, RunOutcome } from "../types.js";
+import type { AgentConfig, BaseBranchMerge, Task, TaskNote, PRReviewContext, PRFollowUpContext, OnFinishConfig, MemoryConfig, RunOutcome } from "../types.js";
 
 interface PromptParts {
   systemPrompt: string;
@@ -250,6 +250,25 @@ function buildReviewSection(review: PRReviewContext): string {
   return lines.join("\n");
 }
 
+function buildBaseMergeSection({ baseBranch, conflictedFiles }: BaseBranchMerge): string {
+  if (conflictedFiles.length === 0) {
+    return [
+      `## Merge Conflicts`,
+      "",
+      `The pull request conflicted with \`${baseBranch}\`. The orchestrator merged \`origin/${baseBranch}\` into this branch without conflicts, and will push the merge even if you change nothing else.`,
+    ].join("\n");
+  }
+  return [
+    `## Merge Conflicts`,
+    "",
+    `The pull request conflicts with \`${baseBranch}\`. The orchestrator has started merging \`origin/${baseBranch}\` into this branch, and these files contain conflict markers:`,
+    "",
+    ...conflictedFiles.map((file) => `- \`${file}\``),
+    "",
+    "Resolve every conflict, keeping the intent of both sides, and remove all conflict markers. Do not run `git merge`, `git commit`, or `git merge --abort` — the orchestrator commits the merge with your commit message. If any conflict marker is left, nothing is committed.",
+  ].join("\n");
+}
+
 function buildFollowUpSection(followUp: PRFollowUpContext): string {
   const lines: string[] = [
     `## Existing Pull Request`,
@@ -260,9 +279,13 @@ function buildFollowUpSection(followUp: PRFollowUpContext): string {
     `URL: ${followUp.pr.url}`,
     `Branch: ${followUp.pr.branch}`,
     "",
-    `## Open Review Threads`,
-    "",
   ];
+
+  if (followUp.baseMerge) {
+    lines.push(buildBaseMergeSection(followUp.baseMerge), "");
+  }
+
+  lines.push(`## Open Review Threads`, "");
 
   if (followUp.threads.length === 0) {
     lines.push("The pull request has no unresolved review threads. Work from the task notes.");
