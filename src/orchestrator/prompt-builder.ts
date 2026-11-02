@@ -33,10 +33,7 @@ export async function buildPrompt(
 
   const index = await taskManager.getIndex();
   if (index.all.length > 0) {
-    const lines = index.all.map((t) => {
-      const files = t.files.join(", ");
-      return `- [${t.status}] ${t.severity} | ${t.title} | ${files}`;
-    });
+    const lines = index.all.map((t) => `- [${t.status}] ${t.severity} | ${t.title}`);
     sections.push(
       `## Existing Tasks\n\nDo not report issues that already appear in this list.\n\n${lines.join("\n")}`,
     );
@@ -44,7 +41,7 @@ export async function buildPrompt(
 
   if (task) {
     sections.push(
-      `## Your Task\n\nTitle: ${task.title}\nSeverity: ${task.severity}\nFiles: ${task.files.join(", ")}\n\n${task.description}`,
+      `## Your Task\n\nTitle: ${task.title}\nSeverity: ${task.severity}\n\n${task.description}`,
     );
     if (task.notes.length > 0) {
       sections.push(buildTaskNotesSection(task.notes));
@@ -84,7 +81,7 @@ export function buildOnFinishPrompt(
 
   if (outcome.task) {
     sections.push(
-      `## Task\n\n- Title: ${outcome.task.title}\n- Severity: ${outcome.task.severity}\n- Files: ${outcome.task.files.join(", ")}`,
+      `## Task\n\n- Title: ${outcome.task.title}\n- Severity: ${outcome.task.severity}`,
     );
   }
 

@@ -23,7 +23,6 @@ function makeTask(overrides: Partial<Task>): Task {
     title: "Task",
     status: "todo",
     severity: "medium",
-    files: [],
     retryCount: 0,
     metadata: {},
     description: "",
@@ -72,7 +71,7 @@ describe("buildPrompt", () => {
 
   it("includes existing task titles in user prompt", async () => {
     const { agentConfig, taskManager } = setup([
-      makeTask({ title: "Null check missing", severity: "high", files: ["src/auth.ts:45"] }),
+      makeTask({ title: "Null check missing", severity: "high" }),
     ]);
 
     const { userPrompt } = await buildPrompt(agentConfig, taskManager);
@@ -91,7 +90,6 @@ describe("buildPrompt", () => {
     const task = makeTask({
       title: "Fix null check",
       severity: "high",
-      files: ["src/auth.ts:45"],
       description: "## Description\n\nThe auth module is broken.",
     });
 
@@ -99,7 +97,6 @@ describe("buildPrompt", () => {
     expect(systemPrompt).toContain("You are a test agent");
     expect(userPrompt).toContain("Fix null check");
     expect(userPrompt).toContain("high");
-    expect(userPrompt).toContain("src/auth.ts:45");
     expect(userPrompt).toContain("auth module is broken");
   });
 
@@ -129,15 +126,15 @@ describe("buildPrompt", () => {
     expect(userPrompt).not.toContain("## Your Task");
   });
 
-  it("shows tasks of every status with status, severity, and files", async () => {
+  it("shows tasks of every status with status, severity, and title", async () => {
     const { agentConfig, taskManager } = setup([
-      makeTask({ title: "Todo task", status: "todo", severity: "high", files: ["a.ts"] }),
-      makeTask({ title: "Rejected task", status: "canceled", severity: "low", files: ["b.ts", "c.ts"] }),
+      makeTask({ title: "Todo task", status: "todo", severity: "high" }),
+      makeTask({ title: "Rejected task", status: "canceled", severity: "low" }),
     ]);
 
     const { userPrompt } = await buildPrompt(agentConfig, taskManager);
-    expect(userPrompt).toContain("- [todo] high | Todo task | a.ts");
-    expect(userPrompt).toContain("- [canceled] low | Rejected task | b.ts, c.ts");
+    expect(userPrompt).toContain("- [todo] high | Todo task");
+    expect(userPrompt).toContain("- [canceled] low | Rejected task");
   });
 
   it("includes review context when provided", async () => {
@@ -345,14 +342,13 @@ describe("buildOnFinishPrompt", () => {
       status: "completed",
       startedAt: "2026-04-21T10:00:00Z",
       completedAt: "2026-04-21T10:05:00Z",
-      task: { title: "Fix null check", severity: "high", files: ["src/auth.ts:45"] },
+      task: { title: "Fix null check", severity: "high" },
       branch: "vteam/fix-null-check",
       prUrl: "https://github.com/org/repo/pull/42",
     };
     const { userPrompt } = buildOnFinishPrompt({ onFinishMdPath: path }, outcome);
     expect(userPrompt).toContain("Fix null check");
     expect(userPrompt).toContain("high");
-    expect(userPrompt).toContain("src/auth.ts:45");
     expect(userPrompt).toContain("vteam/fix-null-check");
     expect(userPrompt).toContain("https://github.com/org/repo/pull/42");
   });

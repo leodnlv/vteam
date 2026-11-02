@@ -436,7 +436,7 @@ async function runAgent(
       startedAt,
       completedAt,
       focus,
-      task: task ? { title: task.title, severity: task.severity, files: task.files } : undefined,
+      task: task ? { title: task.title, severity: task.severity } : undefined,
       branch: branchName,
       prUrl,
       reviewedPR: reviewContext ? { number: reviewContext.pr.number, title: reviewContext.pr.title, url: reviewContext.pr.url } : undefined,
@@ -462,7 +462,7 @@ async function runAgent(
       completedAt: failedAt,
       error: errorMsg,
       focus,
-      task: task ? { title: task.title, severity: task.severity, files: task.files } : undefined,
+      task: task ? { title: task.title, severity: task.severity } : undefined,
       branch: branchName,
       reviewedPR: reviewContext ? { number: reviewContext.pr.number, title: reviewContext.pr.title, url: reviewContext.pr.url } : undefined,
     };

@@ -10,7 +10,6 @@ function task(ref: string, metadata: Record<string, string> = {}): Task {
     title: `Task ${ref}`,
     status: "active",
     severity: "high",
-    files: [],
     retryCount: 0,
     metadata,
     description: "",

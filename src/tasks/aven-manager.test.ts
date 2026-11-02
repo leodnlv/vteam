@@ -31,7 +31,7 @@ function detail(ref: string, overrides: Record<string, unknown> = {}) {
       created_at: "2026-10-01T00:00:00Z",
     },
     description: "body",
-    metadata: { files: "a.ts, b.ts", "retry-count": "2" },
+    metadata: { "retry-count": "2" },
     notes: [{ id: "N1", body: "Tried once.", created_at: "2026-10-02T00:00:00Z" }],
     ...overrides,
   });
@@ -63,7 +63,6 @@ describe("AvenTaskManager", () => {
       "--priority", "urgent",
       "--label", "vteam",
       "--metadata", "found-by=improver",
-      "--metadata", "files=src/a.ts:10, src/b.ts",
       "--description-stdin",
     ]);
     expect(calls[1].stdin).toContain("## Suggested Fix\n\nGuard the input.");
@@ -108,9 +107,8 @@ describe("AvenTaskManager", () => {
         title: "Task APP-0001",
         status: "todo",
         severity: "high",
-        files: ["a.ts", "b.ts"],
         retryCount: 2,
-        metadata: { files: "a.ts, b.ts", "retry-count": "2" },
+        metadata: { "retry-count": "2" },
         description: "body",
         notes: [{ body: "Tried once.", createdAt: "2026-10-02T00:00:00Z" }],
         createdAt: "2026-10-01T00:00:00Z",
@@ -132,7 +130,6 @@ describe("AvenTaskManager", () => {
     const [task] = await new AvenTaskManager(config, exec).listReady();
 
     expect(task.severity).toBe("low");
-    expect(task.files).toEqual([]);
     expect(task.retryCount).toBe(0);
     expect(task.metadata).toEqual({});
     expect(task.notes).toEqual([]);
@@ -288,10 +285,11 @@ describe.skipIf(!avenInstalled())("AvenTaskManager against real aven", () => {
       title: "Null check missing",
       status: "todo",
       severity: "critical",
-      files: ["src/a.ts:10", "src/b.ts"],
       retryCount: 0,
     });
     expect(ready.description).toContain("Crashes on empty input.");
+    expect(ready.description).toContain("- `src/b.ts`");
+    expect(ready.metadata).not.toHaveProperty("files");
 
     await manager.update(ref, { status: "active", metadata: { "claimed-by": "run-1" } });
     expect(await manager.listReady()).toEqual([]);

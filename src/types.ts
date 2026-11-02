@@ -15,7 +15,6 @@ export interface Task {
   title: string;
   status: TaskStatus;
   severity: Severity;
-  files: string[];
   retryCount: number;
   metadata: Record<string, string>;
   description: string;
@@ -30,7 +29,6 @@ export interface TaskNote {
 
 export interface TaskMetadata {
   "found-by"?: string;
-  files?: string;
   "retry-count"?: string;
   completed?: string;
   branch?: string;
@@ -86,7 +84,7 @@ export interface RunOutcome {
   completedAt: string;
   error?: string;
   focus?: string;
-  task?: { title: string; severity: Severity; files: string[] };
+  task?: { title: string; severity: Severity };
   branch?: string;
   prUrl?: string;
   reviewedPR?: { number: number; title: string; url: string };

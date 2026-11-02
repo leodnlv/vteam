@@ -24,7 +24,6 @@ function doneTask(ref: string, metadata: Record<string, string>): Task {
     title: `Task ${ref}`,
     status: "done",
     severity: "medium",
-    files: [],
     retryCount: 0,
     metadata,
     description: "",

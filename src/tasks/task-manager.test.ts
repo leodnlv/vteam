@@ -8,7 +8,6 @@ function task(metadata: Record<string, string>): Task {
     title: "T",
     status: "todo",
     severity: "low",
-    files: [],
     retryCount: 0,
     metadata,
     description: "",

@@ -395,7 +395,6 @@ Because tasks live in aven, you can triage them with `aven tui` or the `aven` CL
 | priority               | From severity: `critical`→`urgent`, `high`→`high`, `medium`→`medium`, `low`→`low` (aven `none` reads back as `low`) |
 | description            | Markdown with `## Description`, `## Suggested Fix` (optional), `## Affected Files` |
 | metadata `found-by`    | Name of the agent that created the task (usable in `taskFilter`)                |
-| metadata `files`       | Comma-separated affected files                                                  |
 | metadata `retry-count` | Incremented each time the coder finishes with no changes                        |
 | metadata `completed`, `branch`, `pr-url` | Added when the task is set to `done` (`pr-url` only if a PR was created). A `todo` task with `pr-url` is a [follow-up](#following-up-on-review-comments) on that PR |
 | metadata `merged`      | `true` once the merge ensurer sees the task's PR merged                          |
