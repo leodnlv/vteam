@@ -200,7 +200,9 @@ skills/
 src/
 ├── bin.ts                        CLI entry point (commander)
 ├── types.ts                      All shared TypeScript types
-├── run-log.ts                    Per-run log file under vteam/.logs/<agent>/ (tees stdout/stderr)
+├── ansi.ts                       ANSI colors (TTY / NO_COLOR / FORCE_COLOR aware) and stripAnsi
+├── log.ts                        Run output formatting: sections, elapsed-time gutter, glyphs, tool lines
+├── run-log.ts                    Per-run log file under vteam/.logs/<agent>/ (tees stdout/stderr, strips ANSI)
 ├── run-state.ts                  Per-run state JSON under vteam/.runs/; live-run discovery from agent locks
 ├── commands/
 │   ├── init.ts                   vteam init — scaffold vteam/ in any project
@@ -267,7 +269,7 @@ vteam skill uninstall                   # remove skill symlinks from ~/.claude/s
 
 `vteam status` (`src/commands/status.ts`) reads only local state plus one `getIndex` and one `listReady`: `findLiveRuns` (`src/run-state.ts`) turns live agent locks in `vteam/.locks/` (except `task-claim`) into running jobs, each with its newest `vteam/.runs/` state started before the lock (`findLatestRunState`) for the worktree path; status matches them to `active` tasks by `claimed-pid`/`claimed-host`; `cron.pid` gives the scheduler state; `pickNextTask` per `input: "task"` agent gives the next pick. It also lists `done` tasks with an unmerged `pr-url`, plus inbox, unroutable, retry-exhausted, orphaned `active` tasks, and worktrees under `worktreeDir` no running job uses (`findOrphanedWorktrees`, which compares real paths). `vteam clean` removes exactly those worktrees (`cleanupOrphanedWorktrees`), so it is safe to run while agents work.
 
-Every `vteam run <agent>` writes a log file for that run at `vteam/.logs/<agent>/<ISO-timestamp>.log` (`src/run-log.ts`), whether it was started by hand or by the scheduler. It copies `process.stdout`/`process.stderr` into the file with synchronous writes, so nothing is lost on `process.exit`, and it records the error stack if the run throws. Logging starts after the agent is resolved, so an unknown agent name creates no file.
+Every `vteam run <agent>` writes a log file for that run at `vteam/.logs/<agent>/<ISO-timestamp>.log` (`src/run-log.ts`), whether it was started by hand or by the scheduler. It copies `process.stdout`/`process.stderr` into the file with synchronous writes, so nothing is lost on `process.exit`, and it records the error stack if the run throws. ANSI colors are stripped from the file. `vteam run` output goes through `src/log.ts`: sections (`Setup`, `Agent: <name>`, `Result`, `On-finish hook`, `Memory curation`, `Cleanup`), an elapsed-time gutter, and glyphs per line kind (`•` step, `❯` Claude text, `⚙` tool call, `✓`/`!`/`✗`). `agent-runner.ts` renders tool calls (`describeTool`), failed tool results, and an exit line with duration, turns, and `total_cost_usd`. In a TTY, tool inputs are cut to one line with `writeSplit` (`run-log.ts`), which writes the short line to the terminal and the full input to the log file. Logging starts after the agent is resolved, so an unknown agent name creates no file.
 
 ## Before submitting changes
 

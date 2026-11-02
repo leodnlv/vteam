@@ -260,7 +260,7 @@ Advisory file locking via atomic `mkdir`. Each lock contains PID + timestamp. St
 
 Agents with a `cron` field, plus `vteam ensure-merge` when `mergeEnsurer.cron` is set, run on schedule via `vteam cron start` (foreground process, stop with Ctrl+C). If an agent is still running when its next tick fires, the tick is skipped. The scheduler writes its pid to `vteam/.locks/cron.pid`, refuses to start twice, and `vteam status` reads that file to report whether it is running.
 
-Every `vteam run <agent>`, whether started by hand or by the scheduler, writes its full output to `vteam/.logs/<agent>/<ISO-timestamp>.log` and still prints to the terminal. Check there first when troubleshooting a run.
+Every `vteam run <agent>`, whether started by hand or by the scheduler, writes its full output to `vteam/.logs/<agent>/<ISO-timestamp>.log` and still prints to the terminal. Check there first when troubleshooting a run. The output is split into sections (Setup, Agent, Result, hooks, Cleanup) with an elapsed-time gutter. Glyphs: `•` step, `❯` Claude text, `⚙` tool call, `✗` failed tool or error, `!` warning. The file has no colors and keeps full tool inputs.
 
 ## The `--focus` option
 

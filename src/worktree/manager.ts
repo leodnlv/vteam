@@ -2,6 +2,7 @@ import { execFileSync, execSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import { slugify } from "../slugify.js";
+import * as log from "../log.js";
 
 export interface WorktreeSession {
   path: string;
@@ -211,7 +212,7 @@ export async function pushBranch(
       return;
     } catch (err) {
       if (attempt >= retryDelaysMs.length || !isTransientPushError(err)) throw err;
-      console.warn(`Push failed with a network error, retrying in ${retryDelaysMs[attempt] / 1000}s...`);
+      log.warn(`push failed with a network error, retrying in ${retryDelaysMs[attempt] / 1000}s`);
       await new Promise((r) => setTimeout(r, retryDelaysMs[attempt]));
       // A dropped connection can still land the push, and the lease would then reject the retry.
       if (remoteBranchSha(worktreePath, branch) === head) return;

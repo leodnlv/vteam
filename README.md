@@ -133,6 +133,8 @@ vteam run improver --focus "only look at the auth module"
 
 Every `vteam run <agent>` writes its full output to a new file at `vteam/.logs/<agent>/<ISO-timestamp>.log`, whether you start it by hand or `vteam cron start` starts it. The output still goes to your terminal; the log file gets a copy of it. This includes Claude's tool calls, orchestrator messages, the ON_FINISH hook and memory curation, plus the error if the run crashes. The path is printed when the run starts.
 
+The output is grouped into sections (Setup, Agent, Result, hooks, Cleanup), and each line starts with the time since the run started. Glyphs mark the kind of line: `•` orchestrator step, `❯` Claude text, `⚙` tool call, `✓` success, `!` warning, `✗` error (including failed tool calls). In a terminal the output is colored and tool inputs are cut to one line. The log file has no colors and keeps the full tool input. Set `NO_COLOR=1` to turn colors off, or `FORCE_COLOR=1` to force them on.
+
 ### `vteam run improver`
 
 1. Acquires an advisory lock (`vteam/.locks/improver.lock`)

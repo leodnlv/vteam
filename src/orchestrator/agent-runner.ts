@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createReadStream, writeFileSync, rmSync, mkdtempSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve, join, relative, isAbsolute } from "node:path";
+import * as log from "../log.js";
 import { tmpdir } from "node:os";
 
 interface AgentRunOptions {
@@ -22,37 +23,84 @@ export interface AgentRunResult {
   durationMs?: number;
 }
 
-interface ContentBlock {
+export interface ContentBlock {
   type: string;
   text?: string;
   name?: string;
   input?: Record<string, unknown>;
+  is_error?: boolean;
+  content?: string | { type: string; text?: string }[];
 }
 
 interface StreamEvent {
   type: string;
   subtype?: string;
-  message?: { content?: ContentBlock[] };
+  message?: { content?: ContentBlock[] | string };
   result?: string;
-  cost_usd?: number;
+  total_cost_usd?: number;
   duration_ms?: number;
+  num_turns?: number;
 }
 
-function formatEvent(event: StreamEvent): string | null {
-  if (event.type !== "assistant" || !event.message?.content) return null;
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" && value ? value : undefined;
+}
 
-  const lines: string[] = [];
-  for (const block of event.message.content) {
-    if (block.type === "tool_use" && block.name) {
-      const input = block.input ?? {};
-      const detail = input.command ?? input.pattern ?? input.file_path ?? input.description ?? "";
-      lines.push(`[claude][tool] ${block.name}${detail ? `: ${String(detail)}` : ""}`);
+function displayPath(path: string, cwd: string): string {
+  const rel = relative(cwd, path);
+  return rel && !rel.startsWith("..") && !isAbsolute(rel) ? rel : path;
+}
+
+export function describeTool(name: string, input: Record<string, unknown>, cwd: string): string {
+  const path = asString(input.file_path) ?? asString(input.notebook_path) ?? asString(input.path);
+  switch (name) {
+    case "Bash":
+      return asString(input.command) ?? "";
+    case "Read":
+    case "Write":
+    case "Edit":
+    case "MultiEdit":
+    case "NotebookEdit":
+      return path ? displayPath(path, cwd) : "";
+    case "Grep":
+    case "Glob": {
+      const pattern = asString(input.pattern) ?? "";
+      return path ? `${pattern}  in ${displayPath(path, cwd)}` : pattern;
     }
-    if (block.type === "text" && block.text) {
-      lines.push(`[claude][text] ${block.text}`);
+    case "WebFetch":
+      return asString(input.url) ?? "";
+    case "WebSearch":
+      return asString(input.query) ?? "";
+    default:
+      return asString(input.description) ?? asString(input.command) ?? asString(input.pattern) ??
+        (path ? displayPath(path, cwd) : undefined) ?? asString(input.url) ?? asString(input.query) ?? "";
+  }
+}
+
+export function toolErrorText(block: ContentBlock): string | undefined {
+  if (block.type !== "tool_result" || !block.is_error) return undefined;
+  if (typeof block.content === "string") return block.content || "tool failed";
+  const text = block.content?.map((part) => part.text ?? "").join("\n").trim();
+  return text || "tool failed";
+}
+
+function renderEvent(event: StreamEvent, cwd: string): void {
+  const content = event.message?.content;
+  if (!Array.isArray(content)) return;
+
+  if (event.type === "assistant") {
+    for (const block of content) {
+      if (block.type === "text" && block.text?.trim()) log.claudeText(block.text);
+      if (block.type === "tool_use" && block.name) log.toolCall(block.name, describeTool(block.name, block.input ?? {}, cwd));
     }
   }
-  return lines.length > 0 ? lines.join("\n") : null;
+
+  if (event.type === "user") {
+    for (const block of content) {
+      const error = toolErrorText(block);
+      if (error) log.toolError(error);
+    }
+  }
 }
 
 export async function runClaudeAgent(
@@ -88,9 +136,9 @@ export async function runClaudeAgent(
     args.push("--disallowedTools", ...options.disallowedTools);
   }
 
-  console.log(`[vteam] Agent personality: ${systemPromptFile}`);
-  console.log(`[vteam] User prompt:     ${userPromptFile}`);
-  console.log(`[vteam] cwd: ${options.cwd}`);
+  log.field("system", systemPromptFile);
+  log.field("prompt", userPromptFile);
+  console.log("");
 
   try {
     return await new Promise<AgentRunResult>((resolve, reject) => {
@@ -102,7 +150,7 @@ export async function runClaudeAgent(
 
       const timeoutMs = options.timeoutMs ?? 30 * 60 * 1000;
       const deadline = setTimeout(() => {
-        console.error(`[vteam] Claude subprocess timed out after ${timeoutMs}ms — sending SIGTERM`);
+        log.fail(`Claude timed out after ${log.formatDuration(timeoutMs)}, sending SIGTERM`);
         proc.kill("SIGTERM");
       }, timeoutMs);
 
@@ -112,8 +160,17 @@ export async function runClaudeAgent(
       let stderr = "";
       let lineBuffer = "";
       let resultText: string | null = null;
+      let stderrBuffer = "";
       let costUsd: number | undefined;
       let durationMs: number | undefined;
+      let turns: number | undefined;
+
+      const recordResult = (event: StreamEvent) => {
+        if (event.result) resultText = event.result;
+        costUsd = event.total_cost_usd;
+        durationMs = event.duration_ms;
+        turns = event.num_turns;
+      };
 
       proc.stdout.on("data", (data: Buffer) => {
         const chunk = data.toString();
@@ -126,25 +183,27 @@ export async function runClaudeAgent(
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed) continue;
+          let event: StreamEvent;
           try {
-            const event: StreamEvent = JSON.parse(trimmed);
-            const formatted = formatEvent(event);
-            if (formatted) console.log(formatted);
-
-            if (event.type === "result") {
-              if (event.result) resultText = event.result;
-              costUsd = event.cost_usd;
-              durationMs = event.duration_ms;
-            }
+            event = JSON.parse(trimmed);
           } catch {
-            console.log(trimmed);
+            log.step(trimmed);
+            continue;
           }
+          renderEvent(event, options.cwd);
+          if (event.type === "result") recordResult(event);
         }
       });
 
       proc.stderr.on("data", (data: Buffer) => {
-        stderr += data.toString();
-        process.stderr.write(data);
+        const chunk = data.toString();
+        stderr += chunk;
+        stderrBuffer += chunk;
+        const lines = stderrBuffer.split("\n");
+        stderrBuffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.trim()) log.warn(`claude: ${line}`);
+        }
       });
 
       proc.on("error", (err) => {
@@ -153,20 +212,17 @@ export async function runClaudeAgent(
 
       proc.on("close", (code) => {
         clearTimeout(deadline);
+        if (stderrBuffer.trim()) log.warn(`claude: ${stderrBuffer}`);
         if (lineBuffer.trim()) {
           try {
             const event: StreamEvent = JSON.parse(lineBuffer.trim());
-            if (event.type === "result" && event.result) {
-              resultText = event.result;
-              costUsd = event.cost_usd;
-              durationMs = event.duration_ms;
-            }
+            if (event.type === "result") recordResult(event);
           } catch {
             // ignore
           }
         }
 
-        console.log(`\n[vteam] claude exited with code ${code}`);
+        log.agentExit({ exitCode: code ?? 1, durationMs, turns, costUsd });
         resolve({
           stdout,
           stderr,
