@@ -3,6 +3,7 @@ default:
 
 build:
     npm run build
+    chmod +x dist/bin.js
 
 dev *args:
     npx tsx src/bin.ts {{args}}
