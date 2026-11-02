@@ -29,13 +29,30 @@ export function formatDuration(ms: number): string {
   return `${seconds}s`;
 }
 
+export function formatTimeOfDay(date: Date): string {
+  const sameDay = date.toDateString() === new Date().toDateString();
+  const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  return sameDay ? time : `${date.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+}
+
+export function formatAge(ms: number): string {
+  const minutes = Math.floor(Math.max(ms, 0) / 60_000);
+  if (minutes < 1) return "<1m";
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
 export function truncate(text: string, width: number): string {
   if (width <= 1) return "…";
   return text.length > width ? `${text.slice(0, width - 1)}…` : text;
 }
 
 function terminalWidth(): number | undefined {
-  return process.stdout.isTTY ? process.stdout.columns : undefined;
+  return process.stdout.isTTY && process.stdout.columns > 0 ? process.stdout.columns : undefined;
 }
 
 function prefix(glyph: string): string {
@@ -63,14 +80,23 @@ function err(glyph: string, text: string, paintText?: (s: string) => string): vo
   console.error(render(glyph, text, paintText));
 }
 
-export function banner(agentName: string, logPath: string): void {
-  console.log(`${color.bold(color.cyan("vteam ▸"))} ${color.bold(agentName)}   ${color.gray(`log: ${logPath}`)}`);
+export function formatBanner(title: string, detail?: string): string {
+  const suffix = detail ? `   ${color.gray(detail)}` : "";
+  return `${color.bold(color.cyan("vteam ▸"))} ${color.bold(title)}${suffix}`;
+}
+
+export function banner(title: string, detail?: string): void {
+  console.log(formatBanner(title, detail));
+}
+
+export function formatSection(title: string): string {
+  const width = Math.min(terminalWidth() ?? DEFAULT_WIDTH, DEFAULT_WIDTH);
+  const head = `━━ ${title} `;
+  return `\n${color.bold(color.cyan(head + "━".repeat(Math.max(3, width - head.length))))}`;
 }
 
 export function section(title: string): void {
-  const width = Math.min(terminalWidth() ?? DEFAULT_WIDTH, DEFAULT_WIDTH);
-  const head = `━━ ${title} `;
-  console.log(`\n${color.bold(color.cyan(head + "━".repeat(Math.max(3, width - head.length))))}`);
+  console.log(formatSection(title));
 }
 
 export function step(text: string): void {
@@ -92,6 +118,14 @@ export function fail(text: string): void {
 export function field(label: string, value: string): void {
   const indent = stripAnsi(prefix(" ")).length;
   console.log(`${" ".repeat(indent)}${color.gray(label.padEnd(LABEL_WIDTH))}${value}`);
+}
+
+export function formatListItem(glyph: string, text: string): string {
+  return `  ${glyph} ${indentContinuation(text, 4)}`;
+}
+
+export function formatListDetail(label: string, value: string): string {
+  return `    ${color.gray(label)} ${value}`;
 }
 
 export function claudeText(text: string): void {

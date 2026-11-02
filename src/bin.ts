@@ -5,6 +5,7 @@ import { Command } from "commander";
 import { initCommand } from "./commands/init.js";
 import { runCommand } from "./commands/run.js";
 import { statusCommand } from "./commands/status.js";
+import { dashboardCommand } from "./commands/dashboard.js";
 import { cleanCommand } from "./commands/clean.js";
 import { ensureMergeCommand } from "./commands/ensure-merge.js";
 import { cronStartCommand, cronStatusCommand } from "./commands/cron.js";
@@ -37,6 +38,11 @@ program
   .command("status")
   .description("Show running agents, upcoming runs, and tasks that need attention")
   .action(statusCommand);
+
+program
+  .command("dashboard")
+  .description("Show 'vteam status' full-screen, refreshed every second")
+  .action(dashboardCommand);
 
 program
   .command("clean")

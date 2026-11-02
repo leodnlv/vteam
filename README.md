@@ -207,6 +207,10 @@ Shows what is happening now and what will happen next. It reads local state and 
 
 For the full task list, use aven (`aven list --label vteam`).
 
+### `vteam dashboard`
+
+Shows the same view as `vteam status` full-screen and refreshes it every second until you press Ctrl+C. A refresh starts only after the previous one finishes, so a large aven project (one `aven show` per task) refreshes less often instead of piling up work. If a refresh fails, the last good view stays on screen and the error appears in the footer. Output taller than the terminal is cut off with a line saying how much is hidden. It needs a terminal; use `vteam status` in scripts.
+
 ### `vteam clean`
 
 Removes the git worktrees under `worktreeDir` that no running agent is using; a worktree belongs to a running agent when that agent's lock is held by a live process and its current run state in `vteam/.runs/` points at it. It also breaks stale locks (held by a dead process or older than 30 minutes) and returns orphaned tasks to `todo`: tasks that are `active` with a claim from this machine whose process is no longer running. Tasks claimed on another machine and `active` tasks without a vteam claim are listed but left alone. Run this after a crash or if a lock is stuck.

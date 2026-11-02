@@ -209,6 +209,7 @@ src/
 │   ├── run.ts                    vteam run <agent> — main orchestration flow
 │   ├── cron.ts                   vteam cron — long-lived scheduler process
 │   ├── status.ts                 vteam status — running agents, scheduler, next picks, tasks needing attention
+│   ├── dashboard.ts              vteam dashboard — vteam status full-screen, refreshed every second
 │   ├── clean.ts                  vteam clean — remove unused worktrees, stale locks, orphaned active tasks
 │   ├── ensure-merge.ts           vteam ensure-merge — record merges, cancel closed PRs, reopen labelled/conflicting PR tasks
 │   └── skill.ts                  vteam skill install/uninstall — manage Claude Code skill symlinks
@@ -257,6 +258,7 @@ vteam run                               # list available agents
 vteam run <agent>                       # run a specific agent
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
 vteam status                            # show running agents, scheduler state, next picks, tasks needing attention
+vteam dashboard                         # vteam status full-screen, refreshed every second until Ctrl+C
 vteam clean                             # remove worktrees no running agent uses, break stale locks, release orphaned active tasks
 vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen labelled or conflicting PR tasks
 vteam cron start                        # start long-lived scheduler for agents with cron patterns
@@ -268,6 +270,8 @@ vteam skill uninstall                   # remove skill symlinks from ~/.claude/s
 `vteam cron start` runs a foreground Node.js process that schedules agents based on `cron` patterns in their `agent.json` (parsed via `croner`), plus `vteam ensure-merge` when `mergeEnsurer.cron` is set. Each agent run spawns a subprocess (`vteam run <agent>`). If an agent is still running when its next cron tick fires, the tick is skipped. The scheduler discards the child's stdout/stderr because the child writes its own log. It writes its pid to `vteam/.locks/cron.pid` and refuses to start while that pid is alive; the file is removed on Ctrl+C/SIGTERM. Stop with Ctrl+C.
 
 `vteam status` (`src/commands/status.ts`) reads only local state plus one `getIndex` and one `listReady`: `findLiveRuns` (`src/run-state.ts`) turns live agent locks in `vteam/.locks/` (except `task-claim`) into running jobs, each with its newest `vteam/.runs/` state started before the lock (`findLatestRunState`) for the worktree path; status matches them to `active` tasks by `claimed-pid`/`claimed-host`; `cron.pid` gives the scheduler state; `pickNextTask` per `input: "task"` agent gives the next pick. It also lists `done` tasks with an unmerged `pr-url`, plus inbox, unroutable, retry-exhausted, orphaned `active` tasks, and worktrees under `worktreeDir` no running job uses (`findOrphanedWorktrees`, which compares real paths). `vteam clean` removes exactly those worktrees (`cleanupOrphanedWorktrees`), so it is safe to run while agents work.
+
+`vteam dashboard` (`src/commands/dashboard.ts`) redraws `renderStatus` output on the terminal's alternate screen (cursor hidden, line wrap off). Each refresh starts at least 1s after the previous one started and never before it finished. A failed refresh keeps the last frame and shows the error in the footer. `composeFrame` cuts the frame to the terminal height. Without a TTY it exits with an error. `status`, `cron status`, and `dashboard` all build their output as lines with the `format*` helpers in `src/log.ts`, so they look the same as `vteam run` output.
 
 Every `vteam run <agent>` writes a log file for that run at `vteam/.logs/<agent>/<ISO-timestamp>.log` (`src/run-log.ts`), whether it was started by hand or by the scheduler. It copies `process.stdout`/`process.stderr` into the file with synchronous writes, so nothing is lost on `process.exit`, and it records the error stack if the run throws. ANSI colors are stripped from the file. `vteam run` output goes through `src/log.ts`: sections (`Setup`, `Agent: <name>`, `Result`, `On-finish hook`, `Memory curation`, `Cleanup`), an elapsed-time gutter, and glyphs per line kind (`•` step, `❯` Claude text, `⚙` tool call, `✓`/`!`/`✗`). `agent-runner.ts` renders tool calls (`describeTool`), failed tool results, and an exit line with duration, turns, and `total_cost_usd`. In a TTY, tool inputs are cut to one line with `writeSplit` (`run-log.ts`), which writes the short line to the terminal and the full input to the log file. Logging starts after the agent is resolved, so an unknown agent name creates no file.
 

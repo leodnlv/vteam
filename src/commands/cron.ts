@@ -8,6 +8,8 @@ import { loadConfig } from "../config/load.js";
 import { MERGE_ENSURER } from "./ensure-merge.js";
 import { agentLogsDir } from "../run-log.js";
 import type { AgentConfig, VteamConfig } from "../types.js";
+import { color } from "../ansi.js";
+import * as log from "../log.js";
 
 export interface ScheduledJob {
   name: string;
@@ -92,23 +94,38 @@ export async function cronStartCommand(): Promise<void> {
 
 export async function cronStatusCommand(): Promise<void> {
   const cwd = process.cwd();
-  const scheduled = findScheduledJobs(cwd, loadConfig(cwd));
+  console.log([log.formatBanner("cron status"), ...renderScheduler(cwd, loadConfig(cwd)), ""].join("\n"));
+}
 
-  if (scheduled.length === 0) {
-    console.log("No agents with cron patterns found.");
-    return;
+export function renderScheduler(cwd: string, config: VteamConfig): string[] {
+  const lines = [log.formatSection("Scheduler")];
+  const jobs = findScheduledJobs(cwd, config);
+  if (jobs.length === 0) {
+    lines.push(log.formatListItem(color.gray("·"), color.dim("no agents have a cron schedule")));
+    return lines;
   }
-
   const pid = readSchedulerPid(cwd);
-  console.log(pid ? `Scheduler running (pid ${pid}).` : "Scheduler not running. Start it with 'vteam cron start'.");
-  console.log(`${scheduled.length} job(s) with cron schedules:\n`);
+  lines.push(
+    pid
+      ? log.formatListItem(color.green("✓"), `running ${color.gray(`(pid ${pid})`)}`)
+      : log.formatListItem(color.yellow("!"), color.yellow("not running (start it with 'vteam cron start')")),
+  );
 
-  for (const scheduledJob of scheduled) {
-    const next = nextRunOf(scheduledJob.cron);
-    console.log(
-      `  ${scheduledJob.name}  ${scheduledJob.cron}  next: ${next?.toISOString() ?? "—"}`,
+  const nameWidth = Math.max(...jobs.map((j) => j.name.length));
+  const cronWidth = Math.max(...jobs.map((j) => j.cron.length));
+  for (const job of jobs) {
+    const next = nextRunOf(job.cron);
+    const when = next
+      ? `next ${log.formatTimeOfDay(next)} ${color.gray(`(in ${log.formatAge(next.getTime() - Date.now())})`)}`
+      : color.dim("no next run");
+    lines.push(
+      log.formatListItem(
+        color.blue("•"),
+        `${color.bold(job.name.padEnd(nameWidth))}  ${color.gray(job.cron.padEnd(cronWidth))}  ${when}`,
+      ),
     );
   }
+  return lines;
 }
 
 function spawnRun(

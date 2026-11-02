@@ -102,7 +102,7 @@ export async function runCommand(agentName: string | undefined, options: RunOpti
   const agent = resolveAgentConfig(agentName, cwd);
   const runLog = startRunLog(cwd, agent.name);
   log.startClock();
-  log.banner(agent.name, relative(cwd, runLog.path));
+  log.banner(agent.name, `log: ${relative(cwd, runLog.path)}`);
   try {
     const config = loadConfig(cwd);
     await runAgent(cwd, config, agent, options.focus);

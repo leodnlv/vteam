@@ -29,6 +29,7 @@ vteam run <agent>                       # run a specific agent
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
 vteam run                               # (no agent) list available agents
 vteam status                            # running agents (pid, task, worktree), scheduler state + next fires, each task agent's next pick, PRs awaiting merge, tasks/worktrees needing attention
+vteam dashboard                         # the vteam status view full-screen, refreshed every second (Ctrl+C to quit)
 vteam clean                             # remove worktrees no running agent uses, break stale locks, release orphaned active tasks
 vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen done tasks whose PR is labelled or conflicting
 vteam cron start                        # start long-lived scheduler for agents with cron patterns (and the merge ensurer)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatClock, formatDuration, truncate } from "./log.js";
+import { formatAge, formatClock, formatDuration, truncate } from "./log.js";
 import { stripAnsi } from "./ansi.js";
 
 describe("formatClock", () => {
@@ -28,5 +28,17 @@ describe("truncate", () => {
 describe("stripAnsi", () => {
   it("removes color escape sequences", () => {
     expect(stripAnsi("\x1b[1m\x1b[36mhi\x1b[39m\x1b[22m")).toBe("hi");
+  });
+});
+
+describe("formatAge", () => {
+  it.each([
+    [0, "<1m"],
+    [-5_000, "<1m"],
+    [12 * 60_000, "12m"],
+    [(3 * 60 + 42) * 60_000, "3h 42m"],
+    [(26 * 60 + 5) * 60_000, "1d 2h"],
+  ])("formats %d ms as %s", (ms, expected) => {
+    expect(formatAge(ms)).toBe(expected);
   });
 });
