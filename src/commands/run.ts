@@ -5,7 +5,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { acquireLock, type FileLock } from "../memory/lock.js";
 import { buildPrompt, buildOnFinishPrompt, buildMemoryCurationPrompt, threadRef } from "../orchestrator/prompt-builder.js";
 import { runClaudeAgent } from "../orchestrator/agent-runner.js";
@@ -38,6 +38,7 @@ import { loadConfig } from "../config/load.js";
 import { labelsOnTaskCreate, labelsOnTaskDone } from "../tasks/labels.js";
 import { resolveAgentConfig, listAgentNames } from "../config/agent.js";
 import { startRunLog } from "../run-log.js";
+import * as log from "../log.js";
 import { writeRunState } from "../run-state.js";
 import type {
   AgentConfig,
@@ -100,7 +101,8 @@ export async function runCommand(agentName: string | undefined, options: RunOpti
 
   const agent = resolveAgentConfig(agentName, cwd);
   const runLog = startRunLog(cwd, agent.name);
-  console.log(`Logging to ${runLog.path}`);
+  log.startClock();
+  log.banner(agent.name, relative(cwd, runLog.path));
   try {
     const config = loadConfig(cwd);
     await runAgent(cwd, config, agent, options.focus);
@@ -110,6 +112,10 @@ export async function runCommand(agentName: string | undefined, options: RunOpti
   } finally {
     runLog.close();
   }
+}
+
+function messageOf(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 function hasUncommittedChanges(worktreePath: string): boolean {
@@ -150,19 +156,20 @@ async function runAgent(
   let runOutcome: RunOutcome | undefined;
 
   try {
-    console.log("Acquiring lock...");
+    log.section("Setup");
     agentLock = await acquireLock(
       resolve(locksDir, agent.name),
       agent.name,
     );
+    log.step("lock acquired");
 
     if (agent.input === "task") {
       task = await claimTask(taskManager, config, agent, runId, locksDir);
       if (!task) {
-        console.log("No eligible tasks. Nothing to do.");
+        log.step("no eligible tasks, nothing to do");
         return;
       }
-      console.log(`Picked task: ${task.ref} ${task.title} (${task.severity})`);
+      log.step(`picked task ${task.ref}: ${task.title} (${task.severity})`);
 
       const existingPrUrl = task.metadata["pr-url"];
       if (agent.worktree && existingPrUrl) {
@@ -174,9 +181,7 @@ async function runAgent(
         }
         followUp = { pr, threads: getOpenReviewThreads(config.platform, pr.number, cwd) };
         prUrl = pr.url;
-        console.log(
-          `Following up on PR #${pr.number} (${followUp.threads.length} open review threads)`,
-        );
+        log.step(`following up on PR #${pr.number} (${followUp.threads.length} open review threads)`);
       }
     }
 
@@ -184,15 +189,13 @@ async function runAgent(
       const labels = agent.prTriggerLabel ? [agent.prTriggerLabel] : [];
       const pr = findReviewablePR(config.platform, labels, cwd);
       if (!pr) {
-        console.log("No PRs need review response. Nothing to do.");
+        log.step("no PRs need a review response, nothing to do");
         return;
       }
       const comments = getReviewComments(config.platform, pr.number, cwd);
       const repoSlug = getRepoSlug(config.platform, cwd);
       reviewContext = { pr, comments, repoSlug };
-      console.log(
-        `Picked PR #${pr.number}: ${pr.title}${comments.length > 0 ? ` (${comments.length} comments)` : ""}`,
-      );
+      log.step(`picked PR #${pr.number}: ${pr.title}${comments.length > 0 ? ` (${comments.length} comments)` : ""}`);
     }
 
     const runState: RunState = {
@@ -208,7 +211,7 @@ async function runAgent(
     if (agent.worktree) {
       const existingPR = reviewContext?.pr ?? followUp?.pr;
       if (existingPR) {
-        console.log(`Checking out PR branch: ${existingPR.branch}...`);
+        log.step(`checking out PR branch ${existingPR.branch}`);
         const wt = checkoutWorktree(
           cwd,
           existingPR.branch,
@@ -218,7 +221,6 @@ async function runAgent(
         branchName = wt.branch;
         remoteSha = wt.remoteSha;
       } else {
-        console.log("Creating worktree...");
         const slug = task
           ? `${task.title}-${runId}`
           : `${agent.name}-${runId}`;
@@ -234,16 +236,19 @@ async function runAgent(
       }
       if (followUp?.pr.mergeable === "conflicting") {
         const { baseBranch } = followUp.pr;
-        console.log(`PR conflicts with ${baseBranch}. Merging origin/${baseBranch}...`);
+        log.warn(`PR conflicts with ${baseBranch}, merging origin/${baseBranch}`);
         const conflictedFiles = mergeBaseBranch(worktreePath, baseBranch);
         followUp.baseMerge = { baseBranch, conflictedFiles };
-        console.log(conflictedFiles.length ? `Conflicts in: ${conflictedFiles.join(", ")}` : "Merged cleanly.");
+        if (conflictedFiles.length) log.warn(`conflicts in ${conflictedFiles.join(", ")}`);
+        else log.ok("merged cleanly");
       }
       agentCwd = worktreePath;
       runState.worktreePath = worktreePath;
       runState.branchName = branchName;
       writeRunState(cwd, runState);
-      console.log(`Worktree: ${worktreePath} (branch: ${branchName})`);
+      log.step("worktree ready");
+      log.field("path", relative(cwd, worktreePath));
+      log.field("branch", branchName);
     }
 
     let memoryContent: string | undefined;
@@ -252,7 +257,6 @@ async function runAgent(
       memoryContent = readFileSync(memoryFilePath, "utf-8").trim() || undefined;
     }
 
-    console.log("Building prompt...");
     const { systemPrompt, userPrompt } = await buildPrompt(
       agent,
       taskManager,
@@ -262,7 +266,9 @@ async function runAgent(
       memoryContent,
     );
 
-    console.log(`Running ${agent.name} agent...`);
+    log.step("prompt built");
+
+    log.section(`Agent: ${agent.name}${agent.model ? ` (${agent.model})` : ""}`);
     runState.status = "claude_running";
     writeRunState(cwd, runState);
 
@@ -285,6 +291,7 @@ async function runAgent(
 
     runState.status = "processing";
     writeRunState(cwd, runState);
+    log.section("Result");
 
     const output = parseAgentOutput(result.resultText);
     memoryUpdate = output.memoryUpdate;
@@ -294,7 +301,7 @@ async function runAgent(
     if (output.content?.type === "task") {
       const taskId = await taskManager.create(output.content.body, agent.name, labelsOnTaskCreate(config.tasks, agent.name));
       runState.tasksCreated = [taskId];
-      console.log(`Created task: ${taskId} ${output.content.body.title} (${output.content.body.severity})`);
+      log.ok(`created task ${taskId}: ${output.content.body.title} (${output.content.body.severity})`);
     }
 
     const unresolvedConflicts = worktreePath && followUp?.baseMerge
@@ -308,7 +315,7 @@ async function runAgent(
       : undefined;
 
     if (agent.worktree && agent.readOnly && worktreePath) {
-      console.log(`\n${agent.name} finished (readOnly). No commit/push.`);
+      log.step("read-only agent, nothing committed");
 
       if (reviewContext) {
         removeTriggerLabel(config, agent, reviewContext.pr.number, cwd);
@@ -316,20 +323,20 @@ async function runAgent(
     } else if (agent.worktree && worktreePath && branchName &&
       (commitMessage || mergedBaseCleanly(followUp))) {
       if (commitMessage) {
-        console.log(`\n${agent.name} made changes. Committing...`);
         execFileSync("git", ["add", "-A"], { cwd: worktreePath, stdio: "pipe" });
         execFileSync(
           "git",
           ["commit", "-m", commitMessage.subject, "-m", commitMessage.body],
           { cwd: worktreePath, stdio: "pipe" },
         );
+        log.ok(`committed ${commitMessage.subject}`);
       } else {
-        console.log(`\n${agent.name} made no changes. Pushing the merge of ${followUp?.baseMerge?.baseBranch}...`);
+        log.step(`no changes, pushing the merge of ${followUp?.baseMerge?.baseBranch}`);
       }
       runState.commitSha = getCommitSha(worktreePath);
 
-      console.log(`Pushing...`);
       await pushBranch(worktreePath, branchName, remoteSha);
+      log.ok(`pushed ${branchName}`);
 
       if (reviewContext) {
         try {
@@ -339,27 +346,23 @@ async function runAgent(
             `Addressed review feedback in \`${runState.commitSha.slice(0, 7)}\`.`,
             cwd,
           );
-          console.log(`Comment posted on PR #${reviewContext.pr.number}.`);
+          log.ok(`commented on PR #${reviewContext.pr.number}`);
         } catch (commentErr) {
-          console.error(
-            "Failed to post PR comment:",
-            commentErr instanceof Error ? commentErr.message : commentErr,
-          );
+          log.warn(`failed to post PR comment: ${messageOf(commentErr)}`);
         }
 
         removeTriggerLabel(config, agent, reviewContext.pr.number, cwd);
       }
 
       if (followUp) {
-        console.log(`Pushed to existing PR: ${followUp.pr.url}`);
+        log.ok(`updated PR ${followUp.pr.url}`);
         if (output.threadReplies?.length) {
           const posted = postThreadReplies(config, agent, followUp, output.threadReplies, runState.commitSha, cwd);
           const threadReplyNote = `Replied to ${posted} of ${output.threadReplies.length} review threads.`;
           extraNotes.push(threadReplyNote);
-          console.log(threadReplyNote);
+          log.step(threadReplyNote);
         }
       } else if (agent.autoPR) {
-        console.log("Creating pull request...");
         try {
           const prBody = output.commitMessage?.body || `Automated by vteam (${agent.name}).${task ? `\n\nTask: ${task.title}` : ""}`;
           const summary = task?.title || output.commitMessage?.subject.replace(/^vteam:\s*/i, "") || "";
@@ -375,13 +378,10 @@ async function runAgent(
             labels: agent.prCreateLabels,
             cwd,
           });
-          console.log(`PR created: ${prUrl}`);
+          log.ok(`created PR ${prUrl}`);
         } catch (mrErr) {
-          console.error(
-            "PR creation failed:",
-            mrErr instanceof Error ? mrErr.message : mrErr,
-          );
-          console.log("Branch was pushed. Create the PR manually.");
+          log.warn(`PR creation failed: ${messageOf(mrErr)}`);
+          log.warn("the branch was pushed, create the PR manually");
         }
       }
 
@@ -397,15 +397,15 @@ async function runAgent(
           addLabels: labelsOnTaskDone(config.tasks, agent.name),
         });
         taskSettled = true;
-        console.log("Task completed.");
+        log.ok(`task ${task.ref} done`);
       }
     } else if (agent.worktree && worktreePath && branchName) {
-      console.log(`\n${agent.name} did not produce changes.`);
+      log.warn(`${agent.name} produced no changes (${output.status})`);
       if (output.status === "blocked" || output.status === "failed") {
-        console.log(`Reason: ${output.blockerReason ?? output.summary}`);
+        log.field("reason", output.blockerReason ?? output.summary);
       }
       if (unresolvedConflicts.length > 0) {
-        console.log(`Unresolved merge conflicts in: ${unresolvedConflicts.join(", ")}`);
+        log.field("conflicts", unresolvedConflicts.join(", "));
       }
       if (task) {
         const retryCount = task.retryCount + 1;
@@ -415,7 +415,7 @@ async function runAgent(
           removeMetadata: [...CLAIM_KEYS],
         });
         taskSettled = true;
-        console.log(`Retry count: ${retryCount}/${config.tasks.maxRetries}`);
+        log.field("retries", `${retryCount}/${config.tasks.maxRetries}`);
       }
     }
 
@@ -425,7 +425,6 @@ async function runAgent(
 
     writeRunState(cwd, runState);
 
-    console.log(`\n${agent.name} finished.`);
     const completedAt = new Date().toISOString();
     runState.status = "completed";
     runState.completedAt = completedAt;
@@ -447,7 +446,6 @@ async function runAgent(
     };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error(`${agent.name} failed:`, errorMsg);
     const failedAt = new Date().toISOString();
     writeRunState(cwd, {
       runId,
@@ -477,8 +475,12 @@ async function runAgent(
       await runMemoryCuration(agent, memoryUpdate, focus, cwd);
     }
     if (worktreePath) {
-      console.log("Cleaning up worktree...");
+      log.section("Cleanup");
       removeWorktree(cwd, worktreePath);
+      log.step("worktree removed");
+    }
+    if (runOutcome) {
+      log.finished(agent.name, runOutcome.status === "failed" ? runOutcome.error : undefined);
     }
     agentLock?.release();
     if (runOutcome?.status === "failed") {
@@ -506,12 +508,9 @@ function removeTriggerLabel(config: VteamConfig, agent: AgentConfig, prNumber: n
   if (!agent.prTriggerLabel) return;
   try {
     removePRLabel(config.platform, prNumber, agent.prTriggerLabel, cwd);
-    console.log(`Removed label "${agent.prTriggerLabel}" from PR #${prNumber}.`);
+    log.ok(`removed label "${agent.prTriggerLabel}" from PR #${prNumber}`);
   } catch (err) {
-    console.error(
-      `Failed to remove label "${agent.prTriggerLabel}" from PR #${prNumber}:`,
-      err instanceof Error ? err.message : err,
-    );
+    log.warn(`failed to remove label "${agent.prTriggerLabel}" from PR #${prNumber}: ${messageOf(err)}`);
   }
 }
 
@@ -542,7 +541,7 @@ async function parkTaskWithClosedPR(
   prUrl: string,
   state: string,
 ): Promise<void> {
-  console.log(`PR ${prUrl} is ${state}. Moving task to backlog.`);
+  log.warn(`PR ${prUrl} is ${state}, moving task to backlog`);
   await taskManager.update(task.ref, { status: "backlog", removeMetadata: [...CLAIM_KEYS] });
   await addRunNote(
     taskManager,
@@ -555,10 +554,7 @@ async function releaseTask(taskManager: TaskManager, task: Task): Promise<void> 
   try {
     await taskManager.update(task.ref, { status: "todo", removeMetadata: [...CLAIM_KEYS] });
   } catch (err) {
-    console.error(
-      `Failed to return task ${task.ref} to todo:`,
-      err instanceof Error ? err.message : err,
-    );
+    log.warn(`failed to return task ${task.ref} to todo: ${messageOf(err)}`);
   }
 }
 
@@ -576,7 +572,7 @@ function postThreadReplies(
   for (const reply of replies) {
     const thread = threadsByRef.get(reply.thread);
     if (!thread) {
-      console.error(`Skipping reply to unknown review thread ${reply.thread}.`);
+      log.warn(`skipping reply to unknown review thread ${reply.thread}`);
       continue;
     }
 
@@ -590,10 +586,7 @@ function postThreadReplies(
       );
       posted++;
     } catch (err) {
-      console.error(
-        `Failed to reply to review thread ${reply.thread}:`,
-        err instanceof Error ? err.message : err,
-      );
+      log.warn(`failed to reply to review thread ${reply.thread}: ${messageOf(err)}`);
       continue;
     }
 
@@ -601,10 +594,7 @@ function postThreadReplies(
       try {
         resolveReviewThread(config.platform, followUp.pr.number, thread.id, cwd);
       } catch (err) {
-        console.error(
-          `Failed to resolve review thread ${reply.thread}:`,
-          err instanceof Error ? err.message : err,
-        );
+        log.warn(`failed to resolve review thread ${reply.thread}: ${messageOf(err)}`);
       }
     }
   }
@@ -633,10 +623,7 @@ async function addRunNote(taskManager: TaskManager, task: Task, text: string): P
   try {
     await taskManager.addNote(task.ref, text);
   } catch (err) {
-    console.error(
-      `Failed to add note to task ${task.ref}:`,
-      err instanceof Error ? err.message : err,
-    );
+    log.warn(`failed to add note to task ${task.ref}: ${messageOf(err)}`);
   }
 }
 
@@ -647,7 +634,7 @@ async function runOnFinishHook(
 ): Promise<void> {
   if (!agent.onFinish) return;
 
-  console.log(`\nRunning on-finish hook for ${agent.name}...`);
+  log.section(`On-finish hook${agent.onFinish.model ? ` (${agent.onFinish.model})` : ""}`);
   const { systemPrompt, userPrompt } = buildOnFinishPrompt(
     agent.onFinish,
     outcome,
@@ -662,12 +649,8 @@ async function runOnFinishHook(
       allowedTools: agent.onFinish.allowedTools,
       disallowedTools: agent.onFinish.disallowedTools,
     });
-    console.log("On-finish hook completed.");
   } catch (hookErr) {
-    console.error(
-      "On-finish hook failed:",
-      hookErr instanceof Error ? hookErr.message : hookErr,
-    );
+    log.warn(`on-finish hook failed: ${messageOf(hookErr)}`);
   }
 }
 
@@ -679,7 +662,7 @@ async function runMemoryCuration(
 ): Promise<void> {
   if (!agent.memory || !memoryUpdate) return;
 
-  console.log(`\nRunning memory curation for ${agent.name}...`);
+  log.section(`Memory curation${agent.memory.model ? ` (${agent.memory.model})` : ""}`);
 
   const memoryDir = resolve(cwd, "vteam", ".memory", agent.name);
   const memoryFilePath = resolve(memoryDir, "store.md");
@@ -709,14 +692,11 @@ async function runMemoryCuration(
     if (result.exitCode === 0 && result.resultText) {
       mkdirSync(memoryDir, { recursive: true });
       writeFileSync(memoryFilePath, result.resultText.trim() + "\n", "utf-8");
-      console.log("Memory updated.");
+      log.ok("memory updated");
     } else {
-      console.error("Memory curation produced no output or failed.");
+      log.warn("memory curation produced no output or failed");
     }
   } catch (err) {
-    console.error(
-      "Memory curation failed:",
-      err instanceof Error ? err.message : err,
-    );
+    log.warn(`memory curation failed: ${messageOf(err)}`);
   }
 }
