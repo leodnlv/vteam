@@ -28,11 +28,11 @@ vteam init                              # scaffold vteam/ directory in the curre
 vteam run <agent>                       # run a specific agent
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
 vteam run                               # (no agent) list available agents
-vteam status                            # show aven project/label, counts per aven status, active/todo tasks with refs + retries, worktrees
-vteam clean                             # prune orphaned worktrees, break stale locks, release orphaned active tasks
+vteam status                            # running agents (pid, task, worktree), scheduler state + next fires, each task agent's next pick, PRs awaiting merge, tasks/worktrees needing attention
+vteam clean                             # remove worktrees no running agent uses, break stale locks, release orphaned active tasks
 vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen done tasks whose PR is labelled or conflicting
-vteam loop start                        # start long-lived scheduler for agents with cron patterns (and the merge ensurer)
-vteam loop status                       # show agents with cron schedules and next fire times
+vteam cron start                        # start long-lived scheduler for agents with cron patterns (and the merge ensurer)
+vteam cron status                       # show whether the scheduler runs, its jobs, and next fire times
 vteam skill install                     # symlink skills from skills/ into ~/.claude/skills/
 vteam skill uninstall                   # remove skill symlinks from ~/.claude/skills/
 ```
@@ -88,7 +88,7 @@ vteam/
 | `tasks.project`    | Required, non-empty. aven project for vteam's tasks; aven auto-creates it on the first task |
 | `tasks.label`      | Default `"vteam"`. Opt-in label — vteam only sees/picks up tasks carrying it. Auto-created. vteam also adds `<label>-<agent>` labels: the creating agent's on new tasks (`vteam-improver`), the finishing agent's on `done` (`vteam-coder`) |
 | `tasks.workspace`  | Optional. aven workspace, passed as `--workspace` to every `aven` call                  |
-| `mergeEnsurer.cron` | Optional. Schedules `vteam ensure-merge` in `vteam loop start`                        |
+| `mergeEnsurer.cron` | Optional. Schedules `vteam ensure-merge` in `vteam cron start`                        |
 | `mergeEnsurer.label` | Default `"vteam:changes-requested"`. PR label a human adds to approve review feedback; the ensurer reopens the task and removes it |
 
 ## Agent configuration (agent.json)
@@ -206,7 +206,7 @@ PR merged → vteam ensure-merge sets merged=true; PR closed → task canceled
 Tasks live in aven, scoped to `tasks.project` + `tasks.label`. Refs look like `APP-7KQ9` (recorded as `taskRef` in `vteam/.runs/*.json`).
 
 - **Creating** (`output: "task"`): `aven add` with `--project`, `--status inbox`, `--label`, priority from severity (critical→urgent, high→high, medium→medium, low→low), metadata `found-by=<agent>` and `files=<comma-separated>`, and a markdown description (Description / Suggested Fix / Affected Files). Aven priority `none` reads back as `low`. aven promotes inbox tasks with priority medium or higher to `todo` on add, so vteam follows up with `aven edit <ref> --status inbox`. Tasks are only picked once a human moves them to `todo`.
-- **Routing**: each `input: "task"` agent's `taskFilter` (in `agent.json`) selects tasks by aven metadata — keys AND, list values OR, `null` = key missing/empty. No `taskFilter` = matches everything. There is no fallback: a task no agent's filter matches is never picked (`vteam status` warns). Overlaps are allowed; picking runs under a global claim lock, so exactly one agent gets each task. vteam only writes `found-by`; other keys (e.g. `actor`) are set by humans via `aven edit <ref> --metadata actor=<agent>`.
+- **Routing**: each `input: "task"` agent's `taskFilter` (in `agent.json`) selects tasks by aven metadata — keys AND, list values OR, `null` = key missing/empty. No `taskFilter` = matches everything. There is no fallback: a task no agent's filter matches is never picked (`vteam status` warns and shows each agent's next pick). Overlaps are allowed; picking runs under a global claim lock, so exactly one agent gets each task. vteam only writes `found-by`; other keys (e.g. `actor`) are set by humans via `aven edit <ref> --metadata actor=<agent>`.
 - **Picking** (`input: "task"`): `aven list --project P --label L --status todo --ready` (one `aven show` per ready task), then routed in-process as above, so aven dependency blocking and `available_at` deferral are respected. Tasks with `retry-count` >= `maxRetries` are skipped. Sorted by severity (`critical` > `high` > `medium` > `low`), then oldest first. The picked task is set to `active` immediately with metadata `claimed-by` (runId), `claimed-pid`, `claimed-host`. The whole list → pick → `active` step holds `vteam/.locks/task-claim` (shared by all agents, released before Claude runs), so concurrent agents with overlapping filters never get the same task. Claim metadata is removed whenever the task leaves `active`. Local to one machine only.
 - **Branch names**: `vteam/<slugified-title>-<runId>` — aven refs are local and are kept out of remote systems.
 - **Human triage**: users can manage tasks in aven (`aven tui` or CLI) — move findings to backlog/canceled, reprioritize, add dependencies, or add the `vteam` label to their own tasks to queue them for the coder. Canceled tasks still appear in the dedup list, so canceling marks a finding as rejected/false positive.
@@ -258,9 +258,9 @@ Advisory file locking via atomic `mkdir`. Each lock contains PID + timestamp. St
 
 ## Scheduling
 
-Agents with a `cron` field, plus `vteam ensure-merge` when `mergeEnsurer.cron` is set, run on schedule via `vteam loop start` (foreground process, stop with Ctrl+C). If an agent is still running when its next tick fires, the tick is skipped.
+Agents with a `cron` field, plus `vteam ensure-merge` when `mergeEnsurer.cron` is set, run on schedule via `vteam cron start` (foreground process, stop with Ctrl+C). If an agent is still running when its next tick fires, the tick is skipped. The scheduler writes its pid to `vteam/.locks/cron.pid`, refuses to start twice, and `vteam status` reads that file to report whether it is running.
 
-Every `vteam run <agent>`, whether started by hand or by the loop, writes its full output to `vteam/.logs/<agent>/<ISO-timestamp>.log` and still prints to the terminal. Check there first when troubleshooting a run.
+Every `vteam run <agent>`, whether started by hand or by the scheduler, writes its full output to `vteam/.logs/<agent>/<ISO-timestamp>.log` and still prints to the terminal. Check there first when troubleshooting a run.
 
 ## The `--focus` option
 
@@ -308,7 +308,7 @@ Common `allowedTools` presets:
 ## Troubleshooting
 
 - **Stuck lock**: Run `vteam clean` or wait 30 minutes for stale detection.
-- **Orphaned worktree**: Run `vteam clean` to remove it.
+- **Orphaned worktree**: `vteam status` lists worktrees no running agent uses. Run `vteam clean` to remove them; it keeps worktrees a running agent is using.
 - **Agent produced no changes**: Check the task's `retry-count` metadata (`aven show <ref>`). After `maxRetries` failures, the task is skipped.
 - **PR creation failed**: Verify `gh` or `glab` is installed and authenticated. The branch is still pushed — create the PR manually.
 - **No eligible tasks**: Run the improver first, then move its findings from `inbox` to `todo` (`aven edit <ref> --status todo`), or add the `vteam` label to existing aven tasks in the project. Tasks blocked by dependencies or deferred are not ready.

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 const STALE_MS = 30 * 60 * 1000; // 30 minutes
 
-interface LockInfo {
+export interface LockInfo {
   pid: number;
   timestamp: number;
   agent: string;
@@ -20,6 +20,15 @@ export function isProcessAlive(pid: number): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+export function readLiveLock(lockDir: string): LockInfo | undefined {
+  try {
+    const info: LockInfo = JSON.parse(readFileSync(resolve(lockDir, "info.json"), "utf-8"));
+    return isProcessAlive(info.pid) ? info : undefined;
+  } catch {
+    return undefined;
   }
 }
 

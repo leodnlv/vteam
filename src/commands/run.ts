@@ -11,7 +11,7 @@ import { buildPrompt, buildOnFinishPrompt, buildMemoryCurationPrompt, threadRef 
 import { runClaudeAgent } from "../orchestrator/agent-runner.js";
 import { parseAgentOutput } from "../orchestrator/output-schema.js";
 import { AvenTaskManager } from "../tasks/aven-manager.js";
-import { matchesTaskFilter, severityPriority, type TaskManager } from "../tasks/task-manager.js";
+import { pickNextTask, type TaskManager } from "../tasks/task-manager.js";
 import { CLAIM_KEYS, claimMetadata } from "../tasks/claim.js";
 import {
   createWorktree,
@@ -38,6 +38,7 @@ import { loadConfig } from "../config/load.js";
 import { labelsOnTaskCreate, labelsOnTaskDone } from "../tasks/labels.js";
 import { resolveAgentConfig, listAgentNames } from "../config/agent.js";
 import { startRunLog } from "../run-log.js";
+import { writeRunState } from "../run-state.js";
 import type {
   AgentConfig,
   AgentOutput,
@@ -49,15 +50,6 @@ import type {
   RunOutcome,
   ThreadReply,
 } from "../types.js";
-
-function writeRunState(cwd: string, state: RunState): void {
-  const runsDir = resolve(cwd, "vteam", ".runs");
-  mkdirSync(runsDir, { recursive: true });
-  writeFileSync(
-    resolve(runsDir, `${state.runId}.json`),
-    JSON.stringify(state, null, 2),
-  );
-}
 
 function generateRunId(agent: string): string {
   const now = new Date();
@@ -533,14 +525,7 @@ async function claimTask(
   const claimLock = await acquireLock(resolve(locksDir, "task-claim"), agent.name);
   try {
     const readyTasks = await taskManager.listReady();
-    const [task] = readyTasks
-      .filter((t) => matchesTaskFilter(t, agent.taskFilter ?? {}))
-      .filter((t) => t.retryCount < config.tasks.maxRetries)
-      .sort(
-        (a, b) =>
-          severityPriority(a.severity) - severityPriority(b.severity) ||
-          a.createdAt.localeCompare(b.createdAt),
-      );
+    const task = pickNextTask(readyTasks, agent.taskFilter ?? {}, config.tasks.maxRetries);
     if (task) {
       await taskManager.update(task.ref, { status: "active", metadata: claimMetadata(runId) });
     }

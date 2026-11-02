@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { cleanupOrphanedWorktrees } from "../worktree/manager.js";
+import { findLiveRuns, liveWorktreePaths } from "../run-state.js";
 import { breakStaleLock } from "../memory/lock.js";
 import { loadConfig } from "../config/load.js";
 import { AvenTaskManager } from "../tasks/aven-manager.js";
@@ -14,9 +15,12 @@ export async function cleanCommand(): Promise<void> {
 
   console.log("=== vteam clean ===\n");
 
-  // Clean up worktrees
   try {
-    const cleaned = cleanupOrphanedWorktrees(cwd, worktreeDir);
+    const inUse = liveWorktreePaths(findLiveRuns(cwd));
+    const cleaned = cleanupOrphanedWorktrees(cwd, worktreeDir, inUse);
+    if (inUse.length > 0) {
+      console.log(`Kept ${inUse.length} worktree(s) in use by a running agent.`);
+    }
     if (cleaned.length > 0) {
       console.log(`Removed ${cleaned.length} worktree(s):`);
       for (const p of cleaned) {

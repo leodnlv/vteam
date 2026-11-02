@@ -165,7 +165,7 @@ Plain markdown — no frontmatter. Put its model and tools in the `onFinish` sec
 After writing files, print:
 - The path to each created file
 - How to test-run the agent: `vteam run <name>` (or `just dev run <name>` if developing vteam itself)
-- If the agent has a cron, mention `vteam loop start`
+- If the agent has a cron, mention `vteam cron start` (and `vteam cron status` to see the next fire time)
 
 ## Important notes
 

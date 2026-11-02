@@ -53,7 +53,7 @@ Each `claude -p` call is stateless. Memory is external:
 
 - **Tasks** — stored in aven (local-first SQLite task manager, `aven` CLI must be on PATH). Scoped to the configured `tasks.project` and `tasks.label`; tasks without the label are invisible to vteam. The orchestrator reads tasks via the `TaskManager` interface at prompt-build time and injects a summary of existing task titles, severities, statuses, and files into every agent's prompt.
 - **Deduplication** — The prompt builder calls `taskManager.getIndex()` and includes every non-deleted labelled task, of every aven status (including `canceled`), in the "Existing Tasks" section. Claude avoids reporting duplicates, so canceling a task in aven acts as "rejected — don't report again". No hashing. aven is the single source of truth.
-- **Per-agent memory** — agents can optionally have a `MEMORY.md` strategy file at `vteam/agents/<name>/MEMORY.md`. When present, the orchestrator injects the agent's accumulated memory (from `vteam/.memory/<agent-name>/store.md`) into the prompt. After the main run, if the agent returned a `memoryUpdate` in its structured output, the orchestrator spawns a small curation agent. The curation agent receives the MEMORY.md instructions (system prompt), the current memory content, and the new update — it returns the complete replacement memory content. The orchestrator writes the result to `.memory/<agent-name>.memory.md`. Memory files are local-only and gitignored. Curation failure is non-fatal.
+- **Per-agent memory** — agents can optionally have a `MEMORY.md` strategy file at `vteam/agents/<name>/MEMORY.md`. When present, the orchestrator injects the agent's accumulated memory (from `vteam/.memory/<agent-name>/store.md`) into the prompt. After the main run, if the agent returned a `memoryUpdate` in its structured output, the orchestrator spawns a small curation agent. The curation agent receives the MEMORY.md instructions (system prompt), the current memory content, and the new update — it returns the complete replacement memory content. The orchestrator writes the result back to `vteam/.memory/<agent-name>/store.md`. Memory files are local-only and gitignored. Curation failure is non-fatal.
 
 ### Worktrees
 
@@ -90,7 +90,7 @@ Each agent is a directory `vteam/agents/<name>/`. `AGENT.md` (required — its p
 - `taskFilter` (optional, requires `input: "task"`) — map of aven metadata key → string, `null` (key missing/empty), or a non-empty list of those. Keys AND, list values OR. E.g. `{ "found-by": ["improver", "security-analyst"] }` or `{ "actor": "mr-reviewer" }`. Omitted = matches every task.
 - `prTriggerLabel` — label that signals "this PR needs work" (e.g. `vteam:changes-requested`); the orchestrator discovers PRs by this label and removes it after the agent pushes
 - `autoPR` (default: `false`) — create a pull request after pushing
-- `cron` — cron expression (5 fields: minute hour day month weekday) for scheduling via `vteam loop start`
+- `cron` — cron expression (5 fields: minute hour day month weekday) for scheduling via `vteam cron start`
 - `model` — Claude model override passed to `claude --model` (alias or full model ID); omit to use Claude Code's default
 - `prCreateLabels` — labels applied to created PRs
 - `resolveThreads` (default: `false`, requires `input: "task"` and `worktree: true`) — resolve each review thread the agent replied to on a PR follow-up
@@ -118,17 +118,17 @@ All task operations go through the `TaskManager` interface (`src/tasks/task-mana
 
 Agent labels are hardcoded conventions, all defined in `src/tasks/labels.ts`: a created task gets `<tasks.label>-<creating agent>` (e.g. `vteam-improver`), and a task set to `done` gets `<tasks.label>-<finishing agent>` (e.g. `vteam-coder`). They are never removed, so they stay when a task is reopened. `toAvenLabel` mirrors aven's label normalization (lowercase, runs of non-`[a-z0-9]` → `-`, trimmed) so the label vteam writes is the one aven stores. Each label is created (`aven label create`) before use, because `aven edit --label` rejects unknown labels.
 - `tasks.workspace` (optional) — passed as `--workspace` to every aven call.
-- `mergeEnsurer.cron` (optional) — schedules `vteam ensure-merge` in `vteam loop start`.
+- `mergeEnsurer.cron` (optional) — schedules `vteam ensure-merge` in `vteam cron start`.
 - `mergeEnsurer.label` (default `"vteam:changes-requested"`) — PR label a human adds to approve the review feedback; see Merge ensurer.
 
-Routing (`matchesTaskFilter` in `task-manager.ts`): `listReady()` returns every ready labelled task with its metadata; `run` keeps the tasks matching the running agent's `taskFilter` (no filter = all). There is no fallback agent — a task no filter matches is never picked. Overlaps are allowed — picking runs under a global claim lock (see Lifecycle), so exactly one run gets each task. vteam only writes `found-by`; humans set other keys such as `actor` via `aven edit <ref> --metadata actor=<agent>`. `vteam status` loads every `input: "task"` agent (`listTaskWorkers`), shows each open task's matching agents, and warns about `todo` tasks no agent matches.
+Routing (`matchesTaskFilter` in `task-manager.ts`): `listReady()` returns every ready labelled task with its metadata; `run` keeps the tasks matching the running agent's `taskFilter` (no filter = all). There is no fallback agent — a task no filter matches is never picked. Overlaps are allowed — picking runs under a global claim lock (see Lifecycle), so exactly one run gets each task. vteam only writes `found-by`; humans set other keys such as `actor` via `aven edit <ref> --metadata actor=<agent>`. `pickNextTask` (also in `task-manager.ts`) applies the filter, the retry limit, and the severity/age ordering; `run` and `vteam status` both use it.
 
 Mapping: severity `critical/high/medium/low` ↔ aven priority `urgent/high/medium/low` (priority `none` reads as `low`). `files`, `found-by`, `retry-count`, `completed`, `branch`, `pr-url`, `merged`, `claimed-by`, `claimed-pid`, `claimed-host` are aven metadata (string values; `files` is comma-separated). The finding's description, suggested fix, and affected files become the aven description.
 
 Tasks created from `output: "task"` findings start in `inbox` and are only picked once a human moves them to `todo`. aven promotes inbox tasks with priority medium or higher to `todo` on `add`, so `create` follows up with `aven edit <ref> --status inbox`.
 
 Lifecycle for `input: "task"` agents:
-1. Under the global claim lock `vteam/.locks/task-claim` (shared by all agents, held only while picking): `aven list --status todo --ready` (respects aven dependencies and `available_at`), keep tasks routed to this agent, drop tasks with `retry-count >= maxRetries`, sort by severity then oldest — pick the first and set it `active` with claim metadata `claimed-by` (runId), `claimed-pid`, `claimed-host`. Once `active`, the task drops out of every other agent's `listReady`. aven has no compare-and-swap, so the lock is what prevents two agents claiming the same task; it only works on one machine.
+1. Under the global claim lock `vteam/.locks/task-claim` (shared by all agents, held only while picking): `aven list --status todo --ready` (respects aven dependencies and `available_at`), keep tasks routed to this agent, drop tasks with `retry-count >= maxRetries`, sort by severity then oldest (`pickNextTask`) — pick the first and set it `active` with claim metadata `claimed-by` (runId), `claimed-pid`, `claimed-host`. Once `active`, the task drops out of every other agent's `listReady`. aven has no compare-and-swap, so the lock is what prevents two agents claiming the same task; it only works on one machine.
 2. Commit pushed → `done` with `completed`/`branch`/`pr-url` metadata and the agent's done label.
 3. Worktree agent produced no changes → back to `todo` with `retry-count` incremented.
 4. Any other ending (error, crash, readOnly or non-worktree agent) → back to `todo` in `finally`, retries unchanged.
@@ -145,7 +145,7 @@ Lifecycle for `input: "task"` agents:
 - open and `mergeable: "conflicting"` → `todo` + note; the coder resolves the conflict (see step 5)
 - otherwise (incl. `mergeable: "unknown"`) → nothing. Review comments alone never reopen a task; the label is the human approval.
 
-Per-task failures are logged and the sweep continues. `mergeEnsurer.cron` in `vteam.config.json` makes `vteam loop start` run it; logs go to `vteam/.logs/merge-ensurer/`.
+Per-task failures are logged and the sweep continues. `mergeEnsurer.cron` in `vteam.config.json` makes `vteam cron start` run it; logs go to `vteam/.logs/merge-ensurer/`.
 
 Whenever the agent returned output (every ending except an error or crash), the orchestrator appends an aven note to the task: `<agent>: <status>`, the agent's `summary`, `Blocker: <blockerReason>` if present, and `PR: <url>` if one was created. A failed note write is logged and does not fail the run. Notes (from runs and from humans) are injected into the prompt the next time an agent picks the task, so retries see why earlier attempts failed.
 
@@ -201,12 +201,13 @@ src/
 ├── bin.ts                        CLI entry point (commander)
 ├── types.ts                      All shared TypeScript types
 ├── run-log.ts                    Per-run log file under vteam/.logs/<agent>/ (tees stdout/stderr)
+├── run-state.ts                  Per-run state JSON under vteam/.runs/; live-run discovery from agent locks
 ├── commands/
 │   ├── init.ts                   vteam init — scaffold vteam/ in any project
 │   ├── run.ts                    vteam run <agent> — main orchestration flow
-│   ├── loop.ts                   vteam loop — long-lived scheduler process
-│   ├── status.ts                 vteam status — task board overview (from aven)
-│   ├── clean.ts                  vteam clean — prune worktrees, stale locks, orphaned active tasks
+│   ├── cron.ts                   vteam cron — long-lived scheduler process
+│   ├── status.ts                 vteam status — running agents, scheduler, next picks, tasks needing attention
+│   ├── clean.ts                  vteam clean — remove unused worktrees, stale locks, orphaned active tasks
 │   ├── ensure-merge.ts           vteam ensure-merge — record merges, cancel closed PRs, reopen labelled/conflicting PR tasks
 │   └── skill.ts                  vteam skill install/uninstall — manage Claude Code skill symlinks
 ├── config/
@@ -250,20 +251,23 @@ just clean          # rm -rf dist/
 
 ```
 vteam init                              # scaffold vteam/ directory
+vteam run                               # list available agents
 vteam run <agent>                       # run a specific agent
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
-vteam status                            # show task board overview
-vteam clean                             # prune worktrees, break stale locks, release orphaned active tasks
+vteam status                            # show running agents, scheduler state, next picks, tasks needing attention
+vteam clean                             # remove worktrees no running agent uses, break stale locks, release orphaned active tasks
 vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen labelled or conflicting PR tasks
-vteam loop start                        # start long-lived scheduler for agents with cron patterns
-vteam loop status                       # show agents with cron schedules and next fire times
+vteam cron start                        # start long-lived scheduler for agents with cron patterns
+vteam cron status                       # show whether the scheduler runs, its jobs, and next fire times
 vteam skill install                     # symlink skills from skills/ into ~/.claude/skills/
 vteam skill uninstall                   # remove skill symlinks from ~/.claude/skills/
 ```
 
-`vteam loop start` runs a foreground Node.js process that schedules agents based on `cron` patterns in their `agent.json` (parsed via `croner`), plus `vteam ensure-merge` when `mergeEnsurer.cron` is set. Each agent run spawns a subprocess (`vteam run <agent>`). If an agent is still running when its next cron tick fires, the tick is skipped. The loop discards the child's stdout/stderr because the child writes its own log. Stop with Ctrl+C.
+`vteam cron start` runs a foreground Node.js process that schedules agents based on `cron` patterns in their `agent.json` (parsed via `croner`), plus `vteam ensure-merge` when `mergeEnsurer.cron` is set. Each agent run spawns a subprocess (`vteam run <agent>`). If an agent is still running when its next cron tick fires, the tick is skipped. The scheduler discards the child's stdout/stderr because the child writes its own log. It writes its pid to `vteam/.locks/cron.pid` and refuses to start while that pid is alive; the file is removed on Ctrl+C/SIGTERM. Stop with Ctrl+C.
 
-Every `vteam run <agent>` writes a log file for that run at `vteam/.logs/<agent>/<ISO-timestamp>.log` (`src/run-log.ts`), whether it was started by hand or by the loop. It copies `process.stdout`/`process.stderr` into the file with synchronous writes, so nothing is lost on `process.exit`, and it records the error stack if the run throws. Logging starts after the agent is resolved, so an unknown agent name creates no file.
+`vteam status` (`src/commands/status.ts`) reads only local state plus one `getIndex` and one `listReady`: `findLiveRuns` (`src/run-state.ts`) turns live agent locks in `vteam/.locks/` (except `task-claim`) into running jobs, each with its newest `vteam/.runs/` state started before the lock (`findLatestRunState`) for the worktree path; status matches them to `active` tasks by `claimed-pid`/`claimed-host`; `cron.pid` gives the scheduler state; `pickNextTask` per `input: "task"` agent gives the next pick. It also lists `done` tasks with an unmerged `pr-url`, plus inbox, unroutable, retry-exhausted, orphaned `active` tasks, and worktrees under `worktreeDir` no running job uses (`findOrphanedWorktrees`, which compares real paths). `vteam clean` removes exactly those worktrees (`cleanupOrphanedWorktrees`), so it is safe to run while agents work.
+
+Every `vteam run <agent>` writes a log file for that run at `vteam/.logs/<agent>/<ISO-timestamp>.log` (`src/run-log.ts`), whether it was started by hand or by the scheduler. It copies `process.stdout`/`process.stderr` into the file with synchronous writes, so nothing is lost on `process.exit`, and it records the error stack if the run throws. Logging starts after the agent is resolved, so an unknown agent name creates no file.
 
 ## Before submitting changes
 

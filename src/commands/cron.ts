@@ -1,5 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { Cron } from "croner";
+import { isProcessAlive } from "../memory/lock.js";
 import { resolveAgentConfig, listAgentNames } from "../config/agent.js";
 import { loadConfig } from "../config/load.js";
 import { MERGE_ENSURER } from "./ensure-merge.js";
@@ -12,7 +15,25 @@ export interface ScheduledJob {
   command: string[];
 }
 
-export async function loopStartCommand(): Promise<void> {
+export function schedulerPidPath(cwd: string): string {
+  return resolve(cwd, "vteam", ".locks", "cron.pid");
+}
+
+export function readSchedulerPid(cwd: string): number | undefined {
+  const path = schedulerPidPath(cwd);
+  if (!existsSync(path)) return undefined;
+  const pid = Number.parseInt(readFileSync(path, "utf-8"), 10);
+  return pid && isProcessAlive(pid) ? pid : undefined;
+}
+
+export function nextRunOf(cron: string): Date | null {
+  const job = new Cron(cron);
+  const next = job.nextRun();
+  job.stop();
+  return next;
+}
+
+export async function cronStartCommand(): Promise<void> {
   const cwd = process.cwd();
   const scheduled = findScheduledJobs(cwd, loadConfig(cwd));
 
@@ -21,10 +42,19 @@ export async function loopStartCommand(): Promise<void> {
     return;
   }
 
+  const runningPid = readSchedulerPid(cwd);
+  if (runningPid) {
+    console.error(`vteam cron is already running (pid ${runningPid}).`);
+    process.exit(1);
+  }
+  const pidPath = schedulerPidPath(cwd);
+  mkdirSync(dirname(pidPath), { recursive: true });
+  writeFileSync(pidPath, String(process.pid));
+
   const jobs: Cron[] = [];
   const running = new Map<string, ChildProcess>();
 
-  console.log(`Starting loop with ${scheduled.length} job(s):\n`);
+  console.log(`Starting scheduler with ${scheduled.length} job(s):\n`);
 
   for (const scheduledJob of scheduled) {
     const job = new Cron(scheduledJob.cron, () => {
@@ -43,7 +73,7 @@ export async function loopStartCommand(): Promise<void> {
     );
   }
 
-  console.log("\nLoop running. Press Ctrl+C to stop.");
+  console.log("\nScheduler running. Press Ctrl+C to stop.");
 
   const shutdown = () => {
     console.log("\nStopping...");
@@ -52,6 +82,7 @@ export async function loopStartCommand(): Promise<void> {
       child.kill("SIGTERM");
       console.log(`  killed ${name}`);
     }
+    rmSync(pidPath, { force: true });
     process.exit(0);
   };
 
@@ -59,7 +90,7 @@ export async function loopStartCommand(): Promise<void> {
   process.on("SIGTERM", shutdown);
 }
 
-export async function loopStatusCommand(): Promise<void> {
+export async function cronStatusCommand(): Promise<void> {
   const cwd = process.cwd();
   const scheduled = findScheduledJobs(cwd, loadConfig(cwd));
 
@@ -68,12 +99,12 @@ export async function loopStatusCommand(): Promise<void> {
     return;
   }
 
+  const pid = readSchedulerPid(cwd);
+  console.log(pid ? `Scheduler running (pid ${pid}).` : "Scheduler not running. Start it with 'vteam cron start'.");
   console.log(`${scheduled.length} job(s) with cron schedules:\n`);
 
   for (const scheduledJob of scheduled) {
-    const job = new Cron(scheduledJob.cron);
-    const next = job.nextRun();
-    job.stop();
+    const next = nextRunOf(scheduledJob.cron);
     console.log(
       `  ${scheduledJob.name}  ${scheduledJob.cron}  next: ${next?.toISOString() ?? "—"}`,
     );

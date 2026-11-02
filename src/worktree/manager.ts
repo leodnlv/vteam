@@ -1,6 +1,6 @@
 import { execFileSync, execSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { resolve, sep } from "node:path";
 import { slugify } from "../slugify.js";
 
 export interface WorktreeSession {
@@ -146,21 +146,30 @@ export function listWorktrees(
   return worktrees;
 }
 
+function canonicalPath(path: string): string {
+  return existsSync(path) ? realpathSync(path) : resolve(path);
+}
+
+export function findOrphanedWorktrees(
+  repoRoot: string,
+  worktreeDir: string,
+  inUse: string[],
+): string[] {
+  const wtBase = canonicalPath(resolve(repoRoot, worktreeDir));
+  const kept = new Set(inUse.map(canonicalPath));
+  return listWorktrees(repoRoot)
+    .map((wt) => wt.path)
+    .filter((path) => canonicalPath(path).startsWith(wtBase + sep) && !kept.has(canonicalPath(path)));
+}
+
 export function cleanupOrphanedWorktrees(
   repoRoot: string,
   worktreeDir: string,
+  inUse: string[],
 ): string[] {
-  const cleaned: string[] = [];
-  const worktrees = listWorktrees(repoRoot);
-  const wtBase = resolve(repoRoot, worktreeDir);
-
-  for (const wt of worktrees) {
-    if (!wt.path.startsWith(wtBase)) continue;
-    removeWorktree(repoRoot, wt.path);
-    cleaned.push(wt.path);
-  }
-
-  return cleaned;
+  const orphaned = findOrphanedWorktrees(repoRoot, worktreeDir, inUse);
+  for (const path of orphaned) removeWorktree(repoRoot, path);
+  return orphaned;
 }
 
 const TRANSIENT_PUSH_ERROR =

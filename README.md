@@ -78,17 +78,17 @@ vteam run coder
 
 ### Running on a schedule
 
-Agents with a `cron` field in their `agent.json`, and the [merge ensurer](#vteam-ensure-merge) when `mergeEnsurer.cron` is set, can be scheduled via the loop command:
+Agents with a `cron` field in their `agent.json`, and the [merge ensurer](#vteam-ensure-merge) when `mergeEnsurer.cron` is set, can be scheduled with `vteam cron`:
 
 ```bash
 # Start the scheduler — runs agents on their cron schedules
-vteam loop start
+vteam cron start
 
-# Check which agents are scheduled and when they fire next
-vteam loop status
+# Check whether the scheduler is running, which jobs it has, and when they fire next
+vteam cron status
 ```
 
-The scheduler is a foreground process — stop it with Ctrl+C. If an agent is still running when its next cron tick fires, the tick is skipped. Each scheduled run writes its own log file, the same as a manual `vteam run` (see [Logs](#logs)).
+The scheduler is a foreground process — stop it with Ctrl+C. While it runs it writes its pid to `vteam/.locks/cron.pid`; a second `vteam cron start` in the same project refuses to start, and `vteam status` uses the file to report whether the scheduler is up. If an agent is still running when its next cron tick fires, the tick is skipped. Each scheduled run writes its own log file, the same as a manual `vteam run` (see [Logs](#logs)).
 
 ## Commands
 
@@ -131,7 +131,7 @@ vteam run improver --focus "only look at the auth module"
 
 ### Logs
 
-Every `vteam run <agent>` writes its full output to a new file at `vteam/.logs/<agent>/<ISO-timestamp>.log`, whether you start it by hand or `vteam loop start` starts it. The output still goes to your terminal; the log file gets a copy of it. This includes Claude's tool calls, orchestrator messages, the ON_FINISH hook and memory curation, plus the error if the run crashes. The path is printed when the run starts.
+Every `vteam run <agent>` writes its full output to a new file at `vteam/.logs/<agent>/<ISO-timestamp>.log`, whether you start it by hand or `vteam cron start` starts it. The output still goes to your terminal; the log file gets a copy of it. This includes Claude's tool calls, orchestrator messages, the ON_FINISH hook and memory curation, plus the error if the run crashes. The path is printed when the run starts.
 
 ### `vteam run improver`
 
@@ -191,15 +191,23 @@ A coder task is `done` once its PR is open, but the PR still has to get through 
 | open, conflicting with its base branch | Moves the task to `todo` with a note. The coder [merges the base branch and resolves the conflicts](#following-up-on-review-comments) |
 | open, otherwise | Nothing. Review comments alone never reopen a task; only the label you add does |
 
-The label is removed before the task is reopened. If that removal fails, the task stays `done` and the next run tries again. Removing it first means a label left behind can never reopen the task over and over. While GitHub or GitLab is still working out whether a PR is mergeable, conflicts are skipped until a later run. Set `mergeEnsurer.cron` to run the ensurer from `vteam loop start`. Each run writes a log to `vteam/.logs/merge-ensurer/`.
+The label is removed before the task is reopened. If that removal fails, the task stays `done` and the next run tries again. Removing it first means a label left behind can never reopen the task over and over. While GitHub or GitLab is still working out whether a PR is mergeable, conflicts are skipped until a later run. Set `mergeEnsurer.cron` to run the ensurer from `vteam cron start`. Each run writes a log to `vteam/.logs/merge-ensurer/`.
 
 ### `vteam status`
 
-Displays the aven project and label, task counts per aven status, lists active and todo tasks with their refs and retry counts, shows active worktrees, and prints recent run IDs.
+Shows what is happening now and what will happen next. It reads local state and the aven project; it makes no GitHub/GitLab calls.
+
+- **Running** — each agent run (and the merge ensurer) whose lock is held by a live process: pid, elapsed time, the task it claimed, and its worktree.
+- **Scheduler** — whether `vteam cron start` is running, and each cron job with its next fire time.
+- **Up next** — for each `input: "task"` agent, the task it would pick if it ran now (same routing, retry limit, and ordering as `vteam run`), marked `(PR follow-up)` when it would continue an existing PR. `input: "pr"` agents show the PR label they watch.
+- **Awaiting merge** — `done` tasks whose PR has not been recorded as merged.
+- **Needs attention** — tasks in `inbox` awaiting triage, `todo` tasks no agent's `taskFilter` matches, `todo` tasks at `maxRetries`, `active` tasks whose claiming process on this machine is dead or that have no vteam claim, and worktrees no running agent is using.
+
+For the full task list, use aven (`aven list --label vteam`).
 
 ### `vteam clean`
 
-Removes orphaned worktrees, breaks stale locks (held by a dead process or older than 30 minutes), and returns orphaned tasks to `todo`: tasks that are `active` with a claim from this machine whose process is no longer running. Tasks claimed on another machine and `active` tasks without a vteam claim are listed but left alone. Run this after a crash or if a lock is stuck.
+Removes the git worktrees under `worktreeDir` that no running agent is using; a worktree belongs to a running agent when that agent's lock is held by a live process and its current run state in `vteam/.runs/` points at it. It also breaks stale locks (held by a dead process or older than 30 minutes) and returns orphaned tasks to `todo`: tasks that are `active` with a claim from this machine whose process is no longer running. Tasks claimed on another machine and `active` tasks without a vteam claim are listed but left alone. Run this after a crash or if a lock is stuck.
 
 ### `vteam skill install`
 
@@ -243,7 +251,7 @@ Global settings live in `vteam/vteam.config.json`:
 | `tasks.project`    | Required. The aven project vteam's tasks live in. aven creates it on the first task. `vteam init` sets it to the current directory name. |
 | `tasks.label`      | Default `"vteam"`. vteam only sees and picks up tasks carrying this label. Created automatically. |
 | `tasks.workspace`  | Optional. aven workspace, passed to every `aven` call as `--workspace`.                 |
-| `mergeEnsurer.cron` | Optional. Cron expression for running [`vteam ensure-merge`](#vteam-ensure-merge) from `vteam loop start`. Without it, the ensurer only runs when you call it. |
+| `mergeEnsurer.cron` | Optional. Cron expression for running [`vteam ensure-merge`](#vteam-ensure-merge) from `vteam cron start`. Without it, the ensurer only runs when you call it. |
 | `mergeEnsurer.label` | Default `"vteam:changes-requested"`. The PR label you add to approve the review feedback on a coder PR. Create it in GitHub/GitLab once. |
 
 ### Agent configuration (agent.json)
@@ -269,7 +277,7 @@ Validation is strict: unknown keys are rejected everywhere, including inside `me
 | Field             | Default    | Description                                                                                                      |
 | ----------------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
 | `model`           | —          | Claude model passed to `claude --model` (e.g. `"sonnet"`, `"opus"`, `"haiku"`, or a full model ID). Omit to use Claude Code's default. |
-| `cron`            | —          | Cron expression (5 fields: minute hour day month weekday) for scheduling via `vteam loop start`. Validated on load. |
+| `cron`            | —          | Cron expression (5 fields: minute hour day month weekday) for scheduling via `vteam cron start`. Validated on load. |
 | `worktree`        | `false`    | Run in an isolated git worktree; push branch on commit                                                           |
 | `readOnly`        | `false`    | Run in a worktree but skip commit/push/PR (requires `worktree: true`, incompatible with `autoPR`). Agent runs freely — `readOnly` only prevents the orchestrator from committing/pushing afterward. |
 | `output`          | —          | `"task"` to produce findings that the orchestrator creates as aven tasks (incompatible with `autoPR` and `readOnly`). When omitted, the agent uses generic content output. All agents share a unified output schema — `output` controls only the `content` field type. |
@@ -364,7 +372,7 @@ Each `input: "task"` agent declares which tasks it works on with a `taskFilter` 
 - An agent without `taskFilter` matches every task.
 - Filters may overlap. Picking happens under a claim lock shared by all agents, so only one agent gets a task. Once it is `active`, it is off every other agent's list.
 - vteam writes `found-by` (the creating agent) on every task. Any other key, like `actor`, is yours to set: `aven edit <ref> --metadata actor=mr-reviewer`.
-- A task that no agent's filter matches is never picked. `vteam status` shows which agents each open task routes to and warns about `todo` tasks no agent will pick.
+- A task that no agent's filter matches is never picked. `vteam status` warns about `todo` tasks no agent will pick and shows which task each agent would pick next.
 
 Agents only pick tasks returned by `aven list --status todo --ready`, so aven's dependency blocking and deferral (`available_at`) are respected. If the vteam process is killed hard mid-run, the task may stay `active`. Run `vteam clean` to return it to `todo`, or reset it manually with `aven edit <ref> --status todo`.
 

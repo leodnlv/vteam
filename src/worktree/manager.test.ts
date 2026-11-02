@@ -13,6 +13,7 @@ import {
   findUnresolvedConflicts,
   pushBranch,
   isTransientPushError,
+  cleanupOrphanedWorktrees,
 } from "./manager.js";
 
 const WT_DIR = ".vteam-worktrees";
@@ -421,5 +422,32 @@ describe("isTransientPushError", () => {
       stderr: Buffer.from(" ! [rejected]        HEAD -> feature (stale info)\nerror: failed to push some refs"),
     });
     expect(isTransientPushError(err)).toBe(false);
+  });
+});
+
+describe("cleanupOrphanedWorktrees", () => {
+  function addWorktree(path: string, branch: string): void {
+    execFileSync("git", ["-C", repo, "worktree", "add", "-b", branch, path], { stdio: "pipe" });
+  }
+
+  it("removes worktrees under worktreeDir except the ones in use", () => {
+    const busy = resolve(repo, WT_DIR, "vteam", "busy");
+    const idle = resolve(repo, WT_DIR, "vteam", "idle");
+    const outside = resolve(repo, "..", `${repo.split("/").pop()}-outside`);
+    addWorktree(busy, "vteam/busy");
+    addWorktree(idle, "vteam/idle");
+    addWorktree(outside, "outside");
+
+    try {
+      const cleaned = cleanupOrphanedWorktrees(repo, WT_DIR, [busy]);
+
+      expect(cleaned).toHaveLength(1);
+      expect(cleaned[0]).toMatch(/vteam\/idle$/);
+      expect(existsSync(idle)).toBe(false);
+      expect(existsSync(busy)).toBe(true);
+      expect(existsSync(outside)).toBe(true);
+    } finally {
+      removeWorktree(repo, outside);
+    }
   });
 });

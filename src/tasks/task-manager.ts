@@ -36,6 +36,21 @@ export function matchesTaskFilter(task: Task, filter: TaskFilter): boolean {
   });
 }
 
+export function pickNextTask(
+  ready: Task[],
+  filter: TaskFilter,
+  maxRetries: number,
+): Task | undefined {
+  return ready
+    .filter((t) => matchesTaskFilter(t, filter))
+    .filter((t) => t.retryCount < maxRetries)
+    .sort(
+      (a, b) =>
+        severityPriority(a.severity) - severityPriority(b.severity) ||
+        a.createdAt.localeCompare(b.createdAt),
+    )[0];
+}
+
 export function severityPriority(severity: Severity): number {
   const map: Record<Severity, number> = {
     critical: 0,

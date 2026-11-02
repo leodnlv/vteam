@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
-import { findCronAgents, findScheduledJobs, buildChildArgs } from "./loop.js";
+import { findCronAgents, findScheduledJobs, buildChildArgs, readSchedulerPid, schedulerPidPath } from "./cron.js";
 import type { VteamConfig } from "../types.js";
 import { isValidCronExpression } from "../config/schema.js";
 
@@ -140,5 +140,32 @@ describe("findScheduledJobs", () => {
   it("leaves the merge ensurer out without a cron", () => {
     const jobs = findScheduledJobs(dir, config({ label: "vteam:changes-requested" }));
     expect(jobs.map((job) => job.name)).toEqual(["coder"]);
+  });
+});
+
+describe("readSchedulerPid", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = join(tmpdir(), `vteam-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(resolve(dir, "vteam", ".locks"), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("returns undefined without a pid file", () => {
+    expect(readSchedulerPid(dir)).toBeUndefined();
+  });
+
+  it("returns the pid of a live scheduler", () => {
+    writeFileSync(schedulerPidPath(dir), String(process.pid));
+    expect(readSchedulerPid(dir)).toBe(process.pid);
+  });
+
+  it("ignores a pid file left by a dead scheduler", () => {
+    writeFileSync(schedulerPidPath(dir), "999999");
+    expect(readSchedulerPid(dir)).toBeUndefined();
   });
 });

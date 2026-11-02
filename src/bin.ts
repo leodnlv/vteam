@@ -1,24 +1,29 @@
 #!/usr/bin/env node
 
+import { readFileSync } from "node:fs";
 import { Command } from "commander";
 import { initCommand } from "./commands/init.js";
 import { runCommand } from "./commands/run.js";
 import { statusCommand } from "./commands/status.js";
 import { cleanCommand } from "./commands/clean.js";
 import { ensureMergeCommand } from "./commands/ensure-merge.js";
-import { loopStartCommand, loopStatusCommand } from "./commands/loop.js";
+import { cronStartCommand, cronStatusCommand } from "./commands/cron.js";
 import { skillInstallCommand, skillUninstallCommand } from "./commands/skill.js";
+
+const { version } = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf-8"),
+) as { version: string };
 
 const program = new Command();
 
 program
   .name("vteam")
   .description("Virtual development team framework powered by Claude Code")
-  .version("0.1.0");
+  .version(version);
 
 program
   .command("init")
-  .description("Scaffold vteam/ directory with default agents and task folders")
+  .description("Scaffold vteam/ directory with default agents and config")
   .action(initCommand);
 
 program
@@ -30,12 +35,12 @@ program
 
 program
   .command("status")
-  .description("Show task board status")
+  .description("Show running agents, upcoming runs, and tasks that need attention")
   .action(statusCommand);
 
 program
   .command("clean")
-  .description("Remove orphaned worktrees, break stale locks")
+  .description("Remove worktrees, break stale locks, and return orphaned active tasks to todo")
   .action(cleanCommand);
 
 program
@@ -43,19 +48,19 @@ program
   .description("Record merged PRs, cancel tasks with closed PRs, and reopen tasks whose PRs need changes or conflict")
   .action(ensureMergeCommand);
 
-const loopCmd = program
-  .command("loop")
+const cronCmd = program
+  .command("cron")
   .description("Run agents on their cron schedules in a long-lived process");
 
-loopCmd
+cronCmd
   .command("start")
   .description("Start the scheduler (runs in foreground)")
-  .action(loopStartCommand);
+  .action(cronStartCommand);
 
-loopCmd
+cronCmd
   .command("status")
-  .description("Show agents with cron schedules and next fire times")
-  .action(loopStatusCommand);
+  .description("Show whether the scheduler is running and the next fire time of each job")
+  .action(cronStatusCommand);
 
 const skillCmd = program
   .command("skill")
