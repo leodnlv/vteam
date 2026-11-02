@@ -376,6 +376,7 @@ Because tasks live in aven, you can triage them with `aven tui` or the `aven` CL
 | ---------------------- | ------------------------------------------------------------------------------- |
 | title                  | The finding's title                                                             |
 | project / label        | `tasks.project` / `tasks.label`                                                 |
+| agent labels           | `<tasks.label>-<agent>` (e.g. `vteam-improver`): added on creation for the agent that created the task, and when a task is set to `done` for the agent that finished it (e.g. `vteam-coder`). Never removed, so they stay when a task is reopened |
 | status                 | `inbox` on creation; `active` while being worked on; `done` on success; `todo` again when the merge ensurer reopens it; `canceled` when the merge ensurer finds its PR closed; `backlog` when a reopened task's PR is merged or closed |
 | priority               | From severity: `critical`→`urgent`, `high`→`high`, `medium`→`medium`, `low`→`low` (aven `none` reads back as `low`) |
 | description            | Markdown with `## Description`, `## Suggested Fix` (optional), `## Affected Files` |

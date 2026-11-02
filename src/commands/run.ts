@@ -35,6 +35,7 @@ import {
   resolveReviewThread,
 } from "../integrations/pull-request.js";
 import { loadConfig } from "../config/load.js";
+import { labelsOnTaskCreate, labelsOnTaskDone } from "../tasks/labels.js";
 import { resolveAgentConfig, listAgentNames } from "../config/agent.js";
 import { startRunLog } from "../run-log.js";
 import type {
@@ -299,7 +300,7 @@ async function runAgent(
     runState.commitMessage = output.commitMessage;
 
     if (output.content?.type === "task") {
-      const taskId = await taskManager.create(output.content.body, agent.name);
+      const taskId = await taskManager.create(output.content.body, agent.name, labelsOnTaskCreate(config.tasks, agent.name));
       runState.tasksCreated = [taskId];
       console.log(`Created task: ${taskId} ${output.content.body.title} (${output.content.body.severity})`);
     }
@@ -401,6 +402,7 @@ async function runAgent(
             "pr-url": prUrl,
           },
           removeMetadata: [...CLAIM_KEYS],
+          addLabels: labelsOnTaskDone(config.tasks, agent.name),
         });
         taskSettled = true;
         console.log("Task completed.");

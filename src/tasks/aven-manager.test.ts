@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { AvenError, AvenTaskManager, runAven, type AvenExec } from "./aven-manager.js";
+import { toAvenLabel } from "./labels.js";
 import type { TaskContentBody, TasksConfig } from "../types.js";
 
 const config: TasksConfig = {
@@ -68,6 +69,19 @@ describe("AvenTaskManager", () => {
     expect(calls[1].stdin).toContain("## Suggested Fix\n\nGuard the input.");
     expect(calls[1].stdin).toContain("- `src/b.ts`");
     expect(calls[2].args).toEqual(["edit", "APP-7KQ9", "--status", "inbox"]);
+  });
+
+  it("adds the agent's labels after the config label, without duplicates", async () => {
+    const { exec, calls } = fakeExec((args) => (args[0] === "add" ? "created APP-7KQ9 ref=7KQ9\n" : ""));
+
+    await new AvenTaskManager(config, exec).create(finding, "improver", ["vteam-improver", "vteam"]);
+
+    expect(calls.slice(0, 2).map((c) => c.args)).toEqual([
+      ["label", "create", "vteam"],
+      ["label", "create", "vteam-improver"],
+    ]);
+    const add = calls[2].args;
+    expect(add.flatMap((arg, i) => (add[i - 1] === "--label" ? [arg] : []))).toEqual(["vteam", "vteam-improver"]);
   });
 
   it("throws when the created ref cannot be parsed", async () => {
@@ -167,6 +181,17 @@ describe("AvenTaskManager", () => {
     ]);
   });
 
+  it("creates and adds labels on update", async () => {
+    const { exec, calls } = fakeExec(() => "");
+
+    await new AvenTaskManager(config, exec).update("APP-0001", { status: "done", addLabels: ["vteam-coder"] });
+
+    expect(calls.map((c) => c.args)).toEqual([
+      ["label", "create", "vteam-coder"],
+      ["edit", "APP-0001", "--status", "done", "--label", "vteam-coder"],
+    ]);
+  });
+
   it("removes metadata keys", async () => {
     const { exec, calls } = fakeExec(() => "");
 
@@ -229,6 +254,23 @@ describe.skipIf(!avenInstalled())("AvenTaskManager against real aven", () => {
     const [ready] = await manager.listReady();
     expect(ready.ref).toBe(ref);
     expect(ready.metadata["found-by"]).toBe("improver");
+  });
+
+  it("adds create and done labels to the aven task", async () => {
+    const ref = await manager.create(finding, "improver", ["vteam-improver"]);
+    await manager.update(ref, { status: "done", addLabels: ["vteam-coder"] });
+    await manager.update(ref, { status: "done", addLabels: ["vteam-coder"] });
+
+    const shown = JSON.parse(await runAven(["--db", join(tmp, "aven.sqlite"), "show", ref, "--json"])) as { labels: string[] };
+    expect(shown.labels.sort()).toEqual(["vteam", "vteam-coder", "vteam-improver"]);
+  });
+
+  it("normalizes labels the same way aven does", async () => {
+    const raw = "Bot_Name: Security.Analyst";
+    const ref = await manager.create(finding, "improver", [raw]);
+
+    const shown = JSON.parse(await runAven(["--db", join(tmp, "aven.sqlite"), "show", ref, "--json"])) as { labels: string[] };
+    expect(shown.labels).toContain(toAvenLabel(raw));
   });
 
   it("round-trips a task through its lifecycle", async () => {

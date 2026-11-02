@@ -86,7 +86,7 @@ vteam/
 | `worktreeDir`      | Where worktrees are created (relative to repo root). Gitignored.                        |
 | `tasks.maxRetries` | How many times the coder retries a failing task before skipping it                      |
 | `tasks.project`    | Required, non-empty. aven project for vteam's tasks; aven auto-creates it on the first task |
-| `tasks.label`      | Default `"vteam"`. Opt-in label — vteam only sees/picks up tasks carrying it. Auto-created |
+| `tasks.label`      | Default `"vteam"`. Opt-in label — vteam only sees/picks up tasks carrying it. Auto-created. vteam also adds `<label>-<agent>` labels: the creating agent's on new tasks (`vteam-improver`), the finishing agent's on `done` (`vteam-coder`) |
 | `tasks.workspace`  | Optional. aven workspace, passed as `--workspace` to every `aven` call                  |
 | `mergeEnsurer.cron` | Optional. Schedules `vteam ensure-merge` in `vteam loop start`                        |
 | `mergeEnsurer.label` | Default `"vteam:changes-requested"`. PR label a human adds to approve review feedback; the ensurer reopens the task and removes it |

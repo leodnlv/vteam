@@ -21,7 +21,7 @@ vi.mock("../orchestrator/agent-runner.js", () => ({
 
 const taskStore = vi.hoisted(() => ({
   tasks: [] as Task[],
-  created: [] as { body: TaskContentBody; foundBy: string }[],
+  created: [] as { body: TaskContentBody; foundBy: string; labels?: string[] }[],
   updates: [] as { ref: string; changes: TaskUpdate }[],
   notes: [] as { ref: string; text: string }[],
   failNotes: false,
@@ -44,8 +44,8 @@ vi.mock("../tasks/aven-manager.js", () => ({
         titles: taskStore.tasks.map((t) => t.title),
       };
     }
-    async create(body: TaskContentBody, foundBy: string) {
-      taskStore.created.push({ body, foundBy });
+    async create(body: TaskContentBody, foundBy: string, labels?: string[]) {
+      taskStore.created.push({ body, foundBy, labels });
       return `VTM-${taskStore.created.length}`;
     }
     async update(ref: string, changes: TaskUpdate) {
@@ -457,6 +457,7 @@ describe("pipeline: agent output → task creation", () => {
           files: ["src/db.ts:20"],
         },
         foundBy: "test-agent",
+        labels: ["vteam-test-agent"],
       },
     ]);
   });
@@ -978,6 +979,8 @@ describe("pipeline: follow-up on a task's existing PR", () => {
     expect(checkoutWorktree).not.toHaveBeenCalled();
     expect(createMergeRequest).toHaveBeenCalledOnce();
     expect(mockRunClaude.mock.calls[0][0].userPrompt).not.toContain("Existing Pull Request");
+    const done = taskStore.updates.find((u) => u.changes.status === "done");
+    expect(done?.changes.addLabels).toEqual(["vteam-test-agent"]);
   });
 
   describe("merge conflicts", () => {

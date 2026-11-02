@@ -115,6 +115,8 @@ All task operations go through the `TaskManager` interface (`src/tasks/task-mana
 
 - `tasks.project` (required) — aven project; aven creates it on the first `add`. `vteam init` defaults it to the directory name.
 - `tasks.label` (default `"vteam"`) — opt-in label. vteam only lists, picks, and dedups against tasks with this label, and creates the label on demand. Humans can queue their own aven tasks for the coder by adding the label.
+
+Agent labels are hardcoded conventions, all defined in `src/tasks/labels.ts`: a created task gets `<tasks.label>-<creating agent>` (e.g. `vteam-improver`), and a task set to `done` gets `<tasks.label>-<finishing agent>` (e.g. `vteam-coder`). They are never removed, so they stay when a task is reopened. `toAvenLabel` mirrors aven's label normalization (lowercase, runs of non-`[a-z0-9]` → `-`, trimmed) so the label vteam writes is the one aven stores. Each label is created (`aven label create`) before use, because `aven edit --label` rejects unknown labels.
 - `tasks.workspace` (optional) — passed as `--workspace` to every aven call.
 - `mergeEnsurer.cron` (optional) — schedules `vteam ensure-merge` in `vteam loop start`.
 - `mergeEnsurer.label` (default `"vteam:changes-requested"`) — PR label a human adds to approve the review feedback; see Merge ensurer.
@@ -127,7 +129,7 @@ Tasks created from `output: "task"` findings start in `inbox` and are only picke
 
 Lifecycle for `input: "task"` agents:
 1. Under the global claim lock `vteam/.locks/task-claim` (shared by all agents, held only while picking): `aven list --status todo --ready` (respects aven dependencies and `available_at`), keep tasks routed to this agent, drop tasks with `retry-count >= maxRetries`, sort by severity then oldest — pick the first and set it `active` with claim metadata `claimed-by` (runId), `claimed-pid`, `claimed-host`. Once `active`, the task drops out of every other agent's `listReady`. aven has no compare-and-swap, so the lock is what prevents two agents claiming the same task; it only works on one machine.
-2. Commit pushed → `done` with `completed`/`branch`/`pr-url` metadata.
+2. Commit pushed → `done` with `completed`/`branch`/`pr-url` metadata and the agent's done label.
 3. Worktree agent produced no changes → back to `todo` with `retry-count` incremented.
 4. Any other ending (error, crash, readOnly or non-worktree agent) → back to `todo` in `finally`, retries unchanged.
 5. Follow-up on an existing PR: when a worktree agent picks a task that already has `pr-url` metadata (typically a `done` task a human moved back to `todo`, with a note saying which review comments to apply), the orchestrator looks the PR up (`getPullRequest`). If it is merged or closed, the task goes to `backlog` with a note and the agent does not run (remove `pr-url` to start over on a new branch). If it is open, the orchestrator checks out the PR branch with `checkoutWorktree`, adds an `## Existing Pull Request` section with the PR's unresolved review threads (`getOpenReviewThreads`; resolved threads and top-level comments are left out) to the prompt, pushes to that branch, skips `autoPR`, and settles the task as in steps 2–4 with `pr-url` kept. After the push, the orchestrator posts each of the agent's `threadReplies` to its thread (`replyToReviewThread`) as `🤖 **vteam <agent>:** <body>` followed by `Fixed in <sha>`, and resolves the thread (`resolveReviewThread`) when the agent has `resolveThreads: true`. Replies to unknown labels are skipped, replies are dropped when nothing was pushed, and failed replies are logged without failing the run. The run note records `Replied to N of M review threads.` Threads Claude skipped get no reply. If the PR's `mergeable` is `conflicting`, the orchestrator runs `mergeBaseBranch` (fetch + `git merge --no-edit origin/<pr base>`) in the worktree before building the prompt and adds a `## Merge Conflicts` section listing the conflicted files. On commit, MERGE_HEAD makes `git commit` produce the merge commit with Claude's message. If `findUnresolvedConflicts` still finds `<<<<<<<`/`>>>>>>>` markers in those files, nothing is committed, the run counts as "no changes" (step 3), and the note records the files. A clean merge is pushed even if Claude made no other changes.
@@ -219,6 +221,7 @@ src/
 │   └── lock.ts                   Advisory file locking (atomic mkdir)
 ├── tasks/
 │   ├── task-manager.ts           TaskManager interface, TaskIndex type, severity ordering, task description format
+│   ├── labels.ts                 Task label conventions (agent labels on create/done, aven label normalization)
 │   ├── claim.ts                  Task claim metadata and orphaned-claim release for vteam clean
 │   └── aven-manager.ts           AvenTaskManager — TaskManager backed by the aven CLI
 ├── worktree/

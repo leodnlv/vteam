@@ -17,13 +17,14 @@ export interface TaskUpdate {
   status?: TaskStatus;
   metadata?: TaskMetadata;
   removeMetadata?: (keyof TaskMetadata)[];
+  addLabels?: string[];
 }
 
 export interface TaskManager {
   listReady(): Promise<Task[]>;
   listDone(): Promise<Task[]>;
   getIndex(): Promise<TaskIndex>;
-  create(body: TaskContentBody, foundBy: string): Promise<string>;
+  create(body: TaskContentBody, foundBy: string, labels?: string[]): Promise<string>;
   update(ref: string, changes: TaskUpdate): Promise<void>;
   addNote(ref: string, text: string): Promise<void>;
 }

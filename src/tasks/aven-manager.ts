@@ -131,8 +131,9 @@ export class AvenTaskManager implements TaskManager {
     return { all, byStatus, titles: all.map((t) => t.title) };
   }
 
-  async create(body: TaskContentBody, foundBy: string): Promise<string> {
-    await this.aven(["label", "create", this.config.label]);
+  async create(body: TaskContentBody, foundBy: string, labels: string[] = []): Promise<string> {
+    const allLabels = [...new Set([this.config.label, ...labels])];
+    await this.createLabels(allLabels);
     const output = await this.aven(
       [
         "add",
@@ -140,7 +141,7 @@ export class AvenTaskManager implements TaskManager {
         "--project", this.config.project,
         "--status", "inbox",
         "--priority", PRIORITY_BY_SEVERITY[body.severity],
-        "--label", this.config.label,
+        ...allLabels.flatMap((label) => ["--label", label]),
         "--metadata", `found-by=${foundBy}`,
         "--metadata", `files=${body.files.join(", ")}`,
         "--description-stdin",
@@ -165,7 +166,16 @@ export class AvenTaskManager implements TaskManager {
     for (const key of changes.removeMetadata ?? []) {
       args.push("--remove-metadata", key);
     }
+    const labels = changes.addLabels ?? [];
+    await this.createLabels(labels);
+    for (const label of labels) args.push("--label", label);
     await this.aven(args);
+  }
+
+  private async createLabels(labels: string[]): Promise<void> {
+    for (const label of labels) {
+      await this.aven(["label", "create", label]);
+    }
   }
 
   async addNote(ref: string, text: string): Promise<void> {
