@@ -1,6 +1,7 @@
 {
   "$schema": "../../agent.schema.json",
   "model": "sonnet",
+  "cron": "30 */2 * * *",
   "worktree": true,
   "autoPR": true,
   "prCreateLabels": [

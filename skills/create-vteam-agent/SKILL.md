@@ -33,7 +33,7 @@ Use the `AskUserQuestion` tool to ask the following questions. Ask them all in a
 |--------|-------------|
 | Tasks (`output: "task"`) | The agent creates findings as aven tasks for other agents to pick up |
 | Code changes (worktree) | The agent edits files and the orchestrator commits + pushes |
-| Code changes + auto-PR | Same as above, plus the orchestrator creates a PR automatically |
+| Code changes + auto-PR | Same as above, plus the orchestrator creates a PR automatically. Without `input: "task"`, vteam records each PR as a `done` task with `found-by: <agent>` so `vteam ensure-merge` tracks it; remind the user that a reopened one is only picked if some `input: "task"` agent's `taskFilter` matches `"found-by": "<new-agent-name>"` (e.g. add it to the coder's list) |
 | Analysis only (read-only worktree) | The agent reads code in a worktree but produces only a text report |
 | Generic text output | The agent returns freeform text (report, summary) without a worktree |
 

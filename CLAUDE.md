@@ -57,7 +57,7 @@ Each `claude -p` call is stateless. Memory is external:
 
 ### Worktrees
 
-Agents with `worktree: true` get an isolated git worktree (`git worktree add`). `createWorktree` fetches `baseBranch` and branches from `origin/<baseBranch>` (not the local branch, which may be stale or hold unpushed commits). Task runs use the branch `vteam/<slugified-title>-<runId>` — aven refs are local and never appear in branch names, commits, or PRs. Claude edits files in the worktree but does not commit — it returns a structured JSON output with a commit message. The orchestrator then runs `git add -A` + `git commit`, pushes the branch, optionally creates a PR (if `autoPR: true`), and cleans up the worktree.
+Agents with `worktree: true` get an isolated git worktree (`git worktree add`). `createWorktree` fetches `baseBranch` and branches from `origin/<baseBranch>` (not the local branch, which may be stale or hold unpushed commits). Task runs use the branch `vteam/<slugified-title>-<runId>` — aven refs are local and never appear in branch names, commits, or PRs. Claude edits files in the worktree but does not commit — it returns a structured JSON output with a commit message. The orchestrator then runs `git add -A` + `git commit`, pushes the branch, optionally creates a PR (if `autoPR: true`), and cleans up the worktree. A PR opened by a run without a task (e.g. test-writer) gets a receipt task (`recordPRTask` in `run.ts`): created with the commit subject as title, the commit body as description, severity `low`, `found-by=<agent>`, then set straight to `done` with `completed`/`branch`/`pr-url`, the agent's done label, and a run note. This keeps the invariant that every vteam PR is backed by a task, which the merge ensurer relies on. A failure to record it is logged and does not fail the run. The coder template's `taskFilter` includes `test-writer` so reopened test PRs get picked.
 
 `pushBranch` pushes with `--force-with-lease=refs/heads/<branch>:<remoteSha>`. `WorktreeSession.remoteSha` is `""` for `createWorktree` (the branch must not exist on the remote) and the fetched `origin/<branch>` sha for `checkoutWorktree`, so commits someone else pushed to a PR branch during the run are never overwritten — the push fails and the task returns to `todo`. Transient network errors (`isTransientPushError`) are retried after 5s and 15s. Before each retry, `git ls-remote` checks whether the dropped push already landed (the lease would reject a re-push of it).
 
@@ -137,7 +137,7 @@ Lifecycle for `input: "task"` agents:
 
 ### Merge ensurer
 
-`vteam ensure-merge` (`src/commands/ensure-merge.ts`) is a deterministic sweep, not a `claude -p` agent. A `done` task only means its PR is open; the ensurer moves it through review. Under `vteam/.locks/merge-ensurer`, it calls `taskManager.listDone()` and, for each task with `pr-url` and without `merged=true` metadata, calls `getPullRequest`:
+`vteam ensure-merge` (`src/commands/ensure-merge.ts`) is a deterministic sweep, not a `claude -p` agent. A `done` task only means its PR is open; the ensurer moves it through review. It only sees PRs that have a task, so every PR vteam opens must have one (see Worktrees). Under `vteam/.locks/merge-ensurer`, it calls `taskManager.listDone()` and, for each task with `pr-url` and without `merged=true` metadata, calls `getPullRequest`:
 
 - merged → metadata `merged=true` (stays `done`, never checked again)
 - closed → `canceled` + note (canceled stays in dedup, so the finding is not re-reported)

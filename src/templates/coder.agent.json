@@ -1,11 +1,13 @@
 {
   "$schema": "../../agent.schema.json",
   "model": "sonnet",
+  "cron": "*/5 * * * *",
   "worktree": true,
   "input": "task",
   "taskFilter": {
     "found-by": [
       "improver",
+      "test-writer",
       null
     ]
   },

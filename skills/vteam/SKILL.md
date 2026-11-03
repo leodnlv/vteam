@@ -186,6 +186,7 @@ The orchestrator then:
 - Commits + pushes from `commitMessage` when the agent modified files
 - Creates a PR if `autoPR: true`
 - Sets the task to `done` (metadata `completed`, `branch`, `pr-url`) if a commit was pushed
+- When an agent without a task opens a PR, creates a `done` task recording it (title from the commit subject, severity `low`, `found-by=<agent>`, metadata `completed`, `branch`, `pr-url`, plus a run note) so the merge ensurer tracks every vteam PR. Failure to record it is logged, not fatal
 - Follows up on an existing PR when a worktree agent picks a task that already has `pr-url` metadata: checks out the PR branch, adds the PR's unresolved review threads to the prompt (`## Existing Pull Request`), pushes to that branch and skips `autoPR`. If the PR conflicts with its base, merges `origin/<base>` into the worktree first and lists the conflicted files in a `## Merge Conflicts` prompt section; leftover conflict markers block the commit (counted as no changes), and a clean merge is pushed even without other changes. After the push it posts the agent's `threadReplies` to their threads (`🤖 **vteam <agent>:** …` + `Fixed in <sha>`) and resolves them if `resolveThreads: true`; reply failures are non-fatal. If the PR is merged or closed, moves the task to `backlog` with a note instead of running
 - Returns the task to `todo` and increments `retry-count` metadata if the agent produced no changes
 - Returns the task to `todo` without incrementing on any other ending (crash, error, readOnly or non-worktree agent)
@@ -276,9 +277,9 @@ vteam run coder --focus "the issue about XYZ"
 
 | Agent                | Purpose                           | Key traits                                      |
 | -------------------- | --------------------------------- | ----------------------------------------------- |
-| **improver**         | Scans codebase for issues         | Read-only, `output: task`, no worktree          |
-| **coder**            | Picks a task and implements a fix | `input: task`, `worktree: true`, `autoPR: true`, `taskFilter: { "found-by": ["improver", null] }` |
-| **test-writer**      | Adds tests for untested code      | `worktree: true`, `autoPR: true`                |
+| **improver**         | Scans codebase for issues         | Read-only, `output: task`, no worktree, `cron: "0 * * * *"` |
+| **coder**            | Picks a task and implements a fix | `input: task`, `worktree: true`, `autoPR: true`, `taskFilter: { "found-by": ["improver", "test-writer", null] }`, `cron: "*/5 * * * *"` |
+| **test-writer**      | Adds tests for untested code; each PR is recorded as a `done` task | `worktree: true`, `autoPR: true`, `cron: "30 */2 * * *"` |
 
 ## Creating a custom agent
 

@@ -398,6 +398,11 @@ async function runAgent(
         });
         taskSettled = true;
         log.ok(`task ${task.ref} done`);
+      } else if (prUrl) {
+        const receipt = await recordPRTask(taskManager, config, agent, output, branchName, prUrl);
+        if (receipt) {
+          runState.tasksCreated = [...(runState.tasksCreated ?? []), receipt];
+        }
       }
     } else if (agent.worktree && worktreePath && branchName) {
       log.warn(`${agent.name} produced no changes (${output.status})`);
@@ -548,6 +553,44 @@ async function parkTaskWithClosedPR(
     task,
     `${agentName}: skipped\n\nPR ${prUrl} is ${state}, so there is no branch to push to. Remove the pr-url metadata and move the task to todo to start over on a new branch.`,
   );
+}
+
+// The merge ensurer only tracks PRs through tasks, so a PR opened without one gets a done task recording it.
+async function recordPRTask(
+  taskManager: TaskManager,
+  config: VteamConfig,
+  agent: AgentConfig,
+  output: AgentOutput,
+  branch: string,
+  prUrl: string,
+): Promise<string | undefined> {
+  try {
+    const ref = await taskManager.create(
+      {
+        title: output.commitMessage?.subject.replace(/^vteam:\s*/i, "") || output.summary,
+        severity: "low",
+        description: output.commitMessage?.body || output.summary,
+        files: output.filesChanged ?? [],
+      },
+      agent.name,
+      labelsOnTaskCreate(config.tasks, agent.name),
+    );
+    await taskManager.update(ref, {
+      status: "done",
+      metadata: { completed: new Date().toISOString(), branch, "pr-url": prUrl },
+      addLabels: labelsOnTaskDone(config.tasks, agent.name),
+    });
+    log.ok(`recorded task ${ref} for ${prUrl}`);
+    try {
+      await taskManager.addNote(ref, formatRunNote(agent.name, output, prUrl, []));
+    } catch (err) {
+      log.warn(`failed to add note to task ${ref}: ${messageOf(err)}`);
+    }
+    return ref;
+  } catch (err) {
+    log.warn(`failed to record a task for ${prUrl}, the merge ensurer will not track it: ${messageOf(err)}`);
+    return undefined;
+  }
 }
 
 async function releaseTask(taskManager: TaskManager, task: Task): Promise<void> {

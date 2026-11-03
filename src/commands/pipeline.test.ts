@@ -1133,4 +1133,57 @@ describe("pipeline: follow-up on a task's existing PR", () => {
       expect(process.exit).not.toHaveBeenCalled();
     });
   });
+
+  describe("PRs opened without a task", () => {
+    function setupSelfDirected(): void {
+      setupProject({ agentConfig: { model: "sonnet", worktree: true, autoPR: true } });
+      vi.mocked(createWorktree).mockImplementation(() => makeGitWorktree("vteam/test-agent-run", ""));
+    }
+
+    it("records a done task with the PR so the merge ensurer tracks it", async () => {
+      setupSelfDirected();
+      mockAgentEditing();
+
+      await runCommand("test-agent", {});
+
+      expect(taskStore.created).toEqual([{
+        body: { title: "guard null email", severity: "low", description: "Review follow-up.", files: ["thing.ts"] },
+        foundBy: "test-agent",
+        labels: ["vteam-test-agent"],
+      }]);
+      expect(taskStore.updates).toEqual([{
+        ref: "VTM-1",
+        changes: {
+          status: "done",
+          metadata: { completed: expect.any(String), branch: "vteam/test-agent-run", "pr-url": "https://github.com/org/repo/pull/99" },
+          addLabels: ["vteam-test-agent"],
+        },
+      }]);
+      expect(taskStore.notes[0]).toMatchObject({ ref: "VTM-1", text: expect.stringContaining("PR: https://github.com/org/repo/pull/99") });
+    });
+
+    it("records no task when PR creation fails", async () => {
+      setupSelfDirected();
+      vi.mocked(createMergeRequest).mockImplementationOnce(() => {
+        throw new Error("gh failed");
+      });
+      mockAgentEditing();
+
+      await runCommand("test-agent", {});
+
+      expect(taskStore.created).toEqual([]);
+      expect(process.exit).not.toHaveBeenCalled();
+    });
+
+    it("keeps the recorded task done when its note fails", async () => {
+      setupSelfDirected();
+      taskStore.failNotes = true;
+      mockAgentEditing();
+
+      await runCommand("test-agent", {});
+
+      expect(taskStore.updates.at(-1)?.changes.status).toBe("done");
+      expect(process.exit).not.toHaveBeenCalled();
+    });
+  });
 });

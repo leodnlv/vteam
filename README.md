@@ -183,7 +183,7 @@ The next coder run sees the task's `pr-url` metadata and works on the existing P
 
 ### `vteam ensure-merge`
 
-A coder task is `done` once its PR is open, but the PR still has to get through review. The merge ensurer checks every `done` task that has `pr-url` metadata and no `merged=true` metadata. It does not run Claude:
+A coder task is `done` once its PR is open, but the PR still has to get through review. An agent that opens a PR without a task (like the test writer) gets a `done` task recording the PR, so every vteam PR is tracked. The merge ensurer checks every `done` task that has `pr-url` metadata and no `merged=true` metadata. It does not run Claude:
 
 | PR state | What happens |
 | --- | --- |
@@ -391,7 +391,7 @@ Because tasks live in aven, you can triage them with `aven tui` or the `aven` CL
 | title                  | The finding's title                                                             |
 | project / label        | `tasks.project` / `tasks.label`                                                 |
 | agent labels           | `<tasks.label>-<agent>` (e.g. `vteam-improver`): added on creation for the agent that created the task, and when a task is set to `done` for the agent that finished it (e.g. `vteam-coder`). Never removed, so they stay when a task is reopened |
-| status                 | `inbox` on creation; `active` while being worked on; `done` on success; `todo` again when the merge ensurer reopens it; `canceled` when the merge ensurer finds its PR closed; `backlog` when a reopened task's PR is merged or closed |
+| status                 | `inbox` on creation (`done` for a task recording a PR opened without a task); `active` while being worked on; `done` on success; `todo` again when the merge ensurer reopens it; `canceled` when the merge ensurer finds its PR closed; `backlog` when a reopened task's PR is merged or closed |
 | priority               | From severity: `critical`→`urgent`, `high`→`high`, `medium`→`medium`, `low`→`low` (aven `none` reads back as `low`) |
 | description            | Markdown with `## Description`, `## Suggested Fix` (optional), `## Affected Files` |
 | metadata `found-by`    | Name of the agent that created the task (usable in `taskFilter`)                |
@@ -446,7 +446,7 @@ Memory is opt-in — agents without a `MEMORY.md` skip it entirely, and a `memor
 
 ## Agents
 
-vteam ships with three default agents (improver, coder, test-writer). Add custom agents by creating `vteam/agents/<name>/AGENT.md` (plus an optional `agent.json`) — no config changes needed.
+vteam ships with three default agents (improver, coder, test-writer). Their `agent.json` files come with cron schedules for `vteam cron start`: coder every 5 minutes (`*/5 * * * *`), improver on the hour (`0 * * * *`), and test-writer every 2 hours at half past (`30 */2 * * *`). The merge ensurer runs every 15 minutes (`mergeEnsurer.cron`). Add custom agents by creating `vteam/agents/<name>/AGENT.md` (plus an optional `agent.json`) — no config changes needed.
 
 ### Improver
 
@@ -458,7 +458,7 @@ vteam ships with three default agents (improver, coder, test-writer). Add custom
 
 ### Coder
 
-- Picks one ready task per run from the aven `todo` queue, limited to improver findings and tasks you created yourself (`"taskFilter": { "found-by": ["improver", null] }`)
+- Picks one ready task per run from the aven `todo` queue, limited to improver findings, reopened test-writer PRs, and tasks you created yourself (`"taskFilter": { "found-by": ["improver", "test-writer", null] }`)
 - Works in an isolated git worktree (never touches the main working tree)
 - Makes minimal, focused changes following existing code style
 - Does not commit or push — the orchestrator handles all git operations and PR creation
@@ -472,6 +472,7 @@ vteam ships with three default agents (improver, coder, test-writer). Add custom
 - Runs tests, type-check, and lint before reporting completion
 - Does not modify source code — only adds or updates test files
 - Does not commit or push — the orchestrator handles all git operations
+- Each PR it opens is recorded as a `done` task (`found-by: test-writer`), so the merge ensurer tracks it and the coder applies review feedback when it is reopened
 
 All agents return a unified JSON output (`AgentOutput`). The orchestrator validates it, creates aven tasks from `content` when type is `"task"`, commits from `commitMessage` when present, and passes `content` through to ON_FINISH hooks. All agents receive existing task titles in their prompt, giving them full context of past and present work.
 
