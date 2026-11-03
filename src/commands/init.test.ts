@@ -27,6 +27,7 @@ describe("initCommand", () => {
     expect(existsSync(resolve(tmp, "vteam", "vteam.config.json"))).toBe(true);
     expect(existsSync(resolve(tmp, "vteam", "agents", "improver", "AGENT.md"))).toBe(true);
     expect(existsSync(resolve(tmp, "vteam", "agents", "coder", "AGENT.md"))).toBe(true);
+    expect(existsSync(resolve(tmp, "vteam", "agents", "security-analyst", "AGENT.md"))).toBe(true);
     expect(existsSync(resolve(tmp, "vteam", "tasks"))).toBe(false);
   });
 
@@ -38,6 +39,27 @@ describe("initCommand", () => {
     expect(config.tasks.project).toBe(basename(tmp));
     expect(config.tasks.label).toBe("vteam");
     expect(config.tasks).not.toHaveProperty("defaultActor");
+  });
+
+  it("scaffolds a read-only task-producing security-analyst agent", async () => {
+    const { initCommand } = await import("./init.js");
+    await initCommand();
+
+    const { resolveAgentConfig } = await import("../config/agent.js");
+    const agent = resolveAgentConfig("security-analyst", tmp);
+    expect(agent.output).toBe("task");
+    expect(agent.worktree).toBeUndefined();
+    expect(agent.allowedTools).not.toContain("Edit");
+    expect(agent.disallowedTools).toContain("Bash(npm audit fix *)");
+    expect(agent.memory?.model).toBe("haiku");
+  });
+
+  it("routes security-analyst findings to the coder", async () => {
+    const { initCommand } = await import("./init.js");
+    await initCommand();
+
+    const coder = JSON.parse(readFileSync(resolve(tmp, "vteam", "agents", "coder", "agent.json"), "utf-8"));
+    expect(coder.taskFilter["found-by"]).toContain("security-analyst");
   });
 
   it("creates .gitignore with worktree and state entries", async () => {

@@ -7,6 +7,7 @@
   "taskFilter": {
     "found-by": [
       "improver",
+      "security-analyst",
       "test-writer",
       null
     ]

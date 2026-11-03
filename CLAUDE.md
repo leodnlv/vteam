@@ -57,7 +57,7 @@ Each `claude -p` call is stateless. Memory is external:
 
 ### Worktrees
 
-Agents with `worktree: true` get an isolated git worktree (`git worktree add`). `createWorktree` fetches `baseBranch` and branches from `origin/<baseBranch>` (not the local branch, which may be stale or hold unpushed commits). Task runs use the branch `vteam/<slugified-title>-<runId>` — aven refs are local and never appear in branch names, commits, or PRs. Claude edits files in the worktree but does not commit — it returns a structured JSON output with a commit message. The orchestrator then runs `git add -A` + `git commit`, pushes the branch, optionally creates a PR (if `autoPR: true`), and cleans up the worktree. A PR opened by a run without a task (e.g. test-writer) gets a receipt task (`recordPRTask` in `run.ts`): created with the commit subject as title, the commit body as description, severity `low`, `found-by=<agent>`, then set straight to `done` with `completed`/`branch`/`pr-url`, the agent's done label, and a run note. This keeps the invariant that every vteam PR is backed by a task, which the merge ensurer relies on. A failure to record it is logged and does not fail the run. The coder template's `taskFilter` includes `test-writer` so reopened test PRs get picked.
+Agents with `worktree: true` get an isolated git worktree (`git worktree add`). `createWorktree` fetches `baseBranch` and branches from `origin/<baseBranch>` (not the local branch, which may be stale or hold unpushed commits). Task runs use the branch `vteam/<slugified-title>-<runId>` — aven refs are local and never appear in branch names, commits, or PRs. Claude edits files in the worktree but does not commit — it returns a structured JSON output with a commit message. The orchestrator then runs `git add -A` + `git commit`, pushes the branch, optionally creates a PR (if `autoPR: true`), and cleans up the worktree. A PR opened by a run without a task (e.g. test-writer) gets a receipt task (`recordPRTask` in `run.ts`): created with the commit subject as title, the commit body as description, severity `low`, `found-by=<agent>`, then set straight to `done` with `completed`/`branch`/`pr-url`, the agent's done label, and a run note. This keeps the invariant that every vteam PR is backed by a task, which the merge ensurer relies on. A failure to record it is logged and does not fail the run. The coder template's `taskFilter` includes `test-writer` so reopened test PRs get picked, and `security-analyst` so its findings get implemented.
 
 `pushBranch` pushes with `--force-with-lease=refs/heads/<branch>:<remoteSha>`. `WorktreeSession.remoteSha` is `""` for `createWorktree` (the branch must not exist on the remote) and the fetched `origin/<branch>` sha for `checkoutWorktree`, so commits someone else pushed to a PR branch during the run are never overwritten — the push fails and the task returns to `todo`. Transient network errors (`isTransientPushError`) are retried after 5s and 15s. Before each retry, `git ls-remote` checks whether the dropped push already landed (the lease would reject a re-push of it).
 
@@ -234,7 +234,7 @@ src/
 │   ├── merge-request.ts          GitHub (gh) and GitLab (glab) MR creation
 │   └── pull-request.ts           PR review discovery, comment fetching, posting
 └── templates/                    Scaffolding templates copied by vteam init
-    ├── <agent>.agent.json        agent.json for each default agent (improver, coder, test-writer)
+    ├── <agent>.agent.json        agent.json for each default agent (improver, security-analyst, coder, test-writer)
     ├── <agent>.agent.md          AGENT.md prompt for each default agent
     ├── <agent>.memory.md         MEMORY.md prompt for each default agent
     └── vteam.config.json
@@ -285,7 +285,7 @@ All three must pass before any commit or PR:
 
 ## v1 scope and constraints
 
-- Ships with three default agents (`improver`, `coder`, `test-writer`). Custom agents supported by creating `vteam/agents/<name>/AGENT.md`.
+- Ships with four default agents (`improver`, `security-analyst`, `coder`, `test-writer`). Custom agents supported by creating `vteam/agents/<name>/AGENT.md`.
 - Supports both GitHub (`gh`) and GitLab (`glab`) — configured via `platform` in `vteam.config.json`.
 - No Slack integration yet.
 - No `--max-budget-usd` caps on agent runs.

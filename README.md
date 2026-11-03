@@ -105,6 +105,10 @@ vteam/
 │   │   ├── agent.json              # Agent configuration
 │   │   ├── AGENT.md                # Improver prompt/personality
 │   │   └── MEMORY.md               # Memory curation strategy
+│   ├── security-analyst/
+│   │   ├── agent.json
+│   │   ├── AGENT.md                # Security analyst prompt/personality
+│   │   └── MEMORY.md
 │   ├── coder/
 │   │   ├── agent.json
 │   │   ├── AGENT.md                # Coder prompt/personality
@@ -127,6 +131,7 @@ All `vteam run` invocations accept `--focus <text>` to inject priority context i
 vteam run coder --focus "the issue about XYZ"
 vteam run test-writer --focus "invite user functionality"
 vteam run improver --focus "only look at the auth module"
+vteam run security-analyst --focus "file upload endpoints"
 ```
 
 ### Logs
@@ -446,7 +451,7 @@ Memory is opt-in — agents without a `MEMORY.md` skip it entirely, and a `memor
 
 ## Agents
 
-vteam ships with three default agents (improver, coder, test-writer). Their `agent.json` files come with cron schedules for `vteam cron start`: coder every 5 minutes (`*/5 * * * *`), improver on the hour (`0 * * * *`), and test-writer every 2 hours at half past (`30 */2 * * *`). The merge ensurer runs every 15 minutes (`mergeEnsurer.cron`). Add custom agents by creating `vteam/agents/<name>/AGENT.md` (plus an optional `agent.json`) — no config changes needed.
+vteam ships with four default agents (improver, security-analyst, coder, test-writer). Their `agent.json` files come with cron schedules for `vteam cron start`: coder every 5 minutes (`*/5 * * * *`), improver on the hour (`0 * * * *`), security-analyst every 4 hours at quarter past (`15 */4 * * *`), and test-writer every 2 hours at half past (`30 */2 * * *`). The merge ensurer runs every 15 minutes (`mergeEnsurer.cron`). Add custom agents by creating `vteam/agents/<name>/AGENT.md` (plus an optional `agent.json`) — no config changes needed.
 
 ### Improver
 
@@ -456,9 +461,17 @@ vteam ships with three default agents (improver, coder, test-writer). Their `age
 - Limited to 1 finding per run (configurable in the AGENT.md prompt)
 - Prioritizes severity: security bugs > performance > code quality
 
+### Security analyst
+
+- Read-only — scans for one security finding per run and returns it as an aven task in `inbox`, like the improver
+- Covers vulnerable and outdated dependencies, injection (SQL/NoSQL, command, path traversal, SSRF, XSS, prototype pollution), data leaks (secrets, logs, over-broad responses), missing mechanisms (validation, authorization, rate limiting, security headers), and shared security utilities
+- May run `npm`/`pnpm`/`yarn` `audit`, `outdated`, `ls`, and `npm view` to check dependencies; `audit fix` is disallowed
+- Its memory tracks reviewed attack surfaces, the security mechanisms the project already has, and accepted risks, so it rotates through the codebase instead of re-reporting
+- Its findings are routed to the coder (`found-by: security-analyst`)
+
 ### Coder
 
-- Picks one ready task per run from the aven `todo` queue, limited to improver findings, reopened test-writer PRs, and tasks you created yourself (`"taskFilter": { "found-by": ["improver", "test-writer", null] }`)
+- Picks one ready task per run from the aven `todo` queue, limited to improver and security-analyst findings, reopened test-writer PRs, and tasks you created yourself (`"taskFilter": { "found-by": ["improver", "security-analyst", "test-writer", null] }`)
 - Works in an isolated git worktree (never touches the main working tree)
 - Makes minimal, focused changes following existing code style
 - Does not commit or push — the orchestrator handles all git operations and PR creation

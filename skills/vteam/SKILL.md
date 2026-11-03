@@ -50,6 +50,7 @@ vteam/
 │   │   ├── AGENT.md                # Required: system prompt only; marks the agent's existence
 │   │   ├── MEMORY.md               # Optional: memory curation prompt; its existence enables memory
 │   │   └── ON_FINISH.md            # Optional: post-run hook prompt; its existence enables the hook
+│   ├── security-analyst/
 │   ├── coder/
 │   └── test-writer/
 ```
@@ -278,7 +279,8 @@ vteam run coder --focus "the issue about XYZ"
 | Agent                | Purpose                           | Key traits                                      |
 | -------------------- | --------------------------------- | ----------------------------------------------- |
 | **improver**         | Scans codebase for issues         | Read-only, `output: task`, no worktree, `cron: "0 * * * *"` |
-| **coder**            | Picks a task and implements a fix | `input: task`, `worktree: true`, `autoPR: true`, `taskFilter: { "found-by": ["improver", "test-writer", null] }`, `cron: "*/5 * * * *"` |
+| **security-analyst** | Scans for one security finding per run (dependencies, injection, data leaks, missing mechanisms) | Read-only plus `npm/pnpm/yarn audit`/`outdated`, `output: task`, no worktree, `cron: "15 */4 * * *"` |
+| **coder**            | Picks a task and implements a fix | `input: task`, `worktree: true`, `autoPR: true`, `taskFilter: { "found-by": ["improver", "security-analyst", "test-writer", null] }`, `cron: "*/5 * * * *"` |
 | **test-writer**      | Adds tests for untested code; each PR is recorded as a `done` task | `worktree: true`, `autoPR: true`, `cron: "30 */2 * * *"` |
 
 ## Creating a custom agent
