@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
+import { mkdirSync, rmSync, readFileSync, writeFileSync, existsSync, statSync, renameSync } from "node:fs";
 import { resolve } from "node:path";
 
 const STALE_MS = 30 * 60 * 1000; // 30 minutes
@@ -40,10 +40,37 @@ function isLockStale(lockDir: string): boolean {
       return Date.now() - stat.mtimeMs > STALE_MS;
     }
     const info: LockInfo = JSON.parse(readFileSync(infoPath, "utf-8"));
-    if (!isProcessAlive(info.pid)) return true;
-    return Date.now() - info.timestamp > STALE_MS;
+    return !isProcessAlive(info.pid);
   } catch {
     return true;
+  }
+}
+
+function removeStaleLock(lockDir: string): boolean {
+  const graveyard = `${lockDir}.stale-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  try {
+    renameSync(lockDir, graveyard);
+  } catch {
+    return false;
+  }
+  if (!isLockStale(graveyard)) {
+    try {
+      renameSync(graveyard, lockDir);
+    } catch {
+      // Lock was re-created meanwhile; the displaced holder's release is a no-op by pid check
+    }
+    return false;
+  }
+  rmSync(graveyard, { recursive: true, force: true });
+  return true;
+}
+
+function ownsLock(lockDir: string): boolean {
+  try {
+    const info: LockInfo = JSON.parse(readFileSync(resolve(lockDir, "info.json"), "utf-8"));
+    return info.pid === process.pid;
+  } catch {
+    return false;
   }
 }
 
@@ -75,7 +102,7 @@ export async function acquireLock(
         path: lockDir,
         release: () => {
           try {
-            rmSync(lockDir, { recursive: true });
+            if (ownsLock(lockDir)) rmSync(lockDir, { recursive: true });
           } catch {
             // Already released
           }
@@ -83,10 +110,7 @@ export async function acquireLock(
       };
     } catch (err: unknown) {
       if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "EEXIST") {
-        if (isLockStale(lockDir)) {
-          rmSync(lockDir, { recursive: true, force: true });
-          continue;
-        }
+        if (isLockStale(lockDir) && removeStaleLock(lockDir)) continue;
         await sleep(500 + Math.random() * 500);
         continue;
       }
@@ -99,11 +123,7 @@ export async function acquireLock(
 
 export function breakStaleLock(resourcePath: string): boolean {
   const lockDir = resourcePath + ".lock";
-  if (existsSync(lockDir) && isLockStale(lockDir)) {
-    rmSync(lockDir, { recursive: true, force: true });
-    return true;
-  }
-  return false;
+  return existsSync(lockDir) && isLockStale(lockDir) && removeStaleLock(lockDir);
 }
 
 export function breakLock(resourcePath: string): boolean {
