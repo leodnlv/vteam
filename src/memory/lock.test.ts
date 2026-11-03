@@ -115,14 +115,14 @@ describe("acquireLock", () => {
     const lock = await acquireLock(resource, "new-agent", 5000);
 
     const staleRemovalCall = vi.mocked(rmSync).mock.calls.find(
-      ([path, opts]) => path === lockDir && (opts as { force?: boolean })?.force === true,
+      ([path, opts]) => typeof path === "string" && path.startsWith(lockDir + ".stale-") && (opts as { force?: boolean })?.force === true,
     );
     expect(staleRemovalCall).toBeDefined();
 
     lock.release();
   });
 
-  it("breaks stale lock older than 30 minutes", async () => {
+  it("does not break a lock older than 30 minutes while its holder is alive", async () => {
     const resource = resolve(tmp, "my-agent");
     const lockDir = resource + ".lock";
     mkdirSync(lockDir);
@@ -135,9 +135,22 @@ describe("acquireLock", () => {
       }),
     );
 
-    const lock = await acquireLock(resource, "new-agent", 5000);
+    expect(breakStaleLock(resource)).toBe(false);
+    await expect(acquireLock(resource, "new-agent", 1000)).rejects.toThrow("Timeout");
     expect(existsSync(lockDir)).toBe(true);
+  });
+
+  it("release leaves a lock owned by another pid", async () => {
+    const resource = resolve(tmp, "my-agent");
+    const lockDir = resource + ".lock";
+    const lock = await acquireLock(resource, "first");
+    writeFileSync(
+      resolve(lockDir, "info.json"),
+      JSON.stringify({ pid: process.pid + 1, timestamp: Date.now(), agent: "other" }),
+    );
+
     lock.release();
+    expect(existsSync(lockDir)).toBe(true);
   });
 });
 
