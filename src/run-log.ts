@@ -1,5 +1,5 @@
 import { closeSync, mkdirSync, openSync, writeSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { stripAnsi } from "./ansi.js";
 
 export interface RunLog {
@@ -19,10 +19,15 @@ export function agentLogsDir(cwd: string, agentName: string): string {
   return resolve(cwd, "vteam", ".logs", agentName);
 }
 
+export const RUN_LOG_ENV = "VTEAM_RUN_LOG";
+
+export function runLogPath(cwd: string, agentName: string, now = new Date()): string {
+  return resolve(agentLogsDir(cwd, agentName), formatLogFilename(now));
+}
+
 export function startRunLog(cwd: string, agentName: string, now = new Date()): RunLog {
-  const dir = agentLogsDir(cwd, agentName);
-  mkdirSync(dir, { recursive: true });
-  const path = resolve(dir, formatLogFilename(now));
+  const path = process.env[RUN_LOG_ENV] || runLogPath(cwd, agentName, now);
+  mkdirSync(dirname(path), { recursive: true });
   const fd = openSync(path, "a");
 
   const write = (chunk: string | Uint8Array) => {

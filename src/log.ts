@@ -5,9 +5,18 @@ const DEFAULT_WIDTH = 72;
 const LABEL_WIDTH = 10;
 
 let clockStart = Date.now();
+let wallClock = false;
 
 export function startClock(now = Date.now()): void {
   clockStart = now;
+}
+
+export function useWallClock(): void {
+  wallClock = true;
+}
+
+export function formatWallClock(date: Date): string {
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
 }
 
 export function formatClock(ms: number): string {
@@ -56,7 +65,8 @@ function terminalWidth(): number | undefined {
 }
 
 function prefix(glyph: string): string {
-  return ` ${color.gray(formatClock(Date.now() - clockStart))}  ${glyph} `;
+  const clock = wallClock ? formatWallClock(new Date()) : formatClock(Date.now() - clockStart);
+  return ` ${color.gray(clock)}  ${glyph} `;
 }
 
 function indentContinuation(text: string, indent: number): string {

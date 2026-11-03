@@ -88,7 +88,7 @@ vteam cron start
 vteam cron status
 ```
 
-The scheduler is a foreground process — stop it with Ctrl+C. While it runs it writes its pid to `vteam/.locks/cron.pid`; a second `vteam cron start` in the same project refuses to start, and `vteam status` uses the file to report whether the scheduler is up. If an agent is still running when its next cron tick fires, the tick is skipped. Each scheduled run writes its own log file, the same as a manual `vteam run` (see [Logs](#logs)).
+The scheduler is a foreground process — stop it with Ctrl+C. While it runs it writes its pid to `vteam/.locks/cron.pid`; a second `vteam cron start` in the same project refuses to start, and `vteam status` uses the file to report whether the scheduler is up. If an agent is still running when its next cron tick fires, the tick is skipped. Each scheduled run writes its own log file, the same as a manual `vteam run` (see [Logs](#logs)). The scheduler prints the job table from `vteam status`, then one line per job start, finish, failure, or skipped tick, stamped with the time of day; starts and failures include the path to that run's log file.
 
 ## Commands
 

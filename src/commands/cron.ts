@@ -1,12 +1,12 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { Cron } from "croner";
 import { isProcessAlive } from "../memory/lock.js";
 import { resolveAgentConfig, listAgentNames } from "../config/agent.js";
 import { loadConfig } from "../config/load.js";
 import { MERGE_ENSURER } from "./ensure-merge.js";
-import { agentLogsDir } from "../run-log.js";
+import { RUN_LOG_ENV, runLogPath } from "../run-log.js";
 import type { AgentConfig, VteamConfig } from "../types.js";
 import { color } from "../ansi.js";
 import * as log from "../log.js";
@@ -37,16 +37,21 @@ export function nextRunOf(cron: string): Date | null {
 
 export async function cronStartCommand(): Promise<void> {
   const cwd = process.cwd();
-  const scheduled = findScheduledJobs(cwd, loadConfig(cwd));
+  const config = loadConfig(cwd);
+  const scheduled = findScheduledJobs(cwd, config);
+  log.useWallClock();
+  log.banner("cron start", `pid ${process.pid}`);
 
   if (scheduled.length === 0) {
-    console.log("No agents with cron patterns found.");
+    console.log("");
+    log.warn("No agents with cron patterns found.");
     return;
   }
 
   const runningPid = readSchedulerPid(cwd);
   if (runningPid) {
-    console.error(`vteam cron is already running (pid ${runningPid}).`);
+    console.log("");
+    log.fail(`vteam cron is already running (pid ${runningPid}).`);
     process.exit(1);
   }
   const pidPath = schedulerPidPath(cwd);
@@ -56,35 +61,32 @@ export async function cronStartCommand(): Promise<void> {
   const jobs: Cron[] = [];
   const running = new Map<string, ChildProcess>();
 
-  console.log(`Starting scheduler with ${scheduled.length} job(s):\n`);
-
   for (const scheduledJob of scheduled) {
-    const job = new Cron(scheduledJob.cron, () => {
-      if (running.has(scheduledJob.name)) {
-        console.log(`[${ts()}] ${scheduledJob.name} skipped (still running)`);
-        return;
-      }
-      spawnRun(cwd, scheduledJob, running);
-    });
-
-    jobs.push(job);
-
-    const next = job.nextRun();
-    console.log(
-      `  ${scheduledJob.name}  ${scheduledJob.cron}  next: ${next?.toISOString() ?? "—"}`,
+    jobs.push(
+      new Cron(scheduledJob.cron, () => {
+        if (running.has(scheduledJob.name)) {
+          log.warn(`${scheduledJob.name} skipped (still running)`);
+          return;
+        }
+        spawnRun(cwd, scheduledJob, running);
+      }),
     );
   }
 
-  console.log("\nScheduler running. Press Ctrl+C to stop.");
+  console.log(renderScheduler(cwd, config).join("\n"));
+  log.section("Activity");
+  log.step(`waiting for jobs ${color.gray("(Ctrl+C to stop)")}`);
 
   const shutdown = () => {
-    console.log("\nStopping...");
+    console.log("");
+    log.step("stopping scheduler");
     for (const job of jobs) job.stop();
     for (const [name, child] of running) {
       child.kill("SIGTERM");
-      console.log(`  killed ${name}`);
+      log.warn(`killed ${name}`);
     }
     rmSync(pidPath, { force: true });
+    log.ok("scheduler stopped");
     process.exit(0);
   };
 
@@ -139,14 +141,32 @@ function spawnRun(
     process.argv[1],
     job.command,
   );
-  const child = spawn(command, args, { cwd, stdio: "ignore" });
+  const logPath = relative(cwd, runLogPath(cwd, job.name));
+  const startedAt = Date.now();
+  const child = spawn(command, args, {
+    cwd,
+    stdio: "ignore",
+    env: { ...process.env, [RUN_LOG_ENV]: resolve(cwd, logPath) },
+  });
 
   running.set(job.name, child);
-  console.log(`[${ts()}] ${job.name} started → ${agentLogsDir(cwd, job.name)}/`);
+  log.step(`${color.bold(job.name)} started`);
+  log.field("log", logPath);
 
-  child.on("close", (code) => {
+  child.on("error", (err) => {
     running.delete(job.name);
-    console.log(`[${ts()}] ${job.name} finished (exit ${code})`);
+    log.fail(`${job.name} could not start: ${err.message}`);
+  });
+
+  child.on("close", (code, signal) => {
+    running.delete(job.name);
+    const elapsed = log.formatDuration(Date.now() - startedAt);
+    if (code === 0) {
+      log.ok(`${color.bold(job.name)} finished in ${elapsed}`);
+      return;
+    }
+    log.fail(`${job.name} ${signal ? `killed by ${signal}` : `exited ${code}`} after ${elapsed}`);
+    log.field("log", logPath);
   });
 }
 
@@ -186,8 +206,4 @@ export function findCronAgents(cwd: string): AgentConfig[] {
   }
 
   return agents;
-}
-
-function ts(): string {
-  return new Date().toISOString();
 }

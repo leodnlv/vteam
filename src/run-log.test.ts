@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
-import { formatLogFilename, startRunLog, writeSplit } from "./run-log.js";
+import { formatLogFilename, RUN_LOG_ENV, startRunLog, writeSplit } from "./run-log.js";
 
 describe("formatLogFilename", () => {
   it("uses ISO 8601 with colons/dots replaced by dashes", () => {
@@ -28,6 +28,19 @@ describe("startRunLog", () => {
     log.close();
 
     expect(log.path).toBe(resolve(dir, "vteam", ".logs", "coder", "2026-04-21T08-40-00-000Z.log"));
+  });
+
+  it("writes to the path given by the scheduler in VTEAM_RUN_LOG", () => {
+    const path = resolve(dir, "vteam", ".logs", "coder", "from-scheduler.log");
+    process.env[RUN_LOG_ENV] = path;
+    try {
+      const log = startRunLog(dir, "coder");
+      log.close();
+      expect(log.path).toBe(path);
+      expect(existsSync(path)).toBe(true);
+    } finally {
+      delete process.env[RUN_LOG_ENV];
+    }
   });
 
   it("tees stdout and stderr into the file until closed", () => {
