@@ -4,6 +4,14 @@
   "cron": "*/5 * * * *",
   "worktree": true,
   "input": "task",
+  "taskFilter": {
+    "found-by": [
+      "improver",
+      "security-analyst",
+      "test-writer",
+      null
+    ]
+  },
   "autoPR": true,
   "prCreateLabels": [
     "vteam"
@@ -19,5 +27,8 @@
     "Bash(just *)",
     "Bash(cat *)",
     "Bash(ls *)"
-  ]
+  ],
+  "memory": {
+    "model": "haiku"
+  }
 }
