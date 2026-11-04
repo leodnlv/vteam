@@ -1,0 +1,173 @@
+{
+  "cwd": "/repo/wt",
+  "tools": [
+    {
+      "name": "Bash",
+      "input": {
+        "command": "ls -la"
+      },
+      "expected": "ls -la"
+    },
+    {
+      "name": "Bash",
+      "input": {},
+      "expected": ""
+    },
+    {
+      "name": "Read",
+      "input": {
+        "file_path": "/repo/wt/src/a.ts"
+      },
+      "expected": "src/a.ts"
+    },
+    {
+      "name": "Read",
+      "input": {
+        "file_path": "/elsewhere/b.ts"
+      },
+      "expected": "/elsewhere/b.ts"
+    },
+    {
+      "name": "Edit",
+      "input": {
+        "file_path": "/repo/wt"
+      },
+      "expected": "/repo/wt"
+    },
+    {
+      "name": "NotebookEdit",
+      "input": {
+        "notebook_path": "/repo/wt/n.ipynb"
+      },
+      "expected": "n.ipynb"
+    },
+    {
+      "name": "Grep",
+      "input": {
+        "pattern": "TODO",
+        "path": "/repo/wt/src"
+      },
+      "expected": "TODO  in src"
+    },
+    {
+      "name": "Glob",
+      "input": {
+        "pattern": "**/*.ts"
+      },
+      "expected": "**/*.ts"
+    },
+    {
+      "name": "WebFetch",
+      "input": {
+        "url": "https://x.y"
+      },
+      "expected": "https://x.y"
+    },
+    {
+      "name": "WebSearch",
+      "input": {
+        "query": "go cron"
+      },
+      "expected": "go cron"
+    },
+    {
+      "name": "Task",
+      "input": {
+        "description": "explore",
+        "command": "c"
+      },
+      "expected": "explore"
+    },
+    {
+      "name": "mcp__x__y",
+      "input": {
+        "path": "/repo/wt/z"
+      },
+      "expected": "z"
+    },
+    {
+      "name": "mcp__x__y",
+      "input": {
+        "query": ""
+      },
+      "expected": ""
+    },
+    {
+      "name": "Read",
+      "input": {
+        "file_path": ""
+      },
+      "expected": ""
+    }
+  ],
+  "toolErrors": [
+    {
+      "block": {
+        "type": "tool_result",
+        "is_error": true,
+        "content": "Permission denied"
+      },
+      "expected": "Permission denied"
+    },
+    {
+      "block": {
+        "type": "tool_result",
+        "is_error": true,
+        "content": ""
+      },
+      "expected": "tool failed"
+    },
+    {
+      "block": {
+        "type": "tool_result",
+        "is_error": true,
+        "content": [
+          {
+            "type": "text",
+            "text": "a"
+          },
+          {
+            "type": "text",
+            "text": "b"
+          }
+        ]
+      },
+      "expected": "a\nb"
+    },
+    {
+      "block": {
+        "type": "tool_result",
+        "is_error": true,
+        "content": [
+          {
+            "type": "image"
+          }
+        ]
+      },
+      "expected": "tool failed"
+    },
+    {
+      "block": {
+        "type": "tool_result",
+        "is_error": true
+      },
+      "expected": "tool failed"
+    },
+    {
+      "block": {
+        "type": "tool_result",
+        "is_error": false,
+        "content": "fine"
+      },
+      "expected": null
+    },
+    {
+      "block": {
+        "type": "text",
+        "is_error": true,
+        "content": "x"
+      },
+      "expected": null
+    }
+  ]
+}

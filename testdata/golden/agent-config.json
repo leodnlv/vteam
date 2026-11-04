@@ -1,0 +1,9021 @@
+[
+  {
+    "input": {},
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "pr"
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "output": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "output": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "pr"
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "task"
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "pr"
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task"
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "task"
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "pr"
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "pr"
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "pr"
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "pr"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "pr"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "pr"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task"
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "task"
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr"
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "pr"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": true,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "pr"
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "pr"
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "task"
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "pr"
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task"
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "task"
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr"
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "readOnly: true is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": true,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "readOnly: true requires worktree: true",
+      "output: \"task\" is incompatible with readOnly: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "pr"
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "task"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "task",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr"
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": true,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "output: \"task\" is incompatible with autoPR: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\""
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "worktree": false,
+      "readOnly": false,
+      "output": "task",
+      "input": "pr",
+      "autoPR": false,
+      "resolveThreads": true,
+      "taskFilter": {
+        "found-by": "improver"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "input: \"pr\" requires worktree: true",
+      "taskFilter requires input: \"task\"",
+      "resolveThreads requires input: \"task\" and worktree: true"
+    ]
+  },
+  {
+    "input": {
+      "unknownKey": true
+    },
+    "ok": false,
+    "errors": [
+      "Unrecognized key: \"unknownKey\""
+    ]
+  },
+  {
+    "input": {
+      "memory": {
+        "model": "haiku",
+        "bogus": 1
+      }
+    },
+    "ok": false,
+    "errors": [
+      "Unrecognized key: \"bogus\""
+    ]
+  },
+  {
+    "input": {
+      "onFinish": {
+        "allowedTools": [
+          "Read"
+        ]
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "$schema": "../../agent.schema.json",
+      "model": "sonnet"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "cron": "0 */6 * * *"
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "cron": "0 */6 * * * *"
+    },
+    "ok": false,
+    "errors": [
+      "Invalid cron expression (expected 5 fields: minute hour day month weekday)"
+    ]
+  },
+  {
+    "input": {
+      "cron": "not a cron"
+    },
+    "ok": false,
+    "errors": [
+      "Invalid cron expression (expected 5 fields: minute hour day month weekday)"
+    ]
+  },
+  {
+    "input": {
+      "input": "task",
+      "taskFilter": {
+        "found-by": [
+          "improver",
+          "security-analyst"
+        ]
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "input": "task",
+      "taskFilter": {
+        "actor": null
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "input": "task",
+      "taskFilter": {
+        "actor": [
+          null,
+          "coder"
+        ]
+      }
+    },
+    "ok": true,
+    "errors": []
+  },
+  {
+    "input": {
+      "input": "task",
+      "taskFilter": {
+        "actor": []
+      }
+    },
+    "ok": false,
+    "errors": [
+      "Too small: expected array to have >=1 items"
+    ]
+  },
+  {
+    "input": {
+      "input": "task",
+      "taskFilter": {
+        "actor": ""
+      }
+    },
+    "ok": false,
+    "errors": [
+      "Too small: expected string to have >=1 characters"
+    ]
+  },
+  {
+    "input": {
+      "input": "task",
+      "taskFilter": {
+        "": "x"
+      }
+    },
+    "ok": false,
+    "errors": [
+      "Invalid key in record"
+    ]
+  },
+  {
+    "input": {
+      "input": "task",
+      "taskFilter": {
+        "actor": 1
+      }
+    },
+    "ok": false,
+    "errors": [
+      "Invalid input"
+    ]
+  },
+  {
+    "input": {
+      "worktree": "yes"
+    },
+    "ok": false,
+    "errors": [
+      "Invalid input: expected boolean, received string"
+    ]
+  },
+  {
+    "input": {
+      "output": "generic"
+    },
+    "ok": false,
+    "errors": [
+      "Invalid input: expected \"task\""
+    ]
+  },
+  {
+    "input": {
+      "input": "issue"
+    },
+    "ok": false,
+    "errors": [
+      "Invalid option: expected one of \"task\"|\"pr\""
+    ]
+  },
+  {
+    "input": {
+      "prCreateLabels": [
+        "vteam",
+        2
+      ]
+    },
+    "ok": false,
+    "errors": [
+      "Invalid input: expected string, received number"
+    ]
+  }
+]

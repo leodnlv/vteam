@@ -1,0 +1,26 @@
+[
+  {
+    "body": {
+      "title": "t",
+      "severity": "low",
+      "description": "D",
+      "files": [
+        "a.ts:1",
+        "b.ts"
+      ]
+    },
+    "expected": "## Description\n\nD\n\n## Affected Files\n\n- `a.ts:1`\n- `b.ts`"
+  },
+  {
+    "body": {
+      "title": "t",
+      "severity": "low",
+      "description": "D",
+      "suggestedFix": "F",
+      "files": [
+        "a.ts"
+      ]
+    },
+    "expected": "## Description\n\nD\n\n## Suggested Fix\n\nF\n\n## Affected Files\n\n- `a.ts`"
+  }
+]

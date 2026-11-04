@@ -1,0 +1,81 @@
+[
+  {
+    "fixture": "success.jsonl",
+    "exitCode": 0,
+    "args": [
+      "-p",
+      "--append-system-prompt-file",
+      "<tmp>/system-prompt.md",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--no-session-persistence",
+      "--model",
+      "sonnet",
+      "--allowedTools",
+      "Read",
+      "Bash(git *)",
+      "--disallowedTools",
+      "WebFetch"
+    ],
+    "stdin": "USER",
+    "output": [
+      "          system    <tmp>/system-prompt.md",
+      "          prompt    <tmp>/user-prompt.md",
+      "",
+      " <clock>  ! claude: warning on stderr",
+      " <clock>  ❯ Let me look around.\n          Two lines.",
+      " <clock>  ⚙ Read   src/a.ts",
+      " <clock>  ⚙ Bash   npm test\n                   --watch",
+      "          ✗ Exit code 1",
+      " <clock>  • this line is not json",
+      " <clock>  ⚙ TodoWrite",
+      "",
+      " <clock>  ✓ claude exited 0 · 2m05s · 7 turns · $0.46"
+    ],
+    "result": {
+      "exitCode": 0,
+      "resultText": "{\"status\":\"completed\",\"summary\":\"done\"}",
+      "costUsd": 0.4567,
+      "durationMs": 125000,
+      "stderr": "warning on stderr\n"
+    }
+  },
+  {
+    "fixture": "failure.jsonl",
+    "exitCode": 3,
+    "args": [
+      "-p",
+      "--append-system-prompt-file",
+      "<tmp>/system-prompt.md",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--no-session-persistence",
+      "--model",
+      "sonnet",
+      "--allowedTools",
+      "Read",
+      "Bash(git *)",
+      "--disallowedTools",
+      "WebFetch"
+    ],
+    "stdin": "USER",
+    "output": [
+      "          system    <tmp>/system-prompt.md",
+      "          prompt    <tmp>/user-prompt.md",
+      "",
+      " <clock>  ! claude: warning on stderr",
+      " <clock>  ❯ Giving up.",
+      "",
+      " <clock>  ✗ claude exited 3 · 3s · 50 turns · $1.50"
+    ],
+    "result": {
+      "exitCode": 3,
+      "resultText": null,
+      "costUsd": 1.5,
+      "durationMs": 3000,
+      "stderr": "warning on stderr\n"
+    }
+  }
+]

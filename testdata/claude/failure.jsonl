@@ -1,0 +1,2 @@
+{"type":"assistant","message":{"content":[{"type":"text","text":"Giving up."}]}}
+{"type":"result","subtype":"error_max_turns","total_cost_usd":1.5,"duration_ms":3000,"num_turns":50}

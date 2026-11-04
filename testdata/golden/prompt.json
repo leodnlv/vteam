@@ -1,0 +1,486 @@
+[
+  {
+    "name": "bare generic agent",
+    "agent": {
+      "name": "reviewer"
+    },
+    "existingTasks": [],
+    "agentMd": "  You are the improver.\n\nFind one issue.\n\n",
+    "expected": {
+      "systemPrompt": "You are the improver.\n\nFind one issue.",
+      "userPrompt": "## Output Format\n\nAfter completing your work, output a JSON object as the LAST thing you produce. Do NOT run git add or git commit — the orchestrator handles committing and pushing. Output ONLY valid JSON with no markdown fencing.\n\n{\n  \"status\": \"completed|partial|blocked|failed\",\n  \"summary\": \"what you did\",\n  \"content\": {\n    \"type\": \"generic\",\n    \"body\": \"your primary output as a string (analysis, review, report, etc.)\"\n  },\n  \"filesChanged\": [\"path/to/file1.ts\"],\n  \"commitMessage\": {\n    \"subject\": \"vteam: <short subject>\",\n    \"body\": \"PR-ready description of the change\"\n  },\n  \"blockerReason\": \"only if status is blocked or failed\"\n}\n\n- \"content\" is optional. Include it when you have a primary deliverable (finding, review, analysis).\n- \"filesChanged\" and \"commitMessage\" are optional. Include them only when you modified files.\n- \"blockerReason\" is optional. Include it only when status is \"blocked\" or \"failed\"."
+    }
+  },
+  {
+    "name": "task output with existing tasks",
+    "agent": {
+      "name": "improver",
+      "output": "task"
+    },
+    "existingTasks": [
+      {
+        "ref": "APP-1",
+        "title": "SQL injection in login",
+        "status": "done",
+        "severity": "critical",
+        "retryCount": 0,
+        "metadata": {},
+        "description": "## Description\n\nIt is broken.",
+        "notes": [],
+        "createdAt": "2026-01-01T00:00:00Z"
+      },
+      {
+        "ref": "APP-2",
+        "title": "Flaky test",
+        "status": "canceled",
+        "severity": "low",
+        "retryCount": 0,
+        "metadata": {},
+        "description": "## Description\n\nIt is broken.",
+        "notes": [],
+        "createdAt": "2026-01-01T00:00:00Z"
+      }
+    ],
+    "agentMd": "  You are the improver.\n\nFind one issue.\n\n",
+    "expected": {
+      "systemPrompt": "You are the improver.\n\nFind one issue.",
+      "userPrompt": "## Existing Tasks\n\nDo not report issues that already appear in this list.\n\n- [done] critical | SQL injection in login\n- [canceled] low | Flaky test\n\n## Output Format\n\nReturn your finding as a JSON object. Do NOT create or modify tasks yourself (no aven commands) — the orchestrator creates them from your output. Output ONLY valid JSON with no markdown fencing.\n\n{\n  \"status\": \"completed|partial|blocked|failed\",\n  \"summary\": \"what you did\",\n  \"content\": {\n    \"type\": \"task\",\n    \"body\": {\n      \"title\": \"short descriptive title\",\n      \"severity\": \"critical|high|medium|low\",\n      \"description\": \"detailed description of the issue and its impact\",\n      \"suggestedFix\": \"how to fix it\",\n      \"files\": [\"file:line\"]\n    }\n  },\n  \"filesChanged\": [\"path/to/file1.ts\"],\n  \"commitMessage\": {\n    \"subject\": \"vteam: <short subject>\",\n    \"body\": \"PR-ready description of the change\"\n  },\n  \"blockerReason\": \"only if status is blocked or failed\"\n}\n\n- \"content\" is optional. Include it when you have a primary deliverable (finding, review, analysis).\n- \"filesChanged\" and \"commitMessage\" are optional. Include them only when you modified files.\n- \"blockerReason\" is optional. Include it only when status is \"blocked\" or \"failed\"."
+    }
+  },
+  {
+    "name": "focus and memory",
+    "agent": {
+      "name": "improver",
+      "output": "task",
+      "memory": true
+    },
+    "existingTasks": [
+      {
+        "ref": "APP-1",
+        "title": "SQL injection in login",
+        "status": "done",
+        "severity": "critical",
+        "retryCount": 0,
+        "metadata": {},
+        "description": "## Description\n\nIt is broken.",
+        "notes": [],
+        "createdAt": "2026-01-01T00:00:00Z"
+      },
+      {
+        "ref": "APP-2",
+        "title": "Flaky test",
+        "status": "canceled",
+        "severity": "low",
+        "retryCount": 0,
+        "metadata": {},
+        "description": "## Description\n\nIt is broken.",
+        "notes": [],
+        "createdAt": "2026-01-01T00:00:00Z"
+      }
+    ],
+    "focus": "Look at auth only.",
+    "memoryContent": "- scanned src/auth\n- false positive: x",
+    "agentMd": "  You are the improver.\n\nFind one issue.\n\n",
+    "expected": {
+      "systemPrompt": "You are the improver.\n\nFind one issue.",
+      "userPrompt": "## Priority Focus\n\nThe user wants you to prioritize the following context above all other considerations:\n\nLook at auth only.\n\n## Agent Memory\n\nThe following is your accumulated memory from previous runs. Use it to inform your work and avoid repeating past efforts.\n\n- scanned src/auth\n- false positive: x\n\n## Existing Tasks\n\nDo not report issues that already appear in this list.\n\n- [done] critical | SQL injection in login\n- [canceled] low | Flaky test\n\n## Output Format\n\nReturn your finding as a JSON object. Do NOT create or modify tasks yourself (no aven commands) — the orchestrator creates them from your output. Output ONLY valid JSON with no markdown fencing.\n\n{\n  \"status\": \"completed|partial|blocked|failed\",\n  \"summary\": \"what you did\",\n  \"content\": {\n    \"type\": \"task\",\n    \"body\": {\n      \"title\": \"short descriptive title\",\n      \"severity\": \"critical|high|medium|low\",\n      \"description\": \"detailed description of the issue and its impact\",\n      \"suggestedFix\": \"how to fix it\",\n      \"files\": [\"file:line\"]\n    }\n  },\n  \"filesChanged\": [\"path/to/file1.ts\"],\n  \"commitMessage\": {\n    \"subject\": \"vteam: <short subject>\",\n    \"body\": \"PR-ready description of the change\"\n  },\n  \"blockerReason\": \"only if status is blocked or failed\",\n  \"memoryUpdate\": \"optional: brief notes about this run to remember for future runs (patterns noticed, decisions made, areas covered)\"\n}\n\n- \"content\" is optional. Include it when you have a primary deliverable (finding, review, analysis).\n- \"filesChanged\" and \"commitMessage\" are optional. Include them only when you modified files.\n- \"blockerReason\" is optional. Include it only when status is \"blocked\" or \"failed\"."
+    }
+  },
+  {
+    "name": "task with notes",
+    "agent": {
+      "name": "coder",
+      "input": "task",
+      "worktree": true
+    },
+    "existingTasks": [
+      {
+        "ref": "APP-1",
+        "title": "SQL injection in login",
+        "status": "done",
+        "severity": "critical",
+        "retryCount": 0,
+        "metadata": {},
+        "description": "## Description\n\nIt is broken.",
+        "notes": [],
+        "createdAt": "2026-01-01T00:00:00Z"
+      },
+      {
+        "ref": "APP-2",
+        "title": "Flaky test",
+        "status": "canceled",
+        "severity": "low",
+        "retryCount": 0,
+        "metadata": {},
+        "description": "## Description\n\nIt is broken.",
+        "notes": [],
+        "createdAt": "2026-01-01T00:00:00Z"
+      }
+    ],
+    "task": {
+      "ref": "APP-1",
+      "title": "Fix the thing",
+      "status": "todo",
+      "severity": "medium",
+      "retryCount": 0,
+      "metadata": {},
+      "description": "## Description\n\nIt is broken.",
+      "notes": [
+        {
+          "body": "coder: failed\nTests broke.",
+          "createdAt": "2026-01-02T00:00:00Z"
+        },
+        {
+          "body": "Try the other approach.",
+          "createdAt": "2026-01-03T00:00:00Z"
+        }
+      ],
+      "createdAt": "2026-01-01T00:00:00Z"
+    },
+    "agentMd": "  You are the improver.\n\nFind one issue.\n\n",
+    "expected": {
+      "systemPrompt": "You are the improver.\n\nFind one issue.",
+      "userPrompt": "## Existing Tasks\n\nDo not report issues that already appear in this list.\n\n- [done] critical | SQL injection in login\n- [canceled] low | Flaky test\n\n## Your Task\n\nTitle: Fix the thing\nSeverity: medium\n\n## Description\n\nIt is broken.\n\n## Task Notes\n\nNotes left on this task by earlier runs and by humans, oldest first. Do not repeat an approach that already failed.\n\n### 2026-01-02T00:00:00Z\n\ncoder: failed\nTests broke.\n\n### 2026-01-03T00:00:00Z\n\nTry the other approach.\n\n## Output Format\n\nAfter completing your work, output a JSON object as the LAST thing you produce. Do NOT run git add or git commit — the orchestrator handles committing and pushing. Output ONLY valid JSON with no markdown fencing.\n\n{\n  \"status\": \"completed|partial|blocked|failed\",\n  \"summary\": \"what you did\",\n  \"content\": {\n    \"type\": \"generic\",\n    \"body\": \"your primary output as a string (analysis, review, report, etc.)\"\n  },\n  \"filesChanged\": [\"path/to/file1.ts\"],\n  \"commitMessage\": {\n    \"subject\": \"vteam: <short subject>\",\n    \"body\": \"PR-ready description of the change\"\n  },\n  \"blockerReason\": \"only if status is blocked or failed\"\n}\n\n- \"content\" is optional. Include it when you have a primary deliverable (finding, review, analysis).\n- \"filesChanged\" and \"commitMessage\" are optional. Include them only when you modified files.\n- \"blockerReason\" is optional. Include it only when status is \"blocked\" or \"failed\"."
+    }
+  },
+  {
+    "name": "task without notes",
+    "agent": {
+      "name": "coder",
+      "input": "task",
+      "worktree": true
+    },
+    "existingTasks": [],
+    "task": {
+      "ref": "APP-1",
+      "title": "Fix the thing",
+      "status": "todo",
+      "severity": "medium",
+      "retryCount": 0,
+      "metadata": {},
+      "description": "## Description\n\nIt is broken.",
+      "notes": [],
+      "createdAt": "2026-01-01T00:00:00Z"
+    },
+    "agentMd": "  You are the improver.\n\nFind one issue.\n\n",
+    "expected": {
+      "systemPrompt": "You are the improver.\n\nFind one issue.",
+      "userPrompt": "## Your Task\n\nTitle: Fix the thing\nSeverity: medium\n\n## Description\n\nIt is broken.\n\n## Output Format\n\nAfter completing your work, output a JSON object as the LAST thing you produce. Do NOT run git add or git commit — the orchestrator handles committing and pushing. Output ONLY valid JSON with no markdown fencing.\n\n{\n  \"status\": \"completed|partial|blocked|failed\",\n  \"summary\": \"what you did\",\n  \"content\": {\n    \"type\": \"generic\",\n    \"body\": \"your primary output as a string (analysis, review, report, etc.)\"\n  },\n  \"filesChanged\": [\"path/to/file1.ts\"],\n  \"commitMessage\": {\n    \"subject\": \"vteam: <short subject>\",\n    \"body\": \"PR-ready description of the change\"\n  },\n  \"blockerReason\": \"only if status is blocked or failed\"\n}\n\n- \"content\" is optional. Include it when you have a primary deliverable (finding, review, analysis).\n- \"filesChanged\" and \"commitMessage\" are optional. Include them only when you modified files.\n- \"blockerReason\" is optional. Include it only when status is \"blocked\" or \"failed\"."
+    }
+  },
+  {
+    "name": "pr review",
+    "agent": {
+      "name": "pr-fixer",
+      "input": "pr",
+      "worktree": true
+    },
+    "existingTasks": [],
+    "review": {
+      "pr": {
+        "number": 7,
+        "title": "Add feature",
+        "branch": "feature",
+        "url": "https://github.com/o/r/pull/7"
+      },
+      "repoSlug": "o/r",
+      "comments": [
+        {
+          "author": "alice",
+          "body": "Nit.",
+          "path": "src/x.ts",
+          "line": 3,
+          "createdAt": "2026-01-01T00:00:00Z"
+        },
+        {
+          "author": "bob",
+          "body": "No line.",
+          "path": "src/y.ts",
+          "createdAt": "2026-01-01T00:00:00Z"
+        },
+        {
+          "author": "carol",
+          "body": "Top level.",
+          "createdAt": "2026-01-01T00:00:00Z"
+        }
+      ]
+    },
+    "agentMd": "  You are the improver.\n\nFind one issue.\n\n",
+    "expected": {
+      "systemPrompt": "You are the improver.\n\nFind one issue.",
+      "userPrompt": "## Pull Request\n\nNumber: #7\nRepository: o/r\nTitle: Add feature\nURL: https://github.com/o/r/pull/7\nBranch: feature\n\n## Review Comments\n\nAddress each of the following review comments:\n\n### alice on `src/x.ts:3`\n\nNit.\n\n### bob on `src/y.ts`\n\nNo line.\n\n### carol\n\nTop level.\n\n\n## Output Format\n\nAfter completing your work, output a JSON object as the LAST thing you produce. Do NOT run git add or git commit — the orchestrator handles committing and pushing. Output ONLY valid JSON with no markdown fencing.\n\n{\n  \"status\": \"completed|partial|blocked|failed\",\n  \"summary\": \"what you did\",\n  \"content\": {\n    \"type\": \"generic\",\n    \"body\": \"your primary output as a string (analysis, review, report, etc.)\"\n  },\n  \"filesChanged\": [\"path/to/file1.ts\"],\n  \"commitMessage\": {\n    \"subject\": \"vteam: <short subject>\",\n    \"body\": \"PR-ready description of the change\"\n  },\n  \"blockerReason\": \"only if status is blocked or failed\"\n}\n\n- \"content\" is optional. Include it when you have a primary deliverable (finding, review, analysis).\n- \"filesChanged\" and \"commitMessage\" are optional. Include them only when you modified files.\n- \"blockerReason\" is optional. Include it only when status is \"blocked\" or \"failed\"."
+    }
+  },
+  {
+    "name": "pr review without comments",
+    "agent": {
+      "name": "pr-fixer",
+      "input": "pr",
+      "worktree": true
+    },
+    "existingTasks": [],
+    "review": {
+      "pr": {
+        "number": 7,
+        "title": "Add feature",
+        "branch": "feature",
+        "url": "https://github.com/o/r/pull/7"
+      },
+      "repoSlug": "o/r",
+      "comments": []
+    },
+    "agentMd": "  You are the improver.\n\nFind one issue.\n\n",
+    "expected": {
+      "systemPrompt": "You are the improver.\n\nFind one issue.",
+      "userPrompt": "## Pull Request\n\nNumber: #7\nRepository: o/r\nTitle: Add feature\nURL: https://github.com/o/r/pull/7\nBranch: feature\n\n\n## Output Format\n\nAfter completing your work, output a JSON object as the LAST thing you produce. Do NOT run git add or git commit — the orchestrator handles committing and pushing. Output ONLY valid JSON with no markdown fencing.\n\n{\n  \"status\": \"completed|partial|blocked|failed\",\n  \"summary\": \"what you did\",\n  \"content\": {\n    \"type\": \"generic\",\n    \"body\": \"your primary output as a string (analysis, review, report, etc.)\"\n  },\n  \"filesChanged\": [\"path/to/file1.ts\"],\n  \"commitMessage\": {\n    \"subject\": \"vteam: <short subject>\",\n    \"body\": \"PR-ready description of the change\"\n  },\n  \"blockerReason\": \"only if status is blocked or failed\"\n}\n\n- \"content\" is optional. Include it when you have a primary deliverable (finding, review, analysis).\n- \"filesChanged\" and \"commitMessage\" are optional. Include them only when you modified files.\n- \"blockerReason\" is optional. Include it only when status is \"blocked\" or \"failed\"."
+    }
+  },
+  {
+    "name": "follow-up with threads",
+    "agent": {
+      "name": "coder",
+      "input": "task",
+      "worktree": true
+    },
+    "existingTasks": [],
+    "task": {
+      "ref": "APP-1",
+      "title": "Fix the thing",
+      "status": "todo",
+      "severity": "medium",
+      "retryCount": 0,
+      "metadata": {
+        "pr-url": "https://github.com/o/r/pull/42"
+      },
+      "description": "## Description\n\nIt is broken.",
+      "notes": [],
+      "createdAt": "2026-01-01T00:00:00Z"
+    },
+    "review": {
+      "pr": {
+        "number": 42,
+        "title": "vteam: fix thing",
+        "branch": "vteam/fix-thing-abc",
+        "url": "https://github.com/o/r/pull/42",
+        "state": "open",
+        "baseBranch": "main",
+        "labels": [],
+        "mergeable": "conflicting",
+        "review": "none"
+      },
+      "threads": [
+        {
+          "id": "PRRT_1",
+          "path": "src/a.ts",
+          "line": 10,
+          "comments": [
+            {
+              "author": "alice",
+              "body": "Rename this.",
+              "createdAt": "2026-01-01T00:00:00Z"
+            },
+            {
+              "author": "bob",
+              "body": "Agreed.",
+              "createdAt": "2026-01-01T00:01:00Z"
+            }
+          ]
+        },
+        {
+          "id": "PRRT_2",
+          "path": "src/b.ts",
+          "comments": [
+            {
+              "author": "alice",
+              "body": "Why?",
+              "createdAt": "2026-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "id": "PRRT_3",
+          "comments": [
+            {
+              "author": "carol",
+              "body": "General remark.",
+              "createdAt": "2026-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    "agentMd": "  You are the improver.\n\nFind one issue.\n\n",
+    "expected": {
+      "systemPrompt": "You are the improver.\n\nFind one issue.",
+      "userPrompt": "## Your Task\n\nTitle: Fix the thing\nSeverity: medium\n\n## Description\n\nIt is broken.\n\n## Existing Pull Request\n\nThis task already has an open pull request. You are working on its branch, and your changes will be pushed to it. Build on the work that is already there instead of starting over.\n\nTitle: vteam: fix thing\nURL: https://github.com/o/r/pull/42\nBranch: vteam/fix-thing-abc\n\n## Open Review Threads\n\nUnresolved review threads on the pull request. If the task notes say which of them to apply, apply only those. Otherwise address them all.\n\n### T1 · `src/a.ts:10`\n\n**alice:** Rename this.\n\n**bob:** Agreed.\n\n### T2 · `src/b.ts`\n\n**alice:** Why?\n\n### T3 · General\n\n**carol:** General remark.\n\n## Output Format\n\nAfter completing your work, output a JSON object as the LAST thing you produce. Do NOT run git add or git commit — the orchestrator handles committing and pushing. Output ONLY valid JSON with no markdown fencing.\n\n{\n  \"status\": \"completed|partial|blocked|failed\",\n  \"summary\": \"what you did\",\n  \"content\": {\n    \"type\": \"generic\",\n    \"body\": \"your primary output as a string (analysis, review, report, etc.)\"\n  },\n  \"filesChanged\": [\"path/to/file1.ts\"],\n  \"commitMessage\": {\n    \"subject\": \"vteam: <short subject>\",\n    \"body\": \"PR-ready description of the change\"\n  },\n  \"blockerReason\": \"only if status is blocked or failed\",\n  \"threadReplies\": [{ \"thread\": \"T1\", \"body\": \"what you changed to address this thread\" }]\n}\n\n- \"content\" is optional. Include it when you have a primary deliverable (finding, review, analysis).\n- \"filesChanged\" and \"commitMessage\" are optional. Include them only when you modified files.\n- \"blockerReason\" is optional. Include it only when status is \"blocked\" or \"failed\".\n- \"threadReplies\" is optional. Add one entry per review thread you addressed in this change, using the thread's label (T1, T2, ...) from \"Open Review Threads\". Do not reply to threads you skipped. Do not post replies yourself; the orchestrator posts them after your change is pushed."
+    }
+  },
+  {
+    "name": "follow-up without threads",
+    "agent": {
+      "name": "coder",
+      "input": "task",
+      "worktree": true,
+      "memory": true
+    },
+    "existingTasks": [],
+    "task": {
+      "ref": "APP-1",
+      "title": "Fix the thing",
+      "status": "todo",
+      "severity": "medium",
+      "retryCount": 0,
+      "metadata": {},
+      "description": "## Description\n\nIt is broken.",
+      "notes": [],
+      "createdAt": "2026-01-01T00:00:00Z"
+    },
+    "review": {
+      "pr": {
+        "number": 42,
+        "title": "vteam: fix thing",
+        "branch": "vteam/fix-thing-abc",
+        "url": "https://github.com/o/r/pull/42",
+        "state": "open",
+        "baseBranch": "main",
+        "labels": [],
+        "mergeable": "conflicting",
+        "review": "none"
+      },
+      "threads": []
+    },
+    "agentMd": "  You are the improver.\n\nFind one issue.\n\n",
+    "expected": {
+      "systemPrompt": "You are the improver.\n\nFind one issue.",
+      "userPrompt": "## Your Task\n\nTitle: Fix the thing\nSeverity: medium\n\n## Description\n\nIt is broken.\n\n## Existing Pull Request\n\nThis task already has an open pull request. You are working on its branch, and your changes will be pushed to it. Build on the work that is already there instead of starting over.\n\nTitle: vteam: fix thing\nURL: https://github.com/o/r/pull/42\nBranch: vteam/fix-thing-abc\n\n## Open Review Threads\n\nThe pull request has no unresolved review threads. Work from the task notes.\n\n## Output Format\n\nAfter completing your work, output a JSON object as the LAST thing you produce. Do NOT run git add or git commit — the orchestrator handles committing and pushing. Output ONLY valid JSON with no markdown fencing.\n\n{\n  \"status\": \"completed|partial|blocked|failed\",\n  \"summary\": \"what you did\",\n  \"content\": {\n    \"type\": \"generic\",\n    \"body\": \"your primary output as a string (analysis, review, report, etc.)\"\n  },\n  \"filesChanged\": [\"path/to/file1.ts\"],\n  \"commitMessage\": {\n    \"subject\": \"vteam: <short subject>\",\n    \"body\": \"PR-ready description of the change\"\n  },\n  \"blockerReason\": \"only if status is blocked or failed\",\n  \"memoryUpdate\": \"optional: brief notes about this run to remember for future runs (patterns noticed, decisions made, areas covered)\"\n}\n\n- \"content\" is optional. Include it when you have a primary deliverable (finding, review, analysis).\n- \"filesChanged\" and \"commitMessage\" are optional. Include them only when you modified files.\n- \"blockerReason\" is optional. Include it only when status is \"blocked\" or \"failed\"."
+    }
+  },
+  {
+    "name": "follow-up with conflicted merge",
+    "agent": {
+      "name": "coder",
+      "input": "task",
+      "worktree": true
+    },
+    "existingTasks": [],
+    "task": {
+      "ref": "APP-1",
+      "title": "Fix the thing",
+      "status": "todo",
+      "severity": "medium",
+      "retryCount": 0,
+      "metadata": {},
+      "description": "## Description\n\nIt is broken.",
+      "notes": [],
+      "createdAt": "2026-01-01T00:00:00Z"
+    },
+    "review": {
+      "pr": {
+        "number": 42,
+        "title": "vteam: fix thing",
+        "branch": "vteam/fix-thing-abc",
+        "url": "https://github.com/o/r/pull/42",
+        "state": "open",
+        "baseBranch": "main",
+        "labels": [],
+        "mergeable": "conflicting",
+        "review": "none"
+      },
+      "threads": [
+        {
+          "id": "PRRT_1",
+          "path": "src/a.ts",
+          "line": 10,
+          "comments": [
+            {
+              "author": "alice",
+              "body": "Rename this.",
+              "createdAt": "2026-01-01T00:00:00Z"
+            },
+            {
+              "author": "bob",
+              "body": "Agreed.",
+              "createdAt": "2026-01-01T00:01:00Z"
+            }
+          ]
+        },
+        {
+          "id": "PRRT_2",
+          "path": "src/b.ts",
+          "comments": [
+            {
+              "author": "alice",
+              "body": "Why?",
+              "createdAt": "2026-01-01T00:00:00Z"
+            }
+          ]
+        },
+        {
+          "id": "PRRT_3",
+          "comments": [
+            {
+              "author": "carol",
+              "body": "General remark.",
+              "createdAt": "2026-01-01T00:00:00Z"
+            }
+          ]
+        }
+      ],
+      "baseMerge": {
+        "baseBranch": "main",
+        "conflictedFiles": [
+          "src/a.ts",
+          "README.md"
+        ]
+      }
+    },
+    "agentMd": "  You are the improver.\n\nFind one issue.\n\n",
+    "expected": {
+      "systemPrompt": "You are the improver.\n\nFind one issue.",
+      "userPrompt": "## Your Task\n\nTitle: Fix the thing\nSeverity: medium\n\n## Description\n\nIt is broken.\n\n## Existing Pull Request\n\nThis task already has an open pull request. You are working on its branch, and your changes will be pushed to it. Build on the work that is already there instead of starting over.\n\nTitle: vteam: fix thing\nURL: https://github.com/o/r/pull/42\nBranch: vteam/fix-thing-abc\n\n## Merge Conflicts\n\nThe pull request conflicts with `main`. The orchestrator has started merging `origin/main` into this branch, and these files contain conflict markers:\n\n- `src/a.ts`\n- `README.md`\n\nResolve every conflict, keeping the intent of both sides, and remove all conflict markers. Do not run `git merge`, `git commit`, or `git merge --abort` — the orchestrator commits the merge with your commit message. If any conflict marker is left, nothing is committed.\n\n## Open Review Threads\n\nUnresolved review threads on the pull request. If the task notes say which of them to apply, apply only those. Otherwise address them all.\n\n### T1 · `src/a.ts:10`\n\n**alice:** Rename this.\n\n**bob:** Agreed.\n\n### T2 · `src/b.ts`\n\n**alice:** Why?\n\n### T3 · General\n\n**carol:** General remark.\n\n## Output Format\n\nAfter completing your work, output a JSON object as the LAST thing you produce. Do NOT run git add or git commit — the orchestrator handles committing and pushing. Output ONLY valid JSON with no markdown fencing.\n\n{\n  \"status\": \"completed|partial|blocked|failed\",\n  \"summary\": \"what you did\",\n  \"content\": {\n    \"type\": \"generic\",\n    \"body\": \"your primary output as a string (analysis, review, report, etc.)\"\n  },\n  \"filesChanged\": [\"path/to/file1.ts\"],\n  \"commitMessage\": {\n    \"subject\": \"vteam: <short subject>\",\n    \"body\": \"PR-ready description of the change\"\n  },\n  \"blockerReason\": \"only if status is blocked or failed\",\n  \"threadReplies\": [{ \"thread\": \"T1\", \"body\": \"what you changed to address this thread\" }]\n}\n\n- \"content\" is optional. Include it when you have a primary deliverable (finding, review, analysis).\n- \"filesChanged\" and \"commitMessage\" are optional. Include them only when you modified files.\n- \"blockerReason\" is optional. Include it only when status is \"blocked\" or \"failed\".\n- \"threadReplies\" is optional. Add one entry per review thread you addressed in this change, using the thread's label (T1, T2, ...) from \"Open Review Threads\". Do not reply to threads you skipped. Do not post replies yourself; the orchestrator posts them after your change is pushed."
+    }
+  },
+  {
+    "name": "follow-up with clean merge",
+    "agent": {
+      "name": "coder",
+      "input": "task",
+      "worktree": true
+    },
+    "existingTasks": [],
+    "task": {
+      "ref": "APP-1",
+      "title": "Fix the thing",
+      "status": "todo",
+      "severity": "medium",
+      "retryCount": 0,
+      "metadata": {},
+      "description": "## Description\n\nIt is broken.",
+      "notes": [],
+      "createdAt": "2026-01-01T00:00:00Z"
+    },
+    "review": {
+      "pr": {
+        "number": 42,
+        "title": "vteam: fix thing",
+        "branch": "vteam/fix-thing-abc",
+        "url": "https://github.com/o/r/pull/42",
+        "state": "open",
+        "baseBranch": "main",
+        "labels": [],
+        "mergeable": "conflicting",
+        "review": "none"
+      },
+      "threads": [],
+      "baseMerge": {
+        "baseBranch": "main",
+        "conflictedFiles": []
+      }
+    },
+    "agentMd": "  You are the improver.\n\nFind one issue.\n\n",
+    "expected": {
+      "systemPrompt": "You are the improver.\n\nFind one issue.",
+      "userPrompt": "## Your Task\n\nTitle: Fix the thing\nSeverity: medium\n\n## Description\n\nIt is broken.\n\n## Existing Pull Request\n\nThis task already has an open pull request. You are working on its branch, and your changes will be pushed to it. Build on the work that is already there instead of starting over.\n\nTitle: vteam: fix thing\nURL: https://github.com/o/r/pull/42\nBranch: vteam/fix-thing-abc\n\n## Merge Conflicts\n\nThe pull request conflicted with `main`. The orchestrator merged `origin/main` into this branch without conflicts, and will push the merge even if you change nothing else.\n\n## Open Review Threads\n\nThe pull request has no unresolved review threads. Work from the task notes.\n\n## Output Format\n\nAfter completing your work, output a JSON object as the LAST thing you produce. Do NOT run git add or git commit — the orchestrator handles committing and pushing. Output ONLY valid JSON with no markdown fencing.\n\n{\n  \"status\": \"completed|partial|blocked|failed\",\n  \"summary\": \"what you did\",\n  \"content\": {\n    \"type\": \"generic\",\n    \"body\": \"your primary output as a string (analysis, review, report, etc.)\"\n  },\n  \"filesChanged\": [\"path/to/file1.ts\"],\n  \"commitMessage\": {\n    \"subject\": \"vteam: <short subject>\",\n    \"body\": \"PR-ready description of the change\"\n  },\n  \"blockerReason\": \"only if status is blocked or failed\"\n}\n\n- \"content\" is optional. Include it when you have a primary deliverable (finding, review, analysis).\n- \"filesChanged\" and \"commitMessage\" are optional. Include them only when you modified files.\n- \"blockerReason\" is optional. Include it only when status is \"blocked\" or \"failed\"."
+    }
+  }
+]

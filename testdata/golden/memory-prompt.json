@@ -1,0 +1,23 @@
+[
+  {
+    "name": "first entry",
+    "currentMemory": "",
+    "memoryUpdate": "Scanned src/.",
+    "memoryMd": "Keep it short.\n",
+    "expected": {
+      "systemPrompt": "Keep it short.",
+      "userPrompt": "## Current Memory\n\n(empty — this is the first memory entry)\n\n## New Update\n\nScanned src/.\n\n## Instructions\n\nReturn the complete replacement memory content. Merge the new update into the current memory according to your curation rules. Output ONLY the final memory content as plain text — no JSON, no fences."
+    }
+  },
+  {
+    "name": "with focus",
+    "currentMemory": "- old",
+    "memoryUpdate": "- new",
+    "focus": "auth",
+    "memoryMd": "Keep it short.\n",
+    "expected": {
+      "systemPrompt": "Keep it short.",
+      "userPrompt": "## Run Context\n\nThe agent was invoked with this focus:\n\nauth\n\n## Current Memory\n\n- old\n\n## New Update\n\n- new\n\n## Instructions\n\nReturn the complete replacement memory content. Merge the new update into the current memory according to your curation rules. Output ONLY the final memory content as plain text — no JSON, no fences."
+    }
+  }
+]

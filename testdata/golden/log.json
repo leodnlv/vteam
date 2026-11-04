@@ -1,0 +1,172 @@
+{
+  "formatClock": [
+    {
+      "ms": 0,
+      "expected": "00:00"
+    },
+    {
+      "ms": 999,
+      "expected": "00:00"
+    },
+    {
+      "ms": 1000,
+      "expected": "00:01"
+    },
+    {
+      "ms": 59999,
+      "expected": "00:59"
+    },
+    {
+      "ms": 60000,
+      "expected": "01:00"
+    },
+    {
+      "ms": 3599000,
+      "expected": "59:59"
+    },
+    {
+      "ms": 3600000,
+      "expected": "1:00:00"
+    },
+    {
+      "ms": 36061000,
+      "expected": "10:01:01"
+    },
+    {
+      "ms": -5,
+      "expected": "00:00"
+    }
+  ],
+  "formatDuration": [
+    {
+      "ms": 0,
+      "expected": "0s"
+    },
+    {
+      "ms": 499,
+      "expected": "0s"
+    },
+    {
+      "ms": 500,
+      "expected": "1s"
+    },
+    {
+      "ms": 1500,
+      "expected": "2s"
+    },
+    {
+      "ms": 59499,
+      "expected": "59s"
+    },
+    {
+      "ms": 59500,
+      "expected": "1m00s"
+    },
+    {
+      "ms": 60000,
+      "expected": "1m00s"
+    },
+    {
+      "ms": 61000,
+      "expected": "1m01s"
+    },
+    {
+      "ms": 3599499,
+      "expected": "59m59s"
+    },
+    {
+      "ms": 3600000,
+      "expected": "1h00m"
+    },
+    {
+      "ms": 7260000,
+      "expected": "2h01m"
+    }
+  ],
+  "formatAge": [
+    {
+      "ms": -1,
+      "expected": "<1m"
+    },
+    {
+      "ms": 0,
+      "expected": "<1m"
+    },
+    {
+      "ms": 59999,
+      "expected": "<1m"
+    },
+    {
+      "ms": 60000,
+      "expected": "1m"
+    },
+    {
+      "ms": 3599999,
+      "expected": "59m"
+    },
+    {
+      "ms": 3600000,
+      "expected": "1h 0m"
+    },
+    {
+      "ms": 86399999,
+      "expected": "23h 59m"
+    },
+    {
+      "ms": 86400000,
+      "expected": "1d 0h"
+    },
+    {
+      "ms": 90061000,
+      "expected": "1d 1h"
+    }
+  ],
+  "truncate": [
+    {
+      "text": "hello",
+      "width": 10,
+      "expected": "hello"
+    },
+    {
+      "text": "hello",
+      "width": 5,
+      "expected": "hello"
+    },
+    {
+      "text": "hello",
+      "width": 4,
+      "expected": "hel…"
+    },
+    {
+      "text": "hello",
+      "width": 1,
+      "expected": "…"
+    },
+    {
+      "text": "hello",
+      "width": 0,
+      "expected": "…"
+    },
+    {
+      "text": "",
+      "width": 3,
+      "expected": ""
+    }
+  ],
+  "plain": {
+    "banner": "vteam ▸ status",
+    "bannerDetail": "vteam ▸ status   aven: p · label: vteam",
+    "section": "\n━━ Running ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "sectionLong": "\n━━ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ━━━",
+    "listItem": "  • line one\n    line two\n\n    line four",
+    "listDetail": "    worktree .w/x"
+  },
+  "color": {
+    "banner": "\u001b[1m\u001b[36mvteam ▸\u001b[39m\u001b[22m \u001b[1mstatus\u001b[22m",
+    "bannerDetail": "\u001b[1m\u001b[36mvteam ▸\u001b[39m\u001b[22m \u001b[1mstatus\u001b[22m   \u001b[90maven: p · label: vteam\u001b[39m",
+    "section": "\n\u001b[1m\u001b[36m━━ Running ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[39m\u001b[22m",
+    "sectionLong": "\n\u001b[1m\u001b[36m━━ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ━━━\u001b[39m\u001b[22m",
+    "listItem": "  • line one\n    line two\n\n    line four",
+    "listDetail": "    \u001b[90mworktree\u001b[39m .w/x"
+  }
+}

@@ -1,0 +1,175 @@
+[
+  {
+    "input": {
+      "baseBranch": "main",
+      "platform": "github",
+      "worktreeDir": ".w",
+      "tasks": {
+        "maxRetries": 3,
+        "project": "p"
+      }
+    },
+    "ok": true,
+    "expected": {
+      "baseBranch": "main",
+      "platform": "github",
+      "worktreeDir": ".w",
+      "tasks": {
+        "maxRetries": 3,
+        "project": "p",
+        "label": "vteam"
+      },
+      "mergeEnsurer": {
+        "label": "vteam:changes-requested"
+      }
+    }
+  },
+  {
+    "input": {
+      "baseBranch": "main",
+      "platform": "gitlab",
+      "worktreeDir": ".w",
+      "tasks": {
+        "maxRetries": 0,
+        "project": "p",
+        "label": "x",
+        "workspace": "w"
+      },
+      "mergeEnsurer": {
+        "cron": "*/5 * * * *"
+      }
+    },
+    "ok": true,
+    "expected": {
+      "baseBranch": "main",
+      "platform": "gitlab",
+      "worktreeDir": ".w",
+      "tasks": {
+        "maxRetries": 0,
+        "project": "p",
+        "label": "x",
+        "workspace": "w"
+      },
+      "mergeEnsurer": {
+        "cron": "*/5 * * * *",
+        "label": "vteam:changes-requested"
+      }
+    }
+  },
+  {
+    "input": {
+      "baseBranch": "main",
+      "platform": "github",
+      "worktreeDir": ".w",
+      "tasks": {
+        "maxRetries": 3,
+        "project": "p"
+      },
+      "mergeEnsurer": {
+        "label": "custom"
+      },
+      "extra": true
+    },
+    "ok": true,
+    "expected": {
+      "baseBranch": "main",
+      "platform": "github",
+      "worktreeDir": ".w",
+      "tasks": {
+        "maxRetries": 3,
+        "project": "p",
+        "label": "vteam"
+      },
+      "mergeEnsurer": {
+        "label": "custom"
+      }
+    }
+  },
+  {
+    "input": {
+      "baseBranch": "main",
+      "platform": "bitbucket",
+      "worktreeDir": ".w",
+      "tasks": {
+        "maxRetries": 3,
+        "project": "p"
+      }
+    },
+    "ok": false
+  },
+  {
+    "input": {
+      "baseBranch": "main",
+      "platform": "github",
+      "worktreeDir": ".w",
+      "tasks": {
+        "maxRetries": -1,
+        "project": "p"
+      }
+    },
+    "ok": false
+  },
+  {
+    "input": {
+      "baseBranch": "main",
+      "platform": "github",
+      "worktreeDir": ".w",
+      "tasks": {
+        "maxRetries": 1.5,
+        "project": "p"
+      }
+    },
+    "ok": false
+  },
+  {
+    "input": {
+      "baseBranch": "main",
+      "platform": "github",
+      "worktreeDir": ".w",
+      "tasks": {
+        "maxRetries": 3,
+        "project": ""
+      }
+    },
+    "ok": false
+  },
+  {
+    "input": {
+      "baseBranch": "main",
+      "platform": "github",
+      "worktreeDir": ".w",
+      "tasks": {
+        "maxRetries": 3,
+        "project": "p",
+        "label": ""
+      }
+    },
+    "ok": false
+  },
+  {
+    "input": {
+      "baseBranch": "main",
+      "platform": "github",
+      "worktreeDir": ".w",
+      "tasks": {
+        "maxRetries": 3,
+        "project": "p"
+      },
+      "mergeEnsurer": {
+        "cron": "bad"
+      }
+    },
+    "ok": false
+  },
+  {
+    "input": {
+      "platform": "github",
+      "worktreeDir": ".w",
+      "tasks": {
+        "maxRetries": 3,
+        "project": "p"
+      }
+    },
+    "ok": false
+  }
+]

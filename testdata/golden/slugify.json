@@ -1,0 +1,26 @@
+[
+  {
+    "input": "Fix SQL injection in login()",
+    "expected": "fix-sql-injection-in-login"
+  },
+  {
+    "input": "  Ünïcödé — Tëst  ",
+    "expected": "unicode-test"
+  },
+  {
+    "input": "---a---b---",
+    "expected": "a-b"
+  },
+  {
+    "input": "",
+    "expected": ""
+  },
+  {
+    "input": "日本語 title",
+    "expected": "title"
+  },
+  {
+    "input": "UPPER_case 123",
+    "expected": "upper-case-123"
+  }
+]

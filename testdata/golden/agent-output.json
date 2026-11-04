@@ -1,0 +1,165 @@
+[
+  {
+    "name": "minimal",
+    "input": "{\"status\":\"completed\",\"summary\":\"did it\"}",
+    "ok": true,
+    "expected": {
+      "status": "completed",
+      "summary": "did it"
+    }
+  },
+  {
+    "name": "json fence",
+    "input": "```json\n{\"status\":\"completed\",\"summary\":\"did it\"}\n```",
+    "ok": true,
+    "expected": {
+      "status": "completed",
+      "summary": "did it"
+    }
+  },
+  {
+    "name": "bare fence",
+    "input": "```\n{\"status\":\"completed\",\"summary\":\"did it\"}\n```",
+    "ok": true,
+    "expected": {
+      "status": "completed",
+      "summary": "did it"
+    }
+  },
+  {
+    "name": "prose before and after",
+    "input": "Here you go:\n{\"status\":\"completed\",\"summary\":\"did it\"}\nThanks!",
+    "ok": true,
+    "expected": {
+      "status": "completed",
+      "summary": "did it"
+    }
+  },
+  {
+    "name": "brace in prose before json",
+    "input": "I used {braces} here.\n{\"status\":\"completed\",\"summary\":\"did it\"}",
+    "ok": true,
+    "expected": {
+      "status": "completed",
+      "summary": "did it"
+    }
+  },
+  {
+    "name": "unknown keys are stripped",
+    "input": "{\"status\":\"completed\",\"summary\":\"did it\",\"extra\":1}",
+    "ok": true,
+    "expected": {
+      "status": "completed",
+      "summary": "did it"
+    }
+  },
+  {
+    "name": "full task output",
+    "input": "{\"status\":\"partial\",\"summary\":\"s\",\"content\":{\"type\":\"task\",\"body\":{\"title\":\"t\",\"severity\":\"high\",\"description\":\"d\",\"suggestedFix\":\"f\",\"files\":[\"a:1\"]}},\"filesChanged\":[\"a\"],\"commitMessage\":{\"subject\":\"vteam: x\",\"body\":\"\"},\"blockerReason\":\"b\",\"memoryUpdate\":\"m\",\"threadReplies\":[{\"thread\":\"T1\",\"body\":\"fixed\"}]}",
+    "ok": true,
+    "expected": {
+      "status": "partial",
+      "summary": "s",
+      "content": {
+        "type": "task",
+        "body": {
+          "title": "t",
+          "severity": "high",
+          "description": "d",
+          "suggestedFix": "f",
+          "files": [
+            "a:1"
+          ]
+        }
+      },
+      "filesChanged": [
+        "a"
+      ],
+      "commitMessage": {
+        "subject": "vteam: x",
+        "body": ""
+      },
+      "blockerReason": "b",
+      "memoryUpdate": "m",
+      "threadReplies": [
+        {
+          "thread": "T1",
+          "body": "fixed"
+        }
+      ]
+    }
+  },
+  {
+    "name": "generic content",
+    "input": "{\"status\":\"completed\",\"summary\":\"did it\",\"content\":{\"type\":\"generic\",\"body\":\"\"}}",
+    "ok": true,
+    "expected": {
+      "status": "completed",
+      "summary": "did it",
+      "content": {
+        "type": "generic",
+        "body": ""
+      }
+    }
+  },
+  {
+    "name": "bad status",
+    "input": "{\"status\":\"done\",\"summary\":\"s\"}",
+    "ok": false
+  },
+  {
+    "name": "missing summary",
+    "input": "{\"status\":\"completed\"}",
+    "ok": false
+  },
+  {
+    "name": "unknown content type",
+    "input": "{\"status\":\"completed\",\"summary\":\"did it\",\"content\":{\"type\":\"other\",\"body\":\"x\"}}",
+    "ok": false
+  },
+  {
+    "name": "task content with empty files",
+    "input": "{\"status\":\"completed\",\"summary\":\"did it\",\"content\":{\"type\":\"task\",\"body\":{\"title\":\"t\",\"severity\":\"low\",\"description\":\"d\",\"files\":[]}}}",
+    "ok": false
+  },
+  {
+    "name": "task content with empty title",
+    "input": "{\"status\":\"completed\",\"summary\":\"did it\",\"content\":{\"type\":\"task\",\"body\":{\"title\":\"\",\"severity\":\"low\",\"description\":\"d\",\"files\":[\"a\"]}}}",
+    "ok": false
+  },
+  {
+    "name": "task content with bad severity",
+    "input": "{\"status\":\"completed\",\"summary\":\"did it\",\"content\":{\"type\":\"task\",\"body\":{\"title\":\"t\",\"severity\":\"urgent\",\"description\":\"d\",\"files\":[\"a\"]}}}",
+    "ok": false
+  },
+  {
+    "name": "generic content with object body",
+    "input": "{\"status\":\"completed\",\"summary\":\"did it\",\"content\":{\"type\":\"generic\",\"body\":{\"a\":1}}}",
+    "ok": false
+  },
+  {
+    "name": "commit message empty subject",
+    "input": "{\"status\":\"completed\",\"summary\":\"did it\",\"commitMessage\":{\"subject\":\"\",\"body\":\"b\"}}",
+    "ok": false
+  },
+  {
+    "name": "thread reply empty body",
+    "input": "{\"status\":\"completed\",\"summary\":\"did it\",\"threadReplies\":[{\"thread\":\"T1\",\"body\":\"\"}]}",
+    "ok": false
+  },
+  {
+    "name": "not json",
+    "input": "I could not finish.",
+    "ok": false
+  },
+  {
+    "name": "empty",
+    "input": "",
+    "ok": false
+  },
+  {
+    "name": "array",
+    "input": "[1,2]",
+    "ok": false
+  }
+]

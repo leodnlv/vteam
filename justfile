@@ -20,3 +20,6 @@ lint:
 
 clean:
     rm -rf dist
+
+goldens:
+    npx tsx scripts/capture-goldens.ts

@@ -1,0 +1,97 @@
+[
+  {
+    "name": "minimal",
+    "outcome": {
+      "agent": "coder",
+      "status": "completed",
+      "startedAt": "2026-01-01T00:00:00.000Z",
+      "completedAt": "2026-01-01T00:05:00.000Z"
+    },
+    "onFinishMd": "Post a summary.\n",
+    "expected": {
+      "systemPrompt": "Post a summary.",
+      "userPrompt": "## Run Outcome\n\n- Agent: coder\n- Status: completed\n- Started: 2026-01-01T00:00:00.000Z\n- Completed: 2026-01-01T00:05:00.000Z"
+    }
+  },
+  {
+    "name": "everything",
+    "outcome": {
+      "agent": "coder",
+      "status": "completed",
+      "startedAt": "2026-01-01T00:00:00.000Z",
+      "completedAt": "2026-01-01T00:05:00.000Z",
+      "focus": "auth",
+      "task": {
+        "title": "Fix it",
+        "severity": "high"
+      },
+      "branch": "vteam/fix-it-1",
+      "prUrl": "https://github.com/o/r/pull/1",
+      "reviewedPR": {
+        "number": 3,
+        "title": "Feature",
+        "url": "https://github.com/o/r/pull/3"
+      },
+      "tasksCreated": [
+        "APP-1",
+        "APP-2"
+      ],
+      "commitMessage": {
+        "subject": "vteam: fix it",
+        "body": "Long body."
+      },
+      "content": {
+        "type": "generic",
+        "body": "A review."
+      }
+    },
+    "onFinishMd": "Post a summary.\n",
+    "expected": {
+      "systemPrompt": "Post a summary.",
+      "userPrompt": "## Run Outcome\n\n- Agent: coder\n- Status: completed\n- Started: 2026-01-01T00:00:00.000Z\n- Completed: 2026-01-01T00:05:00.000Z\n\n## Focus Context\n\nauth\n\n## Task\n\n- Title: Fix it\n- Severity: high\n\n## Branch & PR\n\n- Branch: vteam/fix-it-1\n- PR URL: https://github.com/o/r/pull/1\n\n## Reviewed PR\n\n- Number: #3\n- Title: Feature\n- URL: https://github.com/o/r/pull/3\n\n## Tasks Created\n\n- APP-1\n- APP-2\n\n## Commit Message\n\nvteam: fix it\n\nLong body.\n\n## Content\n\nA review."
+    }
+  },
+  {
+    "name": "task content and error",
+    "outcome": {
+      "agent": "coder",
+      "status": "failed",
+      "startedAt": "2026-01-01T00:00:00.000Z",
+      "completedAt": "2026-01-01T00:05:00.000Z",
+      "error": "boom",
+      "branch": "only-branch",
+      "content": {
+        "type": "task",
+        "body": {
+          "title": "T",
+          "severity": "low",
+          "description": "D",
+          "files": [
+            "a.ts:1"
+          ]
+        }
+      }
+    },
+    "onFinishMd": "Post a summary.\n",
+    "expected": {
+      "systemPrompt": "Post a summary.",
+      "userPrompt": "## Run Outcome\n\n- Agent: coder\n- Status: failed\n- Started: 2026-01-01T00:00:00.000Z\n- Completed: 2026-01-01T00:05:00.000Z\n\n## Branch & PR\n\n- Branch: only-branch\n\n## Content\n\n{\n  \"title\": \"T\",\n  \"severity\": \"low\",\n  \"description\": \"D\",\n  \"files\": [\n    \"a.ts:1\"\n  ]\n}\n\n## Error\n\nboom"
+    }
+  },
+  {
+    "name": "pr url only",
+    "outcome": {
+      "agent": "coder",
+      "status": "completed",
+      "startedAt": "2026-01-01T00:00:00.000Z",
+      "completedAt": "2026-01-01T00:05:00.000Z",
+      "prUrl": "https://x/1",
+      "tasksCreated": []
+    },
+    "onFinishMd": "Post a summary.\n",
+    "expected": {
+      "systemPrompt": "Post a summary.",
+      "userPrompt": "## Run Outcome\n\n- Agent: coder\n- Status: completed\n- Started: 2026-01-01T00:00:00.000Z\n- Completed: 2026-01-01T00:05:00.000Z\n\n## Branch & PR\n\n- PR URL: https://x/1"
+    }
+  }
+]

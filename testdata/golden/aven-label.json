@@ -1,0 +1,26 @@
+[
+  {
+    "input": "vteam-improver",
+    "expected": "vteam-improver"
+  },
+  {
+    "input": "Vteam_Coder",
+    "expected": "vteam-coder"
+  },
+  {
+    "input": "  spaced  out  ",
+    "expected": "spaced-out"
+  },
+  {
+    "input": "--x--",
+    "expected": "x"
+  },
+  {
+    "input": "a.b/c",
+    "expected": "a-b-c"
+  },
+  {
+    "input": "Ünï",
+    "expected": "n"
+  }
+]

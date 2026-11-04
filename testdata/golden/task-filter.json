@@ -1,0 +1,152 @@
+{
+  "tasks": [
+    {
+      "ref": "A",
+      "title": "Fix the thing",
+      "status": "todo",
+      "severity": "low",
+      "retryCount": 0,
+      "metadata": {
+        "found-by": "improver"
+      },
+      "description": "## Description\n\nIt is broken.",
+      "notes": [],
+      "createdAt": "2026-01-01T00:00:00Z"
+    },
+    {
+      "ref": "B",
+      "title": "Fix the thing",
+      "status": "todo",
+      "severity": "high",
+      "retryCount": 0,
+      "metadata": {
+        "found-by": "security-analyst"
+      },
+      "description": "## Description\n\nIt is broken.",
+      "notes": [],
+      "createdAt": "2026-01-03T00:00:00Z"
+    },
+    {
+      "ref": "C",
+      "title": "Fix the thing",
+      "status": "todo",
+      "severity": "high",
+      "retryCount": 0,
+      "metadata": {
+        "found-by": "improver",
+        "actor": ""
+      },
+      "description": "## Description\n\nIt is broken.",
+      "notes": [],
+      "createdAt": "2026-01-02T00:00:00Z"
+    },
+    {
+      "ref": "D",
+      "title": "Fix the thing",
+      "status": "todo",
+      "severity": "critical",
+      "retryCount": 3,
+      "metadata": {},
+      "description": "## Description\n\nIt is broken.",
+      "notes": [],
+      "createdAt": "2026-01-04T00:00:00Z"
+    },
+    {
+      "ref": "E",
+      "title": "Fix the thing",
+      "status": "todo",
+      "severity": "medium",
+      "retryCount": 0,
+      "metadata": {
+        "actor": "mr-reviewer"
+      },
+      "description": "## Description\n\nIt is broken.",
+      "notes": [],
+      "createdAt": "2026-01-05T00:00:00Z"
+    }
+  ],
+  "maxRetries": 3,
+  "cases": [
+    {
+      "filter": {},
+      "matches": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "next": "C"
+    },
+    {
+      "filter": {
+        "found-by": "improver"
+      },
+      "matches": [
+        "A",
+        "C"
+      ],
+      "next": "C"
+    },
+    {
+      "filter": {
+        "found-by": [
+          "improver",
+          "security-analyst"
+        ]
+      },
+      "matches": [
+        "A",
+        "B",
+        "C"
+      ],
+      "next": "C"
+    },
+    {
+      "filter": {
+        "actor": null
+      },
+      "matches": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "next": "C"
+    },
+    {
+      "filter": {
+        "actor": [
+          null,
+          "mr-reviewer"
+        ]
+      },
+      "matches": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "next": "C"
+    },
+    {
+      "filter": {
+        "found-by": "improver",
+        "actor": null
+      },
+      "matches": [
+        "A",
+        "C"
+      ],
+      "next": "C"
+    },
+    {
+      "filter": {
+        "found-by": "nobody"
+      },
+      "matches": [],
+      "next": null
+    }
+  ]
+}
