@@ -1,0 +1,42 @@
+# A failed claude run exits 1, says why, and returns the task to todo for another try.
+[!aven] skip 'aven is not installed'
+mkdir $FAKE_DIR/claude vteam/agents/improver vteam/agents/fixer
+cp vteam.config.json vteam/vteam.config.json
+cp improver.json vteam/agents/improver/agent.json
+cp prompt.md vteam/agents/improver/AGENT.md
+cp fixer.json vteam/agents/fixer/agent.json
+cp prompt.md vteam/agents/fixer/AGENT.md
+
+cp finding.json $FAKE_DIR/claude/1.json
+exec vteam run improver
+triage fail
+
+cp crash.txt $FAKE_DIR/claude/2.json
+! exec vteam run fixer
+stderr '✗ claude exited 3'
+stderr '✗ fixer failed after \S+: claude exited with code 3'
+
+# The task is back in todo with no retry counted, so the next run picks it again.
+exec vteam status
+stdout 'fixer  \S+ \[low\] Flaky test'
+
+cp blocked.json $FAKE_DIR/claude/3.json
+exec vteam run fixer
+stdout '✓ fixer completed in'
+exec aven list --project fail --status todo --json
+stdout 'Flaky test'
+
+-- vteam.config.json --
+{"baseBranch":"main","platform":"github","worktreeDir":".wt","tasks":{"maxRetries":3,"project":"fail"}}
+-- improver.json --
+{"output":"task"}
+-- fixer.json --
+{"input":"task"}
+-- prompt.md --
+You are an agent.
+-- finding.json --
+{"status":"completed","summary":"s","content":{"type":"task","body":{"title":"Flaky test","severity":"low","description":"d","files":["a"]}}}
+-- crash.txt --
+exit 3
+-- blocked.json --
+{"status":"blocked","summary":"Need a database.","blockerReason":"No DB."}

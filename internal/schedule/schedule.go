@@ -185,7 +185,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	if err := os.WriteFile(PIDPath(s.Cwd), []byte(strconv.Itoa(os.Getpid())), 0o644); err != nil {
 		return err
 	}
-	defer os.Remove(PIDPath(s.Cwd))
+	defer func() { _ = os.Remove(PIDPath(s.Cwd)) }()
 
 	s.Log.Println(strings.Join(RenderScheduler(s.Cwd, s.Config, s.Now()), "\n"))
 	s.Log.Section("Activity")

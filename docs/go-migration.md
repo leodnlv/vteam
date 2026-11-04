@@ -103,19 +103,42 @@ These areas are under-tested today and get new tests in the port:
    - A `tsx` script writes goldens to `testdata/`: prompts, log formatting, status frames, `agent.schema.json`, stream-json parse results.
    - Generate the test inventory.
    - Record the TS coverage baseline.
-1. **Skeleton.** `go.mod`, `cmd/vteam`, justfile targets (`build`, `test -race`, `lint` = `go vet` + `golangci-lint`, `dev`), CI.
-2. **Leaf packages.**
+1. **Skeleton.** ✅ Done. `go.mod`, `cmd/vteam`, justfile targets (`build`, `test -race`, `lint` = `go vet` + `golangci-lint`, `dev`), CI.
+2. **Leaf packages.** ✅ Done.
    - `ansi`, `log`, `slugify`, `lock`, `labels`, `config`, `output`, `runstate`, `runlog`.
    - `runlog` takes an explicit `io.Writer` (terminal + ANSI-stripping file writer) instead of patching stdout.
-3. **Exec boundary.** `execx`, `git` (ports the 25 real-git tests), `tasks/aven`, `platform`.
-4. **Claude runner + prompt builder.**
+3. **Exec boundary.** ✅ Done. `execx`, `git` (ports the 25 real-git tests), `tasks/aven`, `platform`.
+4. **Claude runner + prompt builder.** ✅ Done.
    - Runner: stream-json parsing, tool lines, timeout via `exec.CommandContext` + `cmd.Cancel` (SIGTERM).
    - Prompt builder: golden tests with an `-update` flag.
-5. **Orchestration.**
+5. **Orchestration.** ✅ Done.
    - `run` and `ensure-merge` on `Deps`.
    - Port all 46 `pipeline.test.ts` cases, including claim-lock contention between goroutines.
-6. **Remaining commands.** `init`, `status`, `clean`, `cron`, `dashboard` (bubbletea), `skill`. Then the testscript e2e suite.
+6. **Remaining commands.** ✅ Done. `init`, `status`, `clean`, `cron`, `dashboard` (bubbletea), `skill`. Then the testscript e2e suite.
 7. **Cutover.**
    - Run the Go binary on the dogfood `vteam/` for a few improver/coder cycles. On-disk state formats are unchanged, so TS and Go can run side by side on the same repo.
    - Delete `src/` and the npm files.
    - Update `CLAUDE.md`, `README.md`, `skills/*`, and `.claude/skills/cli-output-style`.
+
+## Status after phases 1–6
+
+- Every Go package passes `go test -race`. All goldens match. `vteam status` prints byte-identical output from the TS and Go versions on the dogfood project.
+- `testdata/ts-test-inventory.txt`: 344 of 356 TS cases ported, 12 dropped with a reason (shell escaping, node-only child args, assertions on mocks).
+- Coverage: 85.8% of statements across `internal/` (TS: 63.9%). Every package meets or beats its TS file except `scaffold` (86% vs 100%). What is left there is error returns after file writes, which TS did not have as separate statements.
+- e2e (`cmd/vteam/testdata/script/*.txtar`) runs the real binary through init, errors, a failed run, and the full lifecycle: improver finding → triage → coder worktree → push to a bare origin → PR → merge ensurer → clean. It uses the real `aven` on a temp database and fake `claude`/`gh`.
+- Lint: `go vet` + golangci-lint (pinned with `go get -tool`). It found one real bug, fixed and covered by a regression test: a failed memory write was reported as success.
+- Breaking changes so far:
+  - error messages start lowercase (`claude exited with code 1`)
+  - cron `L` and `n#k` are gone
+  - aven metadata flags are written in key order
+  - the dashboard also quits on `q`
+
+## Remaining: phase 7
+
+1. Dogfood with real Claude: `just build`, then `dist/vteam run improver` and a `coder` cycle on this repo. These cost money and open real PRs.
+2. Delete the TS sources:
+   - `src/` (move `src/templates` → `internal/scaffold/templates`, already copied)
+   - `package.json`, `package-lock.json`, `tsconfig.json`, `eslint.config.js`, `node_modules`
+   - `scripts/capture-goldens.ts`
+   - the `ts-*` and `goldens` just targets
+3. Update `CLAUDE.md`, `README.md`, `skills/vteam`, `skills/create-vteam-agent`, and `.claude/skills/cli-output-style`. They point at `src/*.ts`, npm, and zod.

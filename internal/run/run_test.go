@@ -269,6 +269,15 @@ func TestAgentOutputToMemory(t *testing.T) {
 		requireContains(t, h.out.String(), "memory curation produced no output or failed")
 	})
 
+	t.Run("reports a memory store that cannot be written", func(t *testing.T) {
+		h := setup(t, project{memory: true})
+		writeFile(t, filepath.Join(h.cwd, "vteam", ".memory"), "a file where the directory should be")
+		h.claude.thenText(jsonText(obj{"status": "completed", "summary": "Done.", "memoryUpdate": "x"})).thenText("curated")
+		h.mustRun()
+		requireContains(t, h.out.String(), "memory curation failed")
+		requireNotContains(t, h.out.String(), "memory updated")
+	})
+
 	t.Run("skips curation when agent returns no memoryUpdate", func(t *testing.T) {
 		h := setup(t, project{memory: true})
 		h.claude.thenText(jsonText(obj{"status": "completed", "summary": "Done."}))

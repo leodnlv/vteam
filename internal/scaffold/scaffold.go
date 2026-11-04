@@ -119,12 +119,8 @@ func updateGitignore(cwd string, out io.Writer) error {
 	if len(missing) == 0 {
 		return nil
 	}
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if _, err := f.WriteString("\n" + strings.Join(missing, "\n") + "\n"); err != nil {
+	updated := string(existing) + "\n" + strings.Join(missing, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "  Updated .gitignore with %s\n", strings.Join(missing, ", "))

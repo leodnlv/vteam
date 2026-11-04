@@ -92,3 +92,17 @@ func TestStartAppendsToAnExistingFile(t *testing.T) {
 		t.Errorf("file = %q", got)
 	}
 }
+
+func TestStartReportsUnwritablePaths(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "file")
+	_ = os.WriteFile(blocker, []byte("x"), 0o644)
+	t.Setenv(Env, filepath.Join(blocker, "nested", "run.log"))
+	if _, err := Start(dir, "coder", time.Now(), log.Discard()); err == nil {
+		t.Error("log under a file accepted")
+	}
+	t.Setenv(Env, dir)
+	if _, err := Start(dir, "coder", time.Now(), log.Discard()); err == nil {
+		t.Error("directory accepted as log file")
+	}
+}

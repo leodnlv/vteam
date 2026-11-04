@@ -184,7 +184,7 @@ func (c *CLI) Run(ctx context.Context, opts Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	defer os.RemoveAll(tmp)
+	defer func() { _ = os.RemoveAll(tmp) }()
 	systemFile := filepath.Join(tmp, "system-prompt.md")
 	userFile := filepath.Join(tmp, "user-prompt.md")
 	if err := os.WriteFile(systemFile, []byte(opts.SystemPrompt), 0o600); err != nil {
@@ -217,7 +217,7 @@ func (c *CLI) Run(ctx context.Context, opts Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	defer stdin.Close()
+	defer func() { _ = stdin.Close() }()
 	cmd.Stdin = stdin
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

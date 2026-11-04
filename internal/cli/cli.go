@@ -174,7 +174,7 @@ func runAgent(ctx context.Context, dir, name, focus string) error {
 	if err != nil {
 		return err
 	}
-	defer runLog.Close()
+	defer func() { _ = runLog.Close() }()
 	logger.StartClock()
 	logger.Banner(agent.Name, "log: "+relative(dir, runLog.Path))
 
@@ -293,7 +293,7 @@ func ensureMerge(ctx context.Context, dir string) error {
 	if err != nil {
 		return err
 	}
-	defer runLog.Close()
+	defer func() { _ = runLog.Close() }()
 	logger.StartClock()
 	logger.Banner("ensure-merge", "log: "+relative(dir, runLog.Path))
 

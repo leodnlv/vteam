@@ -443,3 +443,41 @@ func TestAvenAgainstRealBinary(t *testing.T) {
 		}
 	})
 }
+
+func TestAvenErrorPaths(t *testing.T) {
+	ctx := context.Background()
+	failOn := func(sub string) *Aven {
+		return &Aven{Config: testConfig, Exec: &execx.Fake{Handler: func(c execx.Cmd) (string, error) {
+			if strings.Contains(strings.Join(c.Args, " "), sub) {
+				return "", execx.Failure(c, "boom")
+			}
+			if c.Args[0] == "add" {
+				return "created APP-1\n", nil
+			}
+			return "", nil
+		}}}
+	}
+	if _, err := failOn("label create").Create(ctx, finding, "x", nil); err == nil {
+		t.Error("create ignored a failing label create")
+	}
+	if _, err := failOn("add").Create(ctx, finding, "x", nil); err == nil {
+		t.Error("create ignored a failing add")
+	}
+	if _, err := failOn("edit").Create(ctx, finding, "x", nil); err == nil {
+		t.Error("create ignored a failing edit")
+	}
+	if err := failOn("label create").Update(ctx, "APP-1", Update{AddLabels: []string{"l"}}); err == nil {
+		t.Error("update ignored a failing label create")
+	}
+	bad := &Aven{Config: testConfig, Exec: &execx.Fake{Handler: func(execx.Cmd) (string, error) { return "not json", nil }}}
+	if _, err := bad.ListReady(ctx); err == nil {
+		t.Error("list accepted bad JSON")
+	}
+}
+
+func TestNewAvenUsesTheRealCLI(t *testing.T) {
+	a := NewAven(testConfig)
+	if _, ok := a.Exec.(execx.OS); !ok || a.Config != testConfig {
+		t.Errorf("got %+v", a)
+	}
+}

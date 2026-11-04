@@ -1,0 +1,27 @@
+# vteam init scaffolds the default agents and refuses to run twice.
+mkdir my-app
+cd my-app
+exec vteam init
+stdout 'Created vteam/vteam.config.json \(aven project: my-app\)'
+stdout 'Created \.gitignore'
+exists vteam/agents/coder/agent.json vteam/agents/improver/AGENT.md vteam/agents/test-writer/MEMORY.md vteam/agent.schema.json
+grep '"project": "my-app"' vteam/vteam.config.json
+grep '^vteam/\.memory/$' .gitignore
+
+! exec vteam init
+stderr 'vteam/ directory already exists'
+
+# The scaffolded agents all load.
+exec vteam run
+stdout '^  coder  \(worktree, input: task, autoPR\)$'
+stdout '^  improver  \(output: task\)$'
+stdout '^  security-analyst  \(output: task\)$'
+! stdout 'invalid config'
+
+exec vteam cron status
+stdout 'vteam ▸ cron status'
+stdout 'not running \(start it with .vteam cron start.\)'
+stdout '• merge-ensurer +\*/15 \* \* \* \*  next'
+
+exec vteam --version
+stdout 'vteam version'

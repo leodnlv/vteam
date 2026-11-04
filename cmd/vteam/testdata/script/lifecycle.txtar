@@ -1,0 +1,96 @@
+# A finding goes from the improver to a merged PR: inbox, triage, coder worktree, push, PR, merge ensurer.
+[!aven] skip 'aven is not installed'
+mkdir $FAKE_DIR/claude
+
+exec git init -q --bare origin.git
+mkdir app
+cd app
+exec git init -q -b main
+cp ../files/README.md README.md
+exec git add -A
+exec git commit -q -m init
+exec git remote add origin $WORK/origin.git
+exec git push -q origin main
+
+mkdir vteam/agents/improver vteam/agents/coder
+cp ../files/vteam.config.json vteam/vteam.config.json
+cp ../files/improver.json vteam/agents/improver/agent.json
+cp ../files/prompt.md vteam/agents/improver/AGENT.md
+cp ../files/coder.json vteam/agents/coder/agent.json
+cp ../files/prompt.md vteam/agents/coder/AGENT.md
+
+# The improver reports a finding, which lands in inbox.
+cp ../files/finding.json $FAKE_DIR/claude/1.json
+exec vteam run improver
+stdout '⚙ Read   README.md'
+stdout '✓ claude exited 0 · 1s · 2 turns · \$0.01'
+stdout 'created task \S+: Missing null check \(high\)'
+stdout '✓ improver completed in'
+
+exec vteam status
+stdout '! 1 task\(s\) in inbox awaiting triage'
+stdout 'coder  nothing ready'
+
+# A human moves it to todo; the coder would pick it next.
+triage e2e
+exec vteam status
+stdout 'coder  \S+ \[high\] Missing null check'
+
+# The coder fixes it in a worktree, pushes the branch, and opens a PR.
+cp ../files/edit.sh $FAKE_DIR/claude/2.sh
+cp ../files/fix.json $FAKE_DIR/claude/2.json
+exec vteam run coder
+stdout 'picked task \S+: Missing null check \(high\)'
+stdout 'branch    vteam/missing-null-check-'
+stdout '✓ committed vteam: add null check'
+stdout '✓ pushed vteam/missing-null-check-'
+stdout '✓ created PR https://github.com/org/repo/pull/1'
+stdout '✓ task \S+ done'
+stdout 'worktree removed'
+grep '## Your Task\n\nTitle: Missing null check' $FAKE_DIR/claude/prompts.log
+grep '- \[active\] high \| Missing null check' $FAKE_DIR/claude/prompts.log
+grep 'pr create --head vteam/missing-null-check-\S+ --base main --title vteam: coder: Missing null check --body Guards the null case.' $FAKE_DIR/gh.log
+exec git -C ../origin.git log --all --format=%s
+stdout 'vteam: add null check'
+
+exec vteam status
+stdout 'Awaiting merge \(1\)'
+stdout 'https://github.com/org/repo/pull/1'
+
+# The merge ensurer records the merge, and the task leaves the awaiting list.
+cp ../files/merged.json $FAKE_DIR/gh-pr-view.json
+exec vteam ensure-merge
+stdout 'action    recorded merged=true'
+stdout '✓ merged 1 · canceled 0 · reopened 0 · waiting 0'
+stdout '✓ merge-ensurer completed in'
+exec vteam status
+! stdout 'Awaiting merge'
+
+exec vteam clean
+stdout 'No orphaned worktrees found.'
+stdout 'No stale locks found.'
+stdout 'No orphaned active tasks found.'
+
+-- files/README.md --
+# app
+-- files/prompt.md --
+You are an agent.
+-- files/vteam.config.json --
+{
+  "baseBranch": "main",
+  "platform": "github",
+  "worktreeDir": ".vteam-worktrees",
+  "tasks": { "maxRetries": 3, "project": "e2e" }
+}
+-- files/improver.json --
+{ "output": "task" }
+-- files/coder.json --
+{ "worktree": true, "input": "task", "autoPR": true }
+-- files/finding.json --
+{"status":"completed","summary":"Found one.","content":{"type":"task","body":{"title":"Missing null check","severity":"high","description":"Crashes on null.","files":["README.md:1"]}}}
+-- files/edit.sh --
+echo "fixed" >> README.md
+-- files/fix.json --
+{"status":"completed","summary":"Added the check.","filesChanged":["README.md"],"commitMessage":{"subject":"vteam: add null check","body":"Guards the null case."}}
+-- files/merged.json --
+{"number":1,"title":"t","headRefName":"x","baseRefName":"main","url":"https://github.com/org/repo/pull/1","state":"MERGED","labels":[],"mergeable":"UNKNOWN","reviewDecision":"","latestReviews":[]}

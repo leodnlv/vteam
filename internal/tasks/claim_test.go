@@ -2,6 +2,7 @@ package tasks_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -88,4 +89,15 @@ func TestReleaseOrphaned(t *testing.T) {
 			t.Errorf("sweep = %+v", sweep)
 		}
 	})
+}
+
+func TestReleaseOrphanedPropagatesErrors(t *testing.T) {
+	fake := taskstest.New(active("A", claim("200", "box")))
+	fake.FailUpdate = func(string, tasks.Update) error { return errors.New("db locked") }
+	if _, err := tasks.ReleaseOrphaned(context.Background(), fake, alive, "box"); err == nil {
+		t.Error("update error ignored")
+	}
+	if tasks.Hostname() == "" {
+		t.Error("no hostname")
+	}
 }

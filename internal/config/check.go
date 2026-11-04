@@ -15,10 +15,6 @@ type Issue struct {
 	Message string
 }
 
-func (i Issue) String() string {
-	return strings.Join(i.Path, ".") + ": " + i.Message
-}
-
 type checker struct {
 	issues []Issue
 }

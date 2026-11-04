@@ -262,3 +262,35 @@ func TestContentRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestParseRejectsWrongShapes(t *testing.T) {
+	base := func(k string, v any) string { return mustJSON(obj{"status": "completed", "summary": "s", k: v}) }
+	for name, text := range map[string]string{
+		"content not an object":        base("content", "x"),
+		"task body not an object":      base("content", obj{"type": "task", "body": "x"}),
+		"task body missing":            base("content", obj{"type": "task"}),
+		"commitMessage not an object":  base("commitMessage", "x"),
+		"threadReplies not a list":     base("threadReplies", "x"),
+		"thread reply not an object":   base("threadReplies", []any{"x"}),
+		"filesChanged not a list":      base("filesChanged", "a.ts"),
+		"filesChanged with a number":   base("filesChanged", []any{1}),
+		"summary not a string":         mustJSON(obj{"status": "completed", "summary": 1}),
+		"files missing from task body": base("content", obj{"type": "task", "body": obj{"title": "t", "severity": "low", "description": "d"}}),
+		"suggestedFix not a string":    base("content", obj{"type": "task", "body": obj{"title": "t", "severity": "low", "description": "d", "files": []string{"a"}, "suggestedFix": 1}}),
+		"braces with no closing":       "{ not closed",
+		"fence around invalid json":    "```json\n{nope}\n```",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if out, err := Parse(text); err == nil {
+				t.Errorf("Parse succeeded: %+v", out)
+			}
+		})
+	}
+}
+
+func TestParseFindsJSONAfterAFenceWithoutJSON(t *testing.T) {
+	text := "```\nno json here\n```\n" + mustJSON(obj{"status": "completed", "summary": "after"})
+	if out := mustParse(t, text); out.Summary != "after" {
+		t.Errorf("got %+v", out)
+	}
+}

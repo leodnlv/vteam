@@ -1,0 +1,40 @@
+# Commands explain what is wrong instead of failing silently.
+! exec vteam status
+stderr 'No vteam/ directory found. Run .vteam init. first.'
+
+! exec vteam run ghost
+stderr 'error: agent "ghost" not found'
+
+! exec vteam dashboard
+stderr 'No vteam/ directory found'
+
+mkdir vteam/agents/bad vteam/agents/legacy
+cp bad.json vteam/agents/bad/agent.json
+cp prompt.md vteam/agents/bad/AGENT.md
+cp frontmatter.md vteam/agents/legacy/AGENT.md
+
+! exec vteam run bad
+stderr 'invalid config in bad/agent.json:'
+stderr '  - \(root\): input: "pr" requires worktree: true'
+
+! exec vteam run legacy
+stderr 'legacy/AGENT.md starts with YAML frontmatter'
+
+exec vteam run
+stdout 'bad  \(invalid config\)'
+
+# Without a config the run fails after the banner.
+mkdir vteam/agents/ok
+cp prompt.md vteam/agents/ok/AGENT.md
+! exec vteam run ok
+stdout 'vteam ▸ ok   log: vteam/\.logs/ok/'
+stderr 'vteam.config.json not found'
+-- bad.json --
+{ "input": "pr" }
+-- prompt.md --
+You are an agent.
+-- frontmatter.md --
+---
+model: sonnet
+---
+Prompt.

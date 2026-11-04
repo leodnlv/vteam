@@ -3,6 +3,7 @@ package lock
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,7 +114,7 @@ func TestAcquire(t *testing.T) {
 		defer l.Release()
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		if _, err := Acquire(ctx, resource, "waiter", time.Minute); err != context.Canceled {
+		if _, err := Acquire(ctx, resource, "waiter", time.Minute); !errors.Is(err, context.Canceled) {
 			t.Errorf("err = %v", err)
 		}
 	})

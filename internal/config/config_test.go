@@ -458,3 +458,39 @@ func TestDogfoodSchemaIsCurrent(t *testing.T) {
 		t.Error("vteam/agent.schema.json differs from internal/config/agent.schema.json; copy it over")
 	}
 }
+
+func TestValidatorTypeErrors(t *testing.T) {
+	for name, doc := range map[string]any{
+		"not an object":            []any{1},
+		"tools not a list":         obj{"allowedTools": "Read"},
+		"tool not a string":        obj{"allowedTools": []any{1}},
+		"taskFilter not an object": obj{"input": "task", "taskFilter": []any{}},
+		"memory not an object":     obj{"memory": "haiku"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, issues := ParseAgentConfig(doc); len(issues) == 0 {
+				t.Error("expected issues")
+			}
+		})
+	}
+	base := obj{"baseBranch": "main", "platform": "github", "worktreeDir": ".w", "tasks": obj{"maxRetries": "3", "project": "p"}}
+	if _, issues := ParseConfig(base); len(issues) == 0 || issues[0].Message != "Invalid input: expected number, received string" {
+		t.Errorf("issues = %v", issues)
+	}
+	if _, issues := ParseConfig("nope"); len(issues) == 0 {
+		t.Error("string config accepted")
+	}
+}
+
+func TestLoadReportsUnreadableFiles(t *testing.T) {
+	cwd := t.TempDir()
+	_ = os.MkdirAll(ConfigPath(cwd), 0o755)
+	if _, err := Load(cwd); err == nil {
+		t.Error("directory accepted as config")
+	}
+	cwd, dir := setupAgent(t)
+	_ = os.Mkdir(filepath.Join(dir, "agent.json"), 0o755)
+	if _, err := ResolveAgent("bot", cwd); err == nil {
+		t.Error("directory accepted as agent.json")
+	}
+}

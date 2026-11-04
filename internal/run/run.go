@@ -771,12 +771,16 @@ func (r *runner) runMemoryCuration() {
 		r.Log.Warn("memory curation produced no output or failed")
 		return
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err == nil {
-		err = os.WriteFile(path, []byte(strings.TrimSpace(res.ResultText)+"\n"), 0o644)
-	}
-	if err != nil {
+	if err := writeMemory(path, res.ResultText); err != nil {
 		r.Log.Warn("memory curation failed: " + err.Error())
 		return
 	}
 	r.Log.OK("memory updated")
+}
+
+func writeMemory(path, content string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(strings.TrimSpace(content)+"\n"), 0o644)
 }

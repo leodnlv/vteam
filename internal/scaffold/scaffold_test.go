@@ -126,3 +126,22 @@ func TestInitRefusesAnExistingVteamDirectory(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 }
+
+func TestInitReportsWriteFailures(t *testing.T) {
+	cwd := t.TempDir()
+	_ = os.Mkdir(filepath.Join(cwd, ".gitignore"), 0o755)
+	if err := Init(cwd, &bytes.Buffer{}); err == nil {
+		t.Error("unreadable .gitignore accepted")
+	}
+
+	readOnly := t.TempDir()
+	_ = os.Chmod(readOnly, 0o555)
+	t.Cleanup(func() { _ = os.Chmod(readOnly, 0o755) })
+	if err := Init(readOnly, &bytes.Buffer{}); err == nil {
+		t.Error("read-only project accepted")
+	}
+
+	if _, err := Template("missing.md"); err == nil {
+		t.Error("missing template found")
+	}
+}

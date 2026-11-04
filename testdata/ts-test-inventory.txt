@@ -1,356 +1,359 @@
-[ ] src/commands/cron.test.ts:28  returns agents with cron patterns
-[ ] src/commands/cron.test.ts:38  returns empty array when no agents have cron
-[ ] src/commands/cron.test.ts:43  returns empty array when no agents exist
-[ ] src/commands/cron.test.ts:47  skips agents with invalid config
-[ ] src/commands/cron.test.ts:58  (it.each table, see source)
-[ ] src/commands/cron.test.ts:70  (it.each table, see source)
-[ ] src/commands/cron.test.ts:79  spawns node with the script path and agent name
-[ ] src/commands/cron.test.ts:90  forwards execArgv so node loader flags reach the child process
-[ ] src/commands/cron.test.ts:132  schedules the merge ensurer next to cron agents when it has a cron
-[ ] src/commands/cron.test.ts:140  leaves the merge ensurer out without a cron
-[ ] src/commands/cron.test.ts:158  returns undefined without a pid file
-[ ] src/commands/cron.test.ts:162  returns the pid of a live scheduler
-[ ] src/commands/cron.test.ts:167  ignores a pid file left by a dead scheduler
-[ ] src/commands/dashboard.test.ts:6  splits multi-line entries and appends the footer after a blank line
-[ ] src/commands/dashboard.test.ts:10  clips the body to the terminal height and says how much is hidden
-[ ] src/commands/dashboard.test.ts:15  keeps every line when the terminal height is unknown
-[ ] src/commands/ensure-merge.test.ts:84  only looks at done tasks with a PR that is not yet recorded as merged
-[ ] src/commands/ensure-merge.test.ts:99  leaves the task done when the PR is open, unlabelled, and mergeable
-[ ] src/commands/ensure-merge.test.ts:109  logs why a task is still waiting
-[ ] src/commands/ensure-merge.test.ts:121  treats unknown mergeability as nothing to do yet
-[ ] src/commands/ensure-merge.test.ts:130  records a merged PR on the task and keeps it done
-[ ] src/commands/ensure-merge.test.ts:139  cancels the task with a note when the PR was closed without merging
-[ ] src/commands/ensure-merge.test.ts:149  removes the approval label before reopening the task
-[ ] src/commands/ensure-merge.test.ts:166  leaves the task done when the label cannot be removed
-[ ] src/commands/ensure-merge.test.ts:178  reopens a conflicting PR without needing the label
-[ ] src/commands/ensure-merge.test.ts:188  keeps sweeping after one PR lookup fails
-[ ] src/commands/init.test.ts:22  scaffolds the vteam directory structure
-[ ] src/commands/init.test.ts:34  sets the aven project to the directory name
-[ ] src/commands/init.test.ts:44  scaffolds a read-only task-producing security-analyst agent
-[ ] src/commands/init.test.ts:57  routes security-analyst findings to the coder
-[ ] src/commands/init.test.ts:65  creates .gitignore with worktree and state entries
-[ ] src/commands/init.test.ts:76  appends to existing .gitignore without duplicating
-[ ] src/commands/init.test.ts:91  exits if vteam/ already exists
-[ ] src/commands/init.test.ts:106  creates valid JSON config
-[ ] src/commands/pipeline.test.ts:205  passes generic content to ON_FINISH hook
-[ ] src/commands/pipeline.test.ts:230  passes task content as JSON to ON_FINISH hook
-[ ] src/commands/pipeline.test.ts:265  runs ON_FINISH with error details when agent fails
-[ ] src/commands/pipeline.test.ts:282  includes branch and PR info in ON_FINISH when present in outcome
-[ ] src/commands/pipeline.test.ts:306  passes memoryUpdate to curation agent
-[ ] src/commands/pipeline.test.ts:335  writes curation result to store.md
-[ ] src/commands/pipeline.test.ts:367  includes existing memory in curation prompt
-[ ] src/commands/pipeline.test.ts:392  skips curation when agent returns no memoryUpdate
-[ ] src/commands/pipeline.test.ts:406  skips curation when agent has no MEMORY.md even if memoryUpdate present
-[ ] src/commands/pipeline.test.ts:426  creates a task when agent returns task content
-[ ] src/commands/pipeline.test.ts:465  does not create a task for generic content
-[ ] src/commands/pipeline.test.ts:502  marks the picked task active, then returns it to todo when not settled
-[ ] src/commands/pipeline.test.ts:516  claims the task with run metadata and clears the claim on release
-[ ] src/commands/pipeline.test.ts:534  releases the claim lock before the agent runs
-[ ] src/commands/pipeline.test.ts:550  never hands the same task to two agents running at once
-[ ] src/commands/pipeline.test.ts:574  notes the agent's summary and blocker reason on the task
-[ ] src/commands/pipeline.test.ts:589  still releases the task when the note cannot be written
-[ ] src/commands/pipeline.test.ts:604  returns the task to todo when the agent fails
-[ ] src/commands/pipeline.test.ts:616  picks the highest severity task and skips tasks over the retry limit
-[ ] src/commands/pipeline.test.ts:639  picks only tasks matching its taskFilter, ORing list values
-[ ] src/commands/pipeline.test.ts:649  matches a missing metadata key with null
-[ ] src/commands/pipeline.test.ts:659  picks every task when it has no taskFilter
-[ ] src/commands/pipeline.test.ts:666  stays idle when no ready task matches its taskFilter
-[ ] src/commands/pipeline.test.ts:678  does nothing when no task is ready
-[ ] src/commands/pipeline.test.ts:689  runs both ON_FINISH and memory curation when both configured
-[ ] src/commands/pipeline.test.ts:717  runs ON_FINISH even when memory curation is skipped
-[ ] src/commands/pipeline.test.ts:737  makes no extra calls when neither ON_FINISH nor MEMORY configured
-[ ] src/commands/pipeline.test.ts:753  passes focus to ON_FINISH hook
-[ ] src/commands/pipeline.test.ts:777  passes focus to memory curation
-[ ] src/commands/pipeline.test.ts:801  omits focus sections when no focus provided
-[ ] src/commands/pipeline.test.ts:829  injects existing memory into agent's user prompt
-[ ] src/commands/pipeline.test.ts:914  checks out the PR branch, prompts with open threads, and pushes without opening a new PR
-[ ] src/commands/pipeline.test.ts:941  moves the task to backlog without running when the PR is %s
-[ ] src/commands/pipeline.test.ts:956  starts a new branch and PR when the task has no pr-url
-[ ] src/commands/pipeline.test.ts:993  does not merge the base branch when the PR is mergeable
-[ ] src/commands/pipeline.test.ts:1007  merges the base branch, lists conflicted files in the prompt, and pushes the resolution
-[ ] src/commands/pipeline.test.ts:1021  commits nothing and counts a retry when conflict markers are left
-[ ] src/commands/pipeline.test.ts:1041  pushes a clean merge of the base branch even when the agent changes nothing
-[ ] src/commands/pipeline.test.ts:1069  asks for replies by thread label
-[ ] src/commands/pipeline.test.ts:1080  posts annotated replies to known threads after pushing, and notes the count
-[ ] src/commands/pipeline.test.ts:1100  resolves replied threads when resolveThreads is on
-[ ] src/commands/pipeline.test.ts:1110  posts no replies when nothing was committed
-[ ] src/commands/pipeline.test.ts:1121  finishes the task when a reply cannot be posted
-[ ] src/commands/pipeline.test.ts:1143  records a done task with the PR so the merge ensurer tracks it
-[ ] src/commands/pipeline.test.ts:1165  records no task when PR creation fails
-[ ] src/commands/pipeline.test.ts:1178  keeps the recorded task done when its note fails
-[ ] src/commands/skill.test.ts:30  returns empty when no skills/ directory exists
-[ ] src/commands/skill.test.ts:34  returns empty when skills/ has no subdirectories with SKILL.md
-[ ] src/commands/skill.test.ts:39  discovers skills with SKILL.md files
-[ ] src/commands/skill.test.ts:48  ignores files in skills/ that are not directories
-[ ] src/commands/skill.test.ts:60  creates symlinks in the target directory
-[ ] src/commands/skill.test.ts:70  creates the target directory if it does not exist
-[ ] src/commands/skill.test.ts:79  skips already-installed skills with correct symlink
-[ ] src/commands/skill.test.ts:88  updates symlinks pointing to a different location
-[ ] src/commands/skill.test.ts:100  skips non-symlink entries at the target path
-[ ] src/commands/skill.test.ts:109  exits when no skills are found
-[ ] src/commands/skill.test.ts:120  installs multiple skills
-[ ] src/commands/skill.test.ts:132  removes symlinks from the target directory
-[ ] src/commands/skill.test.ts:141  reports skills that are not installed
-[ ] src/commands/skill.test.ts:148  skips non-symlink entries
-[ ] src/commands/skill.test.ts:157  exits when no skills are found
-[ ] src/commands/skill.test.ts:168  removes multiple skills
-[ ] src/config/agent.test.ts:27  uses defaults when agent.json is missing
-[ ] src/config/agent.test.ts:34  reads agent settings from agent.json and drops $schema
-[ ] src/config/agent.test.ts:41  attaches memory and onFinish config to their markdown files
-[ ] src/config/agent.test.ts:53  enables memory and onFinish from markdown files alone
-[ ] src/config/agent.test.ts:61  rejects a memory section without MEMORY.md
-[ ] src/config/agent.test.ts:66  rejects an onFinish section without ON_FINISH.md
-[ ] src/config/agent.test.ts:71  rejects malformed JSON
-[ ] src/config/agent.test.ts:76  rejects unknown keys with their path
-[ ] src/config/agent.test.ts:84  rejects cross-field rule violations
-[ ] src/config/agent.test.ts:89  rejects leftover frontmatter in %s
-[ ] src/config/agent.test.ts:96  matches the schema generated from agentConfigSchema
-[ ] src/config/load.test.ts:28  throws when vteam.config.json does not exist
-[ ] src/config/load.test.ts:32  parses a valid config and returns typed data
-[ ] src/config/load.test.ts:46  defaults the merge ensurer to the changes-requested label with no schedule
-[ ] src/config/load.test.ts:57  rejects an invalid merge ensurer cron
-[ ] src/config/load.test.ts:69  throws with field path on missing required field
-[ ] src/config/load.test.ts:80  throws with field path on invalid platform
-[ ] src/config/load.test.ts:91  throws on invalid JSON
-[ ] src/config/load.test.ts:99  reports multiple errors at once
-[ ] src/config/schema-combinations.test.ts:20  standalone
-[ ] src/config/schema-combinations.test.ts:22  with worktree
-[ ] src/config/schema-combinations.test.ts:24  without worktree
-[ ] src/config/schema-combinations.test.ts:26  with input: task
-[ ] src/config/schema-combinations.test.ts:28  with input: pr and worktree
-[ ] src/config/schema-combinations.test.ts:31  rejects autoPR
-[ ] src/config/schema-combinations.test.ts:34  rejects readOnly
-[ ] src/config/schema-combinations.test.ts:37  rejects autoPR even with worktree
-[ ] src/config/schema-combinations.test.ts:42  readOnly requires worktree
-[ ] src/config/schema-combinations.test.ts:45  readOnly with worktree false
-[ ] src/config/schema-combinations.test.ts:48  readOnly with worktree true
-[ ] src/config/schema-combinations.test.ts:51  readOnly rejects autoPR
-[ ] src/config/schema-combinations.test.ts:56  requires worktree
-[ ] src/config/schema-combinations.test.ts:59  with worktree false
-[ ] src/config/schema-combinations.test.ts:62  with worktree true
-[ ] src/config/schema-combinations.test.ts:65  with readOnly
-[ ] src/config/schema-combinations.test.ts:68  with autoPR
-[ ] src/config/schema-combinations.test.ts:73  improver: output task, no worktree, read-only tools
-[ ] src/config/schema-combinations.test.ts:79  coder: worktree, input task, autoPR
-[ ] src/config/schema-combinations.test.ts:87  test-writer: worktree, input task, autoPR
-[ ] src/config/schema-combinations.test.ts:95  worktree scanner: worktree + output task (scan in isolation)
-[ ] src/config/schema-combinations.test.ts:101  readOnly auditor: worktree + readOnly, no task output
-[ ] src/config/schema-combinations.test.ts:107  bare agent: empty config
-[ ] src/config/schema-combinations.test.ts:112  task producer that also creates PRs
-[ ] src/config/schema-combinations.test.ts:115  readOnly task producer
-[ ] src/config/schema-combinations.test.ts:121  pr input without worktree
-[ ] src/config/schema-combinations.test.ts:124  readOnly without worktree
-[ ] src/config/schema-combinations.test.ts:127  readOnly + autoPR
-[ ] src/config/schema.test.ts:12  accepts a valid config
-[ ] src/config/schema.test.ts:17  rejects unknown platform
-[ ] src/config/schema.test.ts:25  rejects missing baseBranch
-[ ] src/config/schema.test.ts:31  rejects negative maxRetries
-[ ] src/config/schema.test.ts:39  defaults label to vteam
-[ ] src/config/schema.test.ts:47  accepts optional workspace
-[ ] src/config/schema.test.ts:55  rejects missing project
-[ ] src/config/schema.test.ts:63  rejects empty project
-[ ] src/config/schema.test.ts:73  accepts taskFilter with strings, lists and null
-[ ] src/config/schema.test.ts:81  rejects taskFilter without input: task
-[ ] src/config/schema.test.ts:86  accepts resolveThreads on a worktree task agent
-[ ] src/config/schema.test.ts:90  rejects resolveThreads without input: task and worktree
-[ ] src/config/schema.test.ts:95  rejects non-string taskFilter values and empty lists
-[ ] src/config/schema.test.ts:100  rejects unknown keys
-[ ] src/config/schema.test.ts:105  accepts $schema, memory and onFinish sections
-[ ] src/config/schema.test.ts:114  accepts empty config (bare AGENT.md)
-[ ] src/config/schema.test.ts:119  accepts full config
-[ ] src/config/schema.test.ts:131  accepts autoPR without worktree
-[ ] src/config/schema.test.ts:139  rejects input pr without worktree
-[ ] src/config/schema.test.ts:147  accepts input pr with worktree
-[ ] src/config/schema.test.ts:155  accepts input task without worktree
-[ ] src/config/schema.test.ts:162  rejects invalid input value
-[ ] src/config/schema.test.ts:169  accepts output task
-[ ] src/config/schema.test.ts:176  rejects invalid output value
-[ ] src/config/schema.test.ts:183  accepts output task with worktree
-[ ] src/config/schema.test.ts:191  accepts prTriggerLabel with input pr
-[ ] src/config/schema.test.ts:200  accepts valid cron pattern
-[ ] src/config/schema.test.ts:207  rejects invalid cron pattern
-[ ] src/config/schema.test.ts:214  accepts allowedTools
-[ ] src/config/schema.test.ts:221  accepts disallowedTools
-[ ] src/config/schema.test.ts:228  accepts both allowedTools and disallowedTools
-[ ] src/config/schema.test.ts:236  accepts readOnly with worktree
-[ ] src/config/schema.test.ts:244  rejects readOnly without worktree
-[ ] src/config/schema.test.ts:251  rejects readOnly with worktree false
-[ ] src/config/schema.test.ts:259  rejects readOnly with autoPR
-[ ] src/config/schema.test.ts:268  accepts readOnly with input pr
-[ ] src/config/schema.test.ts:277  accepts readOnly with input task
-[ ] src/config/schema.test.ts:288  accepts empty config
-[ ] src/config/schema.test.ts:293  accepts model and tool permissions
-[ ] src/config/schema.test.ts:302  accepts only model
-[ ] src/integrations/merge-request.test.ts:15  wraps simple strings in single quotes
-[ ] src/integrations/merge-request.test.ts:19  escapes single quotes
-[ ] src/integrations/merge-request.test.ts:23  handles empty string
-[ ] src/integrations/merge-request.test.ts:27  handles strings with spaces
-[ ] src/integrations/merge-request.test.ts:31  handles strings with special shell characters
-[ ] src/integrations/merge-request.test.ts:35  handles backticks
-[ ] src/integrations/merge-request.test.ts:39  handles multiple single quotes
-[ ] src/integrations/pull-request.test.ts:5  (it.each table, see source)
-[ ] src/integrations/pull-request.test.ts:13  falls back to the latest reviews when no review is required
-[ ] src/integrations/pull-request.test.ts:22  reports requested changes first
-[ ] src/integrations/pull-request.test.ts:26  is approved only when someone approved and the rules are met
-[ ] src/integrations/pull-request.test.ts:31  distinguishes missing required approvals from no reviews at all
-[ ] src/log.test.ts:6  formats elapsed time as mm:ss, adding hours when needed
-[ ] src/log.test.ts:14  uses the largest two units
-[ ] src/log.test.ts:22  cuts long text with an ellipsis and leaves short text alone
-[ ] src/log.test.ts:29  removes color escape sequences
-[ ] src/log.test.ts:35  (it.each table, see source)
-[ ] src/memory/lock.test.ts:23  leaves a lock held by a live process
-[ ] src/memory/lock.test.ts:33  breaks a lock held by a dead process
-[ ] src/memory/lock.test.ts:45  returns false when there is no lock
-[ ] src/memory/lock.test.ts:51  acquires a lock and creates the lock directory
-[ ] src/memory/lock.test.ts:58  releases the lock by removing the directory
-[ ] src/memory/lock.test.ts:65  writes lock info with PID and agent name
-[ ] src/memory/lock.test.ts:79  times out when lock is held by a live process
-[ ] src/memory/lock.test.ts:90  breaks stale lock from dead process and acquires
-[ ] src/memory/lock.test.ts:104  calls rmSync with force: true when removing a stale lock
-[ ] src/memory/lock.test.ts:125  breaks stale lock older than 30 minutes
-[ ] src/memory/lock.test.ts:145  returns true and removes existing lock
-[ ] src/memory/lock.test.ts:152  returns false when no lock exists
-[ ] src/orchestrator/agent-runner.test.ts:7  shows the command for Bash
-[ ] src/orchestrator/agent-runner.test.ts:11  shows file paths relative to the agent cwd
-[ ] src/orchestrator/agent-runner.test.ts:16  shows the pattern and search path for Grep
-[ ] src/orchestrator/agent-runner.test.ts:21  falls back to url for unknown tools without description or path
-[ ] src/orchestrator/agent-runner.test.ts:27  returns undefined for successful results
-[ ] src/orchestrator/agent-runner.test.ts:31  extracts text from string and array error content
-[ ] src/orchestrator/output-schema.test.ts:6  parses minimal output (status + summary only)
-[ ] src/orchestrator/output-schema.test.ts:19  parses generic content
-[ ] src/orchestrator/output-schema.test.ts:33  parses task content with all fields
-[ ] src/orchestrator/output-schema.test.ts:61  parses task content without optional suggestedFix
-[ ] src/orchestrator/output-schema.test.ts:82  parses output with filesChanged and commitMessage
-[ ] src/orchestrator/output-schema.test.ts:101  parses output with memoryUpdate
-[ ] src/orchestrator/output-schema.test.ts:115  parses blocked status with blockerReason
-[ ] src/orchestrator/output-schema.test.ts:129  parses failed status
-[ ] src/orchestrator/output-schema.test.ts:141  parses partial status with all optional fields
-[ ] src/orchestrator/output-schema.test.ts:164  accepts all four severity levels in task content
-[ ] src/orchestrator/output-schema.test.ts:189  strips ```json fences
-[ ] src/orchestrator/output-schema.test.ts:198  strips plain ``` fences
-[ ] src/orchestrator/output-schema.test.ts:207  handles triple backticks inside JSON string values
-[ ] src/orchestrator/output-schema.test.ts:231  handles triple backticks inside JSON string values without outer fence
-[ ] src/orchestrator/output-schema.test.ts:255  extracts JSON from text with leading prose
-[ ] src/orchestrator/output-schema.test.ts:266  skips curly braces in prose before the actual JSON
-[ ] src/orchestrator/output-schema.test.ts:281  throws on non-JSON text
-[ ] src/orchestrator/output-schema.test.ts:285  throws on missing summary
-[ ] src/orchestrator/output-schema.test.ts:291  throws on missing status
-[ ] src/orchestrator/output-schema.test.ts:297  throws on invalid status value
-[ ] src/orchestrator/output-schema.test.ts:305  throws on invalid severity in task content
-[ ] src/orchestrator/output-schema.test.ts:325  throws on task content with empty files array
-[ ] src/orchestrator/output-schema.test.ts:345  throws on unknown content type
-[ ] src/orchestrator/output-schema.test.ts:357  throws on task content with missing title
-[ ] src/orchestrator/output-schema.test.ts:376  throws on commitMessage with empty subject
-[ ] src/orchestrator/prompt-builder.test.ts:66  includes agent md content as system prompt
-[ ] src/orchestrator/prompt-builder.test.ts:72  includes existing task titles in user prompt
-[ ] src/orchestrator/prompt-builder.test.ts:82  omits existing tasks section when no tasks exist
-[ ] src/orchestrator/prompt-builder.test.ts:88  includes task details when task provided
-[ ] src/orchestrator/prompt-builder.test.ts:103  includes task notes oldest first when the task has notes
-[ ] src/orchestrator/prompt-builder.test.ts:117  omits the task notes section when the task has no notes
-[ ] src/orchestrator/prompt-builder.test.ts:123  omits task section when no task provided
-[ ] src/orchestrator/prompt-builder.test.ts:129  shows tasks of every status with status, severity, and title
-[ ] src/orchestrator/prompt-builder.test.ts:140  includes review context when provided
-[ ] src/orchestrator/prompt-builder.test.ts:179  includes PR info but omits comments section when review has no comments
-[ ] src/orchestrator/prompt-builder.test.ts:199  includes open review threads for a follow-up on an existing PR
-[ ] src/orchestrator/prompt-builder.test.ts:231  tells a follow-up to work from the task notes when no review threads are open
-[ ] src/orchestrator/prompt-builder.test.ts:243  omits review section when no review provided
-[ ] src/orchestrator/prompt-builder.test.ts:250  includes focus as first section in user prompt
-[ ] src/orchestrator/prompt-builder.test.ts:260  omits focus section when not provided
-[ ] src/orchestrator/prompt-builder.test.ts:266  uses unified output schema with status for all agents
-[ ] src/orchestrator/prompt-builder.test.ts:275  uses task content schema when output is task
-[ ] src/orchestrator/prompt-builder.test.ts:284  uses generic content schema by default (no output field)
-[ ] src/orchestrator/prompt-builder.test.ts:292  uses task content schema for worktree agent with output task
-[ ] src/orchestrator/prompt-builder.test.ts:312  uses ON_FINISH.md body as system prompt
-[ ] src/orchestrator/prompt-builder.test.ts:324  includes run outcome in user prompt
-[ ] src/orchestrator/prompt-builder.test.ts:338  includes task details when present
-[ ] src/orchestrator/prompt-builder.test.ts:356  includes error on failure
-[ ] src/orchestrator/prompt-builder.test.ts:370  includes reviewed PR details
-[ ] src/orchestrator/prompt-builder.test.ts:385  omits optional sections when not present
-[ ] src/orchestrator/prompt-builder.test.ts:401  includes generic content when present
-[ ] src/orchestrator/prompt-builder.test.ts:415  includes task content as JSON when present
-[ ] src/orchestrator/prompt-builder.test.ts:437  includes focus context when present
-[ ] src/orchestrator/prompt-builder.test.ts:451  omits focus context when not present
-[ ] src/orchestrator/prompt-builder.test.ts:475  includes focus as run context when provided
-[ ] src/orchestrator/prompt-builder.test.ts:487  omits run context when no focus provided
-[ ] src/orchestrator/prompt-builder.test.ts:497  places run context before current memory
-[ ] src/run-log.test.ts:8  uses ISO 8601 with colons/dots replaced by dashes
-[ ] src/run-log.test.ts:25  writes a per-run file under vteam/.logs/<agent>/
-[ ] src/run-log.test.ts:33  writes to the path given by the scheduler in VTEAM_RUN_LOG
-[ ] src/run-log.test.ts:46  tees stdout and stderr into the file until closed
-[ ] src/run-log.test.ts:73  strips ANSI colors from the file
-[ ] src/run-log.test.ts:83  writeSplit sends the short line to the terminal and the full line to the file
-[ ] src/run-state.test.ts:18  returns undefined without any runs
-[ ] src/run-state.test.ts:22  returns the newest run of the agent started before the given time
-[ ] src/run-state.test.ts:31  does not confuse agents whose names end the same way
-[ ] src/slugify.test.ts:5  lowercases input
-[ ] src/slugify.test.ts:9  replaces spaces with hyphens
-[ ] src/slugify.test.ts:13  strips non-alphanumeric characters
-[ ] src/slugify.test.ts:17  collapses consecutive separators into one hyphen
-[ ] src/slugify.test.ts:21  strips leading and trailing hyphens
-[ ] src/slugify.test.ts:25  handles already-slugified input
-[ ] src/slugify.test.ts:29  returns empty string for empty input
-[ ] src/slugify.test.ts:33  returns empty string for all-special-character input
-[ ] src/slugify.test.ts:37  preserves numbers
-[ ] src/slugify.test.ts:41  handles unicode accented characters
-[ ] src/slugify.test.ts:45  handles mixed case with punctuation
-[ ] src/slugify.test.ts:49  handles input used for task filenames
-[ ] src/slugify.test.ts:53  handles input used for branch names
-[ ] src/tasks/aven-manager.test.ts:50  creates a labelled inbox task with metadata and returns its ref
-[ ] src/tasks/aven-manager.test.ts:73  adds the agent's labels after the config label, without duplicates
-[ ] src/tasks/aven-manager.test.ts:86  throws when the created ref cannot be parsed
-[ ] src/tasks/aven-manager.test.ts:93  lists every ready labelled task with its metadata
-[ ] src/tasks/aven-manager.test.ts:119  maps priority none and missing metadata to safe defaults
-[ ] src/tasks/aven-manager.test.ts:138  groups the index by status
-[ ] src/tasks/aven-manager.test.ts:154  returns no tasks when the project or label does not exist yet
-[ ] src/tasks/aven-manager.test.ts:161  propagates other aven errors
-[ ] src/tasks/aven-manager.test.ts:168  updates status and skips undefined metadata
-[ ] src/tasks/aven-manager.test.ts:181  creates and adds labels on update
-[ ] src/tasks/aven-manager.test.ts:192  removes metadata keys
-[ ] src/tasks/aven-manager.test.ts:206  adds a note via stdin
-[ ] src/tasks/aven-manager.test.ts:214  prefixes every command with the configured workspace
-[ ] src/tasks/aven-manager.test.ts:248  exposes found-by metadata on listed tasks
-[ ] src/tasks/aven-manager.test.ts:256  adds create and done labels to the aven task
-[ ] src/tasks/aven-manager.test.ts:265  normalizes labels the same way aven does
-[ ] src/tasks/aven-manager.test.ts:273  round-trips a task through its lifecycle
-[ ] src/tasks/claim.test.ts:41  records the run, process and host
-[ ] src/tasks/claim.test.ts:58  returns tasks claimed by a dead process on this host to todo
-[ ] src/tasks/claim.test.ts:69  leaves tasks claimed by a live process
-[ ] src/tasks/claim.test.ts:78  leaves tasks claimed on another host
-[ ] src/tasks/claim.test.ts:87  leaves active tasks without a vteam claim
-[ ] src/tasks/labels.test.ts:8  (it.each table, see source)
-[ ] src/tasks/labels.test.ts:21  derives the agent label from tasks.label and the agent name
-[ ] src/tasks/labels.test.ts:26  labels created tasks with the creating agent
-[ ] src/tasks/labels.test.ts:30  labels done tasks with the finishing agent
-[ ] src/tasks/task-manager.test.ts:20  matches an exact value
-[ ] src/tasks/task-manager.test.ts:25  ORs values within a list
-[ ] src/tasks/task-manager.test.ts:31  ANDs different keys
-[ ] src/tasks/task-manager.test.ts:37  treats null as a missing or empty key
-[ ] src/tasks/task-manager.test.ts:43  matches everything with an empty filter
-[ ] src/tasks/task-manager.test.ts:51  picks the highest severity, then the oldest
-[ ] src/tasks/task-manager.test.ts:60  skips tasks outside the filter or at max retries
-[ ] src/tasks/task-manager.test.ts:69  returns undefined when nothing qualifies
-[ ] src/worktree/manager.test.ts:86  creates a worktree from scratch
-[ ] src/worktree/manager.test.ts:93  succeeds when worktree already exists at the same path
-[ ] src/worktree/manager.test.ts:102  succeeds when orphaned directory exists without git metadata
-[ ] src/worktree/manager.test.ts:113  succeeds when git metadata is stale (directory manually deleted)
-[ ] src/worktree/manager.test.ts:122  branches from the latest remote base branch when local main is behind
-[ ] src/worktree/manager.test.ts:130  leaves out unpushed commits on local main
-[ ] src/worktree/manager.test.ts:161  checks out a remote branch into a worktree
-[ ] src/worktree/manager.test.ts:168  succeeds when worktree already exists at the same path
-[ ] src/worktree/manager.test.ts:177  succeeds when orphaned directory exists without git metadata
-[ ] src/worktree/manager.test.ts:188  succeeds when git metadata is stale (directory manually deleted)
-[ ] src/worktree/manager.test.ts:197  succeeds when branch is already checked out in another worktree
-[ ] src/worktree/manager.test.ts:213  resets to latest remote state when local branch exists
-[ ] src/worktree/manager.test.ts:277  merges the base branch and reports no conflicts when it applies cleanly
-[ ] src/worktree/manager.test.ts:284  leaves the merge in progress and lists conflicted files, which commit as a merge once resolved
-[ ] src/worktree/manager.test.ts:300  ignores missing files and lines that only resemble conflict markers
-[ ] src/worktree/manager.test.ts:340  pushes a new branch
-[ ] src/worktree/manager.test.ts:349  refuses to overwrite a new branch that already exists on the remote
-[ ] src/worktree/manager.test.ts:358  pushes to an existing PR branch
-[ ] src/worktree/manager.test.ts:367  refuses to overwrite commits pushed to the PR branch after checkout
-[ ] src/worktree/manager.test.ts:378  retries after a network error
-[ ] src/worktree/manager.test.ts:391  treats a dropped connection as success when the push already landed
-[ ] src/worktree/manager.test.ts:403  gives up after the last retry
-[ ] src/worktree/manager.test.ts:413  recognises network failures from git push
-[ ] src/worktree/manager.test.ts:420  does not retry lease rejections
-[ ] src/worktree/manager.test.ts:433  removes worktrees under worktreeDir except the ones in use
+# Parity checklist: every TS test case and where it lives in Go.
+# [x] ported (Go test file after ->)   [-] dropped on purpose (reason given)
+
+[x] src/commands/cron.test.ts:28  returns agents with cron patterns  -> internal/schedule/schedule_test.go, internal/cron/cron_test.go
+[x] src/commands/cron.test.ts:38  returns empty array when no agents have cron  -> internal/schedule/schedule_test.go, internal/cron/cron_test.go
+[x] src/commands/cron.test.ts:43  returns empty array when no agents exist  -> internal/schedule/schedule_test.go, internal/cron/cron_test.go
+[x] src/commands/cron.test.ts:47  skips agents with invalid config  -> internal/schedule/schedule_test.go, internal/cron/cron_test.go
+[x] src/commands/cron.test.ts:58  (it.each table, see source)  -> internal/schedule/schedule_test.go, internal/cron/cron_test.go
+[x] src/commands/cron.test.ts:70  (it.each table, see source)  -> internal/schedule/schedule_test.go, internal/cron/cron_test.go
+[-] src/commands/cron.test.ts:79  spawns node with the script path and agent name  -- dropped: node-specific: the scheduler re-executes os.Executable()
+[-] src/commands/cron.test.ts:90  forwards execArgv so node loader flags reach the child process  -- dropped: node-specific: the scheduler re-executes os.Executable()
+[x] src/commands/cron.test.ts:132  schedules the merge ensurer next to cron agents when it has a cron  -> internal/schedule/schedule_test.go, internal/cron/cron_test.go
+[x] src/commands/cron.test.ts:140  leaves the merge ensurer out without a cron  -> internal/schedule/schedule_test.go, internal/cron/cron_test.go
+[x] src/commands/cron.test.ts:158  returns undefined without a pid file  -> internal/schedule/schedule_test.go, internal/cron/cron_test.go
+[x] src/commands/cron.test.ts:162  returns the pid of a live scheduler  -> internal/schedule/schedule_test.go, internal/cron/cron_test.go
+[x] src/commands/cron.test.ts:167  ignores a pid file left by a dead scheduler  -> internal/schedule/schedule_test.go, internal/cron/cron_test.go
+[x] src/commands/dashboard.test.ts:6  splits multi-line entries and appends the footer after a blank line  -> internal/dashboard/dashboard_test.go
+[x] src/commands/dashboard.test.ts:10  clips the body to the terminal height and says how much is hidden  -> internal/dashboard/dashboard_test.go
+[x] src/commands/dashboard.test.ts:15  keeps every line when the terminal height is unknown  -> internal/dashboard/dashboard_test.go
+[x] src/commands/ensure-merge.test.ts:84  only looks at done tasks with a PR that is not yet recorded as merged  -> internal/ensuremerge/ensuremerge_test.go
+[x] src/commands/ensure-merge.test.ts:99  leaves the task done when the PR is open, unlabelled, and mergeable  -> internal/ensuremerge/ensuremerge_test.go
+[x] src/commands/ensure-merge.test.ts:109  logs why a task is still waiting  -> internal/ensuremerge/ensuremerge_test.go
+[x] src/commands/ensure-merge.test.ts:121  treats unknown mergeability as nothing to do yet  -> internal/ensuremerge/ensuremerge_test.go
+[x] src/commands/ensure-merge.test.ts:130  records a merged PR on the task and keeps it done  -> internal/ensuremerge/ensuremerge_test.go
+[x] src/commands/ensure-merge.test.ts:139  cancels the task with a note when the PR was closed without merging  -> internal/ensuremerge/ensuremerge_test.go
+[x] src/commands/ensure-merge.test.ts:149  removes the approval label before reopening the task  -> internal/ensuremerge/ensuremerge_test.go
+[x] src/commands/ensure-merge.test.ts:166  leaves the task done when the label cannot be removed  -> internal/ensuremerge/ensuremerge_test.go
+[x] src/commands/ensure-merge.test.ts:178  reopens a conflicting PR without needing the label  -> internal/ensuremerge/ensuremerge_test.go
+[x] src/commands/ensure-merge.test.ts:188  keeps sweeping after one PR lookup fails  -> internal/ensuremerge/ensuremerge_test.go
+[x] src/commands/init.test.ts:22  scaffolds the vteam directory structure  -> internal/scaffold/scaffold_test.go, cmd/vteam/testdata/script/init.txtar
+[x] src/commands/init.test.ts:34  sets the aven project to the directory name  -> internal/scaffold/scaffold_test.go, cmd/vteam/testdata/script/init.txtar
+[x] src/commands/init.test.ts:44  scaffolds a read-only task-producing security-analyst agent  -> internal/scaffold/scaffold_test.go, cmd/vteam/testdata/script/init.txtar
+[x] src/commands/init.test.ts:57  routes security-analyst findings to the coder  -> internal/scaffold/scaffold_test.go, cmd/vteam/testdata/script/init.txtar
+[x] src/commands/init.test.ts:65  creates .gitignore with worktree and state entries  -> internal/scaffold/scaffold_test.go, cmd/vteam/testdata/script/init.txtar
+[x] src/commands/init.test.ts:76  appends to existing .gitignore without duplicating  -> internal/scaffold/scaffold_test.go, cmd/vteam/testdata/script/init.txtar
+[x] src/commands/init.test.ts:91  exits if vteam/ already exists  -> internal/scaffold/scaffold_test.go, cmd/vteam/testdata/script/init.txtar
+[x] src/commands/init.test.ts:106  creates valid JSON config  -> internal/scaffold/scaffold_test.go, cmd/vteam/testdata/script/init.txtar
+[x] src/commands/pipeline.test.ts:205  passes generic content to ON_FINISH hook  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:230  passes task content as JSON to ON_FINISH hook  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:265  runs ON_FINISH with error details when agent fails  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:282  includes branch and PR info in ON_FINISH when present in outcome  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:306  passes memoryUpdate to curation agent  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:335  writes curation result to store.md  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:367  includes existing memory in curation prompt  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:392  skips curation when agent returns no memoryUpdate  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:406  skips curation when agent has no MEMORY.md even if memoryUpdate present  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:426  creates a task when agent returns task content  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:465  does not create a task for generic content  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:502  marks the picked task active, then returns it to todo when not settled  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:516  claims the task with run metadata and clears the claim on release  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:534  releases the claim lock before the agent runs  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:550  never hands the same task to two agents running at once  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:574  notes the agent's summary and blocker reason on the task  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:589  still releases the task when the note cannot be written  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:604  returns the task to todo when the agent fails  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:616  picks the highest severity task and skips tasks over the retry limit  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:639  picks only tasks matching its taskFilter, ORing list values  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:649  matches a missing metadata key with null  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:659  picks every task when it has no taskFilter  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:666  stays idle when no ready task matches its taskFilter  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:678  does nothing when no task is ready  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:689  runs both ON_FINISH and memory curation when both configured  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:717  runs ON_FINISH even when memory curation is skipped  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:737  makes no extra calls when neither ON_FINISH nor MEMORY configured  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:753  passes focus to ON_FINISH hook  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:777  passes focus to memory curation  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:801  omits focus sections when no focus provided  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:829  injects existing memory into agent's user prompt  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:914  checks out the PR branch, prompts with open threads, and pushes without opening a new PR  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:941  moves the task to backlog without running when the PR is %s  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:956  starts a new branch and PR when the task has no pr-url  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:993  does not merge the base branch when the PR is mergeable  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:1007  merges the base branch, lists conflicted files in the prompt, and pushes the resolution  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:1021  commits nothing and counts a retry when conflict markers are left  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:1041  pushes a clean merge of the base branch even when the agent changes nothing  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:1069  asks for replies by thread label  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:1080  posts annotated replies to known threads after pushing, and notes the count  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:1100  resolves replied threads when resolveThreads is on  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:1110  posts no replies when nothing was committed  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:1121  finishes the task when a reply cannot be posted  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:1143  records a done task with the PR so the merge ensurer tracks it  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:1165  records no task when PR creation fails  -> internal/run/run_test.go
+[x] src/commands/pipeline.test.ts:1178  keeps the recorded task done when its note fails  -> internal/run/run_test.go
+[x] src/commands/skill.test.ts:30  returns empty when no skills/ directory exists  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:34  returns empty when skills/ has no subdirectories with SKILL.md  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:39  discovers skills with SKILL.md files  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:48  ignores files in skills/ that are not directories  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:60  creates symlinks in the target directory  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:70  creates the target directory if it does not exist  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:79  skips already-installed skills with correct symlink  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:88  updates symlinks pointing to a different location  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:100  skips non-symlink entries at the target path  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:109  exits when no skills are found  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:120  installs multiple skills  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:132  removes symlinks from the target directory  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:141  reports skills that are not installed  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:148  skips non-symlink entries  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:157  exits when no skills are found  -> internal/skill/skill_test.go
+[x] src/commands/skill.test.ts:168  removes multiple skills  -> internal/skill/skill_test.go
+[x] src/config/agent.test.ts:27  uses defaults when agent.json is missing  -> internal/config/config_test.go
+[x] src/config/agent.test.ts:34  reads agent settings from agent.json and drops $schema  -> internal/config/config_test.go
+[x] src/config/agent.test.ts:41  attaches memory and onFinish config to their markdown files  -> internal/config/config_test.go
+[x] src/config/agent.test.ts:53  enables memory and onFinish from markdown files alone  -> internal/config/config_test.go
+[x] src/config/agent.test.ts:61  rejects a memory section without MEMORY.md  -> internal/config/config_test.go
+[x] src/config/agent.test.ts:66  rejects an onFinish section without ON_FINISH.md  -> internal/config/config_test.go
+[x] src/config/agent.test.ts:71  rejects malformed JSON  -> internal/config/config_test.go
+[x] src/config/agent.test.ts:76  rejects unknown keys with their path  -> internal/config/config_test.go
+[x] src/config/agent.test.ts:84  rejects cross-field rule violations  -> internal/config/config_test.go
+[x] src/config/agent.test.ts:89  rejects leftover frontmatter in %s  -> internal/config/config_test.go
+[-] src/config/agent.test.ts:96  matches the schema generated from agentConfigSchema  -- dropped: the schema is a checked-in file now; TestAgentSchemaMatchesValidator and TestDogfoodSchemaIsCurrent replace this
+[x] src/config/load.test.ts:28  throws when vteam.config.json does not exist  -> internal/config/config_test.go
+[x] src/config/load.test.ts:32  parses a valid config and returns typed data  -> internal/config/config_test.go
+[x] src/config/load.test.ts:46  defaults the merge ensurer to the changes-requested label with no schedule  -> internal/config/config_test.go
+[x] src/config/load.test.ts:57  rejects an invalid merge ensurer cron  -> internal/config/config_test.go
+[x] src/config/load.test.ts:69  throws with field path on missing required field  -> internal/config/config_test.go
+[x] src/config/load.test.ts:80  throws with field path on invalid platform  -> internal/config/config_test.go
+[x] src/config/load.test.ts:91  throws on invalid JSON  -> internal/config/config_test.go
+[x] src/config/load.test.ts:99  reports multiple errors at once  -> internal/config/config_test.go
+[x] src/config/schema-combinations.test.ts:20  standalone  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:22  with worktree  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:24  without worktree  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:26  with input: task  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:28  with input: pr and worktree  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:31  rejects autoPR  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:34  rejects readOnly  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:37  rejects autoPR even with worktree  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:42  readOnly requires worktree  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:45  readOnly with worktree false  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:48  readOnly with worktree true  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:51  readOnly rejects autoPR  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:56  requires worktree  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:59  with worktree false  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:62  with worktree true  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:65  with readOnly  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:68  with autoPR  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:73  improver: output task, no worktree, read-only tools  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:79  coder: worktree, input task, autoPR  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:87  test-writer: worktree, input task, autoPR  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:95  worktree scanner: worktree + output task (scan in isolation)  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:101  readOnly auditor: worktree + readOnly, no task output  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:107  bare agent: empty config  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:112  task producer that also creates PRs  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:115  readOnly task producer  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:121  pr input without worktree  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:124  readOnly without worktree  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema-combinations.test.ts:127  readOnly + autoPR  -> internal/config/config_test.go (TestAgentConfigGolden: 666-case matrix with exact messages)
+[x] src/config/schema.test.ts:12  accepts a valid config  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:17  rejects unknown platform  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:25  rejects missing baseBranch  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:31  rejects negative maxRetries  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:39  defaults label to vteam  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:47  accepts optional workspace  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:55  rejects missing project  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:63  rejects empty project  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:73  accepts taskFilter with strings, lists and null  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:81  rejects taskFilter without input: task  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:86  accepts resolveThreads on a worktree task agent  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:90  rejects resolveThreads without input: task and worktree  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:95  rejects non-string taskFilter values and empty lists  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:100  rejects unknown keys  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:105  accepts $schema, memory and onFinish sections  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:114  accepts empty config (bare AGENT.md)  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:119  accepts full config  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:131  accepts autoPR without worktree  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:139  rejects input pr without worktree  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:147  accepts input pr with worktree  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:155  accepts input task without worktree  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:162  rejects invalid input value  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:169  accepts output task  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:176  rejects invalid output value  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:183  accepts output task with worktree  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:191  accepts prTriggerLabel with input pr  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:200  accepts valid cron pattern  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:207  rejects invalid cron pattern  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:214  accepts allowedTools  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:221  accepts disallowedTools  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:228  accepts both allowedTools and disallowedTools  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:236  accepts readOnly with worktree  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:244  rejects readOnly without worktree  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:251  rejects readOnly with worktree false  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:259  rejects readOnly with autoPR  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:268  accepts readOnly with input pr  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:277  accepts readOnly with input task  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:288  accepts empty config  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:293  accepts model and tool permissions  -> internal/config/config_test.go
+[x] src/config/schema.test.ts:302  accepts only model  -> internal/config/config_test.go
+[-] src/integrations/merge-request.test.ts:15  wraps simple strings in single quotes  -- dropped: shellEscape is gone: the Go port passes argv to exec and never builds shell strings
+[-] src/integrations/merge-request.test.ts:19  escapes single quotes  -- dropped: shellEscape is gone: the Go port passes argv to exec and never builds shell strings
+[-] src/integrations/merge-request.test.ts:23  handles empty string  -- dropped: shellEscape is gone: the Go port passes argv to exec and never builds shell strings
+[-] src/integrations/merge-request.test.ts:27  handles strings with spaces  -- dropped: shellEscape is gone: the Go port passes argv to exec and never builds shell strings
+[-] src/integrations/merge-request.test.ts:31  handles strings with special shell characters  -- dropped: shellEscape is gone: the Go port passes argv to exec and never builds shell strings
+[-] src/integrations/merge-request.test.ts:35  handles backticks  -- dropped: shellEscape is gone: the Go port passes argv to exec and never builds shell strings
+[-] src/integrations/merge-request.test.ts:39  handles multiple single quotes  -- dropped: shellEscape is gone: the Go port passes argv to exec and never builds shell strings
+[x] src/integrations/pull-request.test.ts:5  (it.each table, see source)  -> internal/platform/platform_test.go
+[x] src/integrations/pull-request.test.ts:13  falls back to the latest reviews when no review is required  -> internal/platform/platform_test.go
+[x] src/integrations/pull-request.test.ts:22  reports requested changes first  -> internal/platform/platform_test.go
+[x] src/integrations/pull-request.test.ts:26  is approved only when someone approved and the rules are met  -> internal/platform/platform_test.go
+[x] src/integrations/pull-request.test.ts:31  distinguishes missing required approvals from no reviews at all  -> internal/platform/platform_test.go
+[x] src/log.test.ts:6  formats elapsed time as mm:ss, adding hours when needed  -> internal/log/log_test.go, internal/ansi/ansi_test.go
+[x] src/log.test.ts:14  uses the largest two units  -> internal/log/log_test.go, internal/ansi/ansi_test.go
+[x] src/log.test.ts:22  cuts long text with an ellipsis and leaves short text alone  -> internal/log/log_test.go, internal/ansi/ansi_test.go
+[x] src/log.test.ts:29  removes color escape sequences  -> internal/log/log_test.go, internal/ansi/ansi_test.go
+[x] src/log.test.ts:35  (it.each table, see source)  -> internal/log/log_test.go, internal/ansi/ansi_test.go
+[x] src/memory/lock.test.ts:23  leaves a lock held by a live process  -> internal/lock/lock_test.go
+[x] src/memory/lock.test.ts:33  breaks a lock held by a dead process  -> internal/lock/lock_test.go
+[x] src/memory/lock.test.ts:45  returns false when there is no lock  -> internal/lock/lock_test.go
+[x] src/memory/lock.test.ts:51  acquires a lock and creates the lock directory  -> internal/lock/lock_test.go
+[x] src/memory/lock.test.ts:58  releases the lock by removing the directory  -> internal/lock/lock_test.go
+[x] src/memory/lock.test.ts:65  writes lock info with PID and agent name  -> internal/lock/lock_test.go
+[x] src/memory/lock.test.ts:79  times out when lock is held by a live process  -> internal/lock/lock_test.go
+[x] src/memory/lock.test.ts:90  breaks stale lock from dead process and acquires  -> internal/lock/lock_test.go
+[-] src/memory/lock.test.ts:104  calls rmSync with force: true when removing a stale lock  -- dropped: asserted a mocked fs call; the stale-lock tests cover the behavior
+[x] src/memory/lock.test.ts:125  breaks stale lock older than 30 minutes  -> internal/lock/lock_test.go
+[x] src/memory/lock.test.ts:145  returns true and removes existing lock  -> internal/lock/lock_test.go
+[x] src/memory/lock.test.ts:152  returns false when no lock exists  -> internal/lock/lock_test.go
+[x] src/orchestrator/agent-runner.test.ts:7  shows the command for Bash  -> internal/claude/claude_test.go
+[x] src/orchestrator/agent-runner.test.ts:11  shows file paths relative to the agent cwd  -> internal/claude/claude_test.go
+[x] src/orchestrator/agent-runner.test.ts:16  shows the pattern and search path for Grep  -> internal/claude/claude_test.go
+[x] src/orchestrator/agent-runner.test.ts:21  falls back to url for unknown tools without description or path  -> internal/claude/claude_test.go
+[x] src/orchestrator/agent-runner.test.ts:27  returns undefined for successful results  -> internal/claude/claude_test.go
+[x] src/orchestrator/agent-runner.test.ts:31  extracts text from string and array error content  -> internal/claude/claude_test.go
+[x] src/orchestrator/output-schema.test.ts:6  parses minimal output (status + summary only)  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:19  parses generic content  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:33  parses task content with all fields  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:61  parses task content without optional suggestedFix  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:82  parses output with filesChanged and commitMessage  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:101  parses output with memoryUpdate  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:115  parses blocked status with blockerReason  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:129  parses failed status  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:141  parses partial status with all optional fields  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:164  accepts all four severity levels in task content  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:189  strips ```json fences  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:198  strips plain ``` fences  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:207  handles triple backticks inside JSON string values  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:231  handles triple backticks inside JSON string values without outer fence  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:255  extracts JSON from text with leading prose  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:266  skips curly braces in prose before the actual JSON  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:281  throws on non-JSON text  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:285  throws on missing summary  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:291  throws on missing status  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:297  throws on invalid status value  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:305  throws on invalid severity in task content  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:325  throws on task content with empty files array  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:345  throws on unknown content type  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:357  throws on task content with missing title  -> internal/output/output_test.go
+[x] src/orchestrator/output-schema.test.ts:376  throws on commitMessage with empty subject  -> internal/output/output_test.go
+[x] src/orchestrator/prompt-builder.test.ts:66  includes agent md content as system prompt  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:72  includes existing task titles in user prompt  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:82  omits existing tasks section when no tasks exist  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:88  includes task details when task provided  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:103  includes task notes oldest first when the task has notes  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:117  omits the task notes section when the task has no notes  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:123  omits task section when no task provided  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:129  shows tasks of every status with status, severity, and title  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:140  includes review context when provided  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:179  includes PR info but omits comments section when review has no comments  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:199  includes open review threads for a follow-up on an existing PR  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:231  tells a follow-up to work from the task notes when no review threads are open  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:243  omits review section when no review provided  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:250  includes focus as first section in user prompt  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:260  omits focus section when not provided  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:266  uses unified output schema with status for all agents  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:275  uses task content schema when output is task  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:284  uses generic content schema by default (no output field)  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:292  uses task content schema for worktree agent with output task  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:312  uses ON_FINISH.md body as system prompt  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:324  includes run outcome in user prompt  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:338  includes task details when present  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:356  includes error on failure  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:370  includes reviewed PR details  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:385  omits optional sections when not present  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:401  includes generic content when present  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:415  includes task content as JSON when present  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:437  includes focus context when present  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:451  omits focus context when not present  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:475  includes focus as run context when provided  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:487  omits run context when no focus provided  -> internal/prompt/prompt_test.go
+[x] src/orchestrator/prompt-builder.test.ts:497  places run context before current memory  -> internal/prompt/prompt_test.go
+[x] src/run-log.test.ts:8  uses ISO 8601 with colons/dots replaced by dashes  -> internal/runlog/runlog_test.go, internal/log/log_test.go
+[x] src/run-log.test.ts:25  writes a per-run file under vteam/.logs/<agent>/  -> internal/runlog/runlog_test.go, internal/log/log_test.go
+[x] src/run-log.test.ts:33  writes to the path given by the scheduler in VTEAM_RUN_LOG  -> internal/runlog/runlog_test.go, internal/log/log_test.go
+[-] src/run-log.test.ts:46  tees stdout and stderr into the file until closed  -- dropped: Go does not patch stdout; TestLoggerLinesGoToTheFileWithoutColorsUntilClosed covers the behavior
+[x] src/run-log.test.ts:73  strips ANSI colors from the file  -> internal/runlog/runlog_test.go, internal/log/log_test.go
+[x] src/run-log.test.ts:83  writeSplit sends the short line to the terminal and the full line to the file  -> internal/runlog/runlog_test.go, internal/log/log_test.go
+[x] src/run-state.test.ts:18  returns undefined without any runs  -> internal/runstate/runstate_test.go
+[x] src/run-state.test.ts:22  returns the newest run of the agent started before the given time  -> internal/runstate/runstate_test.go
+[x] src/run-state.test.ts:31  does not confuse agents whose names end the same way  -> internal/runstate/runstate_test.go
+[x] src/slugify.test.ts:5  lowercases input  -> internal/slugify/slugify_test.go
+[x] src/slugify.test.ts:9  replaces spaces with hyphens  -> internal/slugify/slugify_test.go
+[x] src/slugify.test.ts:13  strips non-alphanumeric characters  -> internal/slugify/slugify_test.go
+[x] src/slugify.test.ts:17  collapses consecutive separators into one hyphen  -> internal/slugify/slugify_test.go
+[x] src/slugify.test.ts:21  strips leading and trailing hyphens  -> internal/slugify/slugify_test.go
+[x] src/slugify.test.ts:25  handles already-slugified input  -> internal/slugify/slugify_test.go
+[x] src/slugify.test.ts:29  returns empty string for empty input  -> internal/slugify/slugify_test.go
+[x] src/slugify.test.ts:33  returns empty string for all-special-character input  -> internal/slugify/slugify_test.go
+[x] src/slugify.test.ts:37  preserves numbers  -> internal/slugify/slugify_test.go
+[x] src/slugify.test.ts:41  handles unicode accented characters  -> internal/slugify/slugify_test.go
+[x] src/slugify.test.ts:45  handles mixed case with punctuation  -> internal/slugify/slugify_test.go
+[x] src/slugify.test.ts:49  handles input used for task filenames  -> internal/slugify/slugify_test.go
+[x] src/slugify.test.ts:53  handles input used for branch names  -> internal/slugify/slugify_test.go
+[x] src/tasks/aven-manager.test.ts:50  creates a labelled inbox task with metadata and returns its ref  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:73  adds the agent's labels after the config label, without duplicates  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:86  throws when the created ref cannot be parsed  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:93  lists every ready labelled task with its metadata  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:119  maps priority none and missing metadata to safe defaults  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:138  groups the index by status  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:154  returns no tasks when the project or label does not exist yet  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:161  propagates other aven errors  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:168  updates status and skips undefined metadata  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:181  creates and adds labels on update  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:192  removes metadata keys  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:206  adds a note via stdin  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:214  prefixes every command with the configured workspace  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:248  exposes found-by metadata on listed tasks  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:256  adds create and done labels to the aven task  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:265  normalizes labels the same way aven does  -> internal/tasks/aven_test.go
+[x] src/tasks/aven-manager.test.ts:273  round-trips a task through its lifecycle  -> internal/tasks/aven_test.go
+[x] src/tasks/claim.test.ts:41  records the run, process and host  -> internal/tasks/claim_test.go
+[x] src/tasks/claim.test.ts:58  returns tasks claimed by a dead process on this host to todo  -> internal/tasks/claim_test.go
+[x] src/tasks/claim.test.ts:69  leaves tasks claimed by a live process  -> internal/tasks/claim_test.go
+[x] src/tasks/claim.test.ts:78  leaves tasks claimed on another host  -> internal/tasks/claim_test.go
+[x] src/tasks/claim.test.ts:87  leaves active tasks without a vteam claim  -> internal/tasks/claim_test.go
+[x] src/tasks/labels.test.ts:8  (it.each table, see source)  -> internal/tasks/tasks_test.go
+[x] src/tasks/labels.test.ts:21  derives the agent label from tasks.label and the agent name  -> internal/tasks/tasks_test.go
+[x] src/tasks/labels.test.ts:26  labels created tasks with the creating agent  -> internal/tasks/tasks_test.go
+[x] src/tasks/labels.test.ts:30  labels done tasks with the finishing agent  -> internal/tasks/tasks_test.go
+[x] src/tasks/task-manager.test.ts:20  matches an exact value  -> internal/tasks/tasks_test.go
+[x] src/tasks/task-manager.test.ts:25  ORs values within a list  -> internal/tasks/tasks_test.go
+[x] src/tasks/task-manager.test.ts:31  ANDs different keys  -> internal/tasks/tasks_test.go
+[x] src/tasks/task-manager.test.ts:37  treats null as a missing or empty key  -> internal/tasks/tasks_test.go
+[x] src/tasks/task-manager.test.ts:43  matches everything with an empty filter  -> internal/tasks/tasks_test.go
+[x] src/tasks/task-manager.test.ts:51  picks the highest severity, then the oldest  -> internal/tasks/tasks_test.go
+[x] src/tasks/task-manager.test.ts:60  skips tasks outside the filter or at max retries  -> internal/tasks/tasks_test.go
+[x] src/tasks/task-manager.test.ts:69  returns undefined when nothing qualifies  -> internal/tasks/tasks_test.go
+[x] src/worktree/manager.test.ts:86  creates a worktree from scratch  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:93  succeeds when worktree already exists at the same path  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:102  succeeds when orphaned directory exists without git metadata  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:113  succeeds when git metadata is stale (directory manually deleted)  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:122  branches from the latest remote base branch when local main is behind  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:130  leaves out unpushed commits on local main  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:161  checks out a remote branch into a worktree  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:168  succeeds when worktree already exists at the same path  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:177  succeeds when orphaned directory exists without git metadata  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:188  succeeds when git metadata is stale (directory manually deleted)  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:197  succeeds when branch is already checked out in another worktree  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:213  resets to latest remote state when local branch exists  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:277  merges the base branch and reports no conflicts when it applies cleanly  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:284  leaves the merge in progress and lists conflicted files, which commit as a merge once resolved  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:300  ignores missing files and lines that only resemble conflict markers  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:340  pushes a new branch  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:349  refuses to overwrite a new branch that already exists on the remote  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:358  pushes to an existing PR branch  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:367  refuses to overwrite commits pushed to the PR branch after checkout  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:378  retries after a network error  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:391  treats a dropped connection as success when the push already landed  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:403  gives up after the last retry  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:413  recognises network failures from git push  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:420  does not retry lease rejections  -> internal/git/git_test.go
+[x] src/worktree/manager.test.ts:433  removes worktrees under worktreeDir except the ones in use  -> internal/git/git_test.go
