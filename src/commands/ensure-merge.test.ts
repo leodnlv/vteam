@@ -112,8 +112,10 @@ describe("ensureMerges", () => {
     await ensureMerges(fakeManager([doneTask("A", { "pr-url": prUrl })]), config, "/repo");
 
     const output = vi.mocked(console.log).mock.calls.map((call) => call.join(" ")).join("\n");
-    expect(output).toContain(`A "Task A"\n  PR #7 ${prUrl}`);
-    expect(output).toContain('open, approved, no "vteam:changes-requested" label, mergeability not computed yet. Waiting.');
+    expect(output).toMatch(/• A Task A\n/);
+    expect(output).toContain(`PR        #7 ${prUrl}`);
+    expect(output).toContain('state     open · approved · no "vteam:changes-requested" label · mergeability not computed yet');
+    expect(output).toContain("action    none, waiting");
   });
 
   it("treats unknown mergeability as nothing to do yet", async () => {

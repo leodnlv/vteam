@@ -145,7 +145,7 @@ Lifecycle for `input: "task"` agents:
 - open and `mergeable: "conflicting"` → `todo` + note; the coder resolves the conflict (see step 5)
 - otherwise (incl. `mergeable: "unknown"`) → nothing. Review comments alone never reopen a task; the label is the human approval.
 
-Per-task failures are logged and the sweep continues. `mergeEnsurer.cron` in `vteam.config.json` makes `vteam cron start` run it; logs go to `vteam/.logs/merge-ensurer/`.
+Per-task failures are logged and the sweep continues. Its output follows the `vteam run` style: a `Setup` section, a `Pull requests` section with one headline per task plus `PR`/`state`/`action` fields, and a `Result` section with the counts. `mergeEnsurer.cron` in `vteam.config.json` makes `vteam cron start` run it; logs go to `vteam/.logs/merge-ensurer/`.
 
 Whenever the agent returned output (every ending except an error or crash), the orchestrator appends an aven note to the task: `<agent>: <status>`, the agent's `summary`, `Blocker: <blockerReason>` if present, and `PR: <url>` if one was created. A failed note write is logged and does not fail the run. Notes (from runs and from humans) are injected into the prompt the next time an agent picks the task, so retries see why earlier attempts failed.
 
@@ -296,6 +296,7 @@ All three must pass before any commit or PR:
 ## Conventions
 
 - Self-documenting code, no comments unless the why is non-obvious.
+- Terminal output of every CLI command uses the helpers in `src/log.ts` (banner, sections, gutter, glyphs, fields). The conventions are in the project skill `.claude/skills/cli-output-style/SKILL.md`; load it before adding a command or changing what one prints.
 - Task refs (e.g. `APP-7KQ9`) are local to the user's aven database. Never put them in branch names, commit messages, or PR bodies.
 - Locking uses atomic `mkdir` with stale detection (30 min timeout).
 - Tasks live in the user's aven database, not the repo. The real shared artifacts are PRs.
