@@ -4,6 +4,7 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 type TaskStatus string
@@ -293,4 +294,9 @@ type RunState struct {
 	TasksCreated  []string       `json:"tasksCreated,omitempty"`
 	CommitSHA     string         `json:"commitSha,omitempty"`
 	CommitMessage *CommitMessage `json:"commitMessage,omitempty"`
+}
+
+// ISOTime formats t like JavaScript's Date.toISOString, the format stored in run state and task metadata.
+func ISOTime(t time.Time) string {
+	return t.UTC().Format("2006-01-02T15:04:05.000Z")
 }
