@@ -20,18 +20,3 @@ cover:
 
 clean:
     rm -rf dist
-
-# Capture the TypeScript behavior as goldens under testdata/golden (only until the TS code is removed).
-goldens:
-    npx tsx scripts/capture-goldens.ts
-
-ts-build:
-    npm run build
-    chmod +x dist/bin.js
-
-ts-test:
-    npx vitest run
-
-ts-lint:
-    npx tsc --noEmit
-    npx eslint src/

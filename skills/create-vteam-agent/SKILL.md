@@ -56,7 +56,7 @@ Let the user choose a preset and customize.
 
 **6. Model** — Which Claude model? Default to `sonnet` for most agents. Suggest `opus` for complex reasoning tasks, `haiku` for simple/fast tasks.
 
-**7. Cron schedule** — Should this agent run on a schedule? If so, ask for a cron expression (5 fields: minute hour day month weekday). Examples: `0 */6 * * *` (every 6 hours), `0 9 * * 1-5` (weekdays at 9am).
+**7. Cron schedule** — Should this agent run on a schedule? If so, ask for a cron expression (5 fields: minute hour day month weekday; `L` and `#` are not supported). Examples: `0 */6 * * *` (every 6 hours), `0 9 * * 1-5` (weekdays at 9am).
 
 ## Step 3 — Derive agent.json from answers
 

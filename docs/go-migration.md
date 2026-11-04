@@ -2,9 +2,11 @@
 
 Port vteam from TypeScript/Node to Go. Breaking changes are allowed. Test coverage must stay at least as good as it is now.
 
+**Status: done.** The TypeScript code was deleted at cutover. This file is kept as a record of the decisions; the git history before the cutover commit has the TS sources.
+
 ## Decisions
 
-- Module: `github.com/leodnlv/vteam`, Go 1.25+.
+- Module: `github.com/leodnlv/vteam`, Go 1.27 (`go.mod`).
 - Go code lives at the repo root next to `src/` until cutover. Then `src/` and the npm files are deleted.
 - CLI: `spf13/cobra`.
 - Dashboard: `charmbracelet/bubbletea`, because more interactive TUI features are planned.
@@ -27,7 +29,7 @@ Port vteam from TypeScript/Node to Go. Breaking changes are allowed. Test covera
 
 ## Goldens
 
-`just goldens` runs `scripts/capture-goldens.ts` against the TS code and writes `testdata/golden/*.json`. Go tests load these files directly. Regenerate them only while the TS code still exists. After cutover they are frozen, and the script is deleted with the rest of the TS code.
+`scripts/capture-goldens.ts` (deleted at cutover) ran the TS code and wrote `testdata/golden/*.json`. Go tests load these files directly. They are now frozen: when behavior changes on purpose, edit the golden by hand together with the code.
 
 | File | What it pins |
 |---|---|
@@ -115,7 +117,7 @@ These areas are under-tested today and get new tests in the port:
    - `run` and `ensure-merge` on `Deps`.
    - Port all 46 `pipeline.test.ts` cases, including claim-lock contention between goroutines.
 6. **Remaining commands.** ✅ Done. `init`, `status`, `clean`, `cron`, `dashboard` (bubbletea), `skill`. Then the testscript e2e suite.
-7. **Cutover.**
+7. **Cutover.** ✅ Done.
    - Run the Go binary on the dogfood `vteam/` for a few improver/coder cycles. On-disk state formats are unchanged, so TS and Go can run side by side on the same repo.
    - Delete `src/` and the npm files.
    - Update `CLAUDE.md`, `README.md`, `skills/*`, and `.claude/skills/cli-output-style`.
@@ -133,12 +135,9 @@ These areas are under-tested today and get new tests in the port:
   - aven metadata flags are written in key order
   - the dashboard also quits on `q`
 
-## Remaining: phase 7
+## Cutover
 
-1. Dogfood with real Claude: `just build`, then `dist/vteam run improver` and a `coder` cycle on this repo. These cost money and open real PRs.
-2. Delete the TS sources:
-   - `src/` (move `src/templates` → `internal/scaffold/templates`, already copied)
-   - `package.json`, `package-lock.json`, `tsconfig.json`, `eslint.config.js`, `node_modules`
-   - `scripts/capture-goldens.ts`
-   - the `ts-*` and `goldens` just targets
-3. Update `CLAUDE.md`, `README.md`, `skills/vteam`, `skills/create-vteam-agent`, and `.claude/skills/cli-output-style`. They point at `src/*.ts`, npm, and zod.
+- Dogfooded the Go binary by hand on this repo before deleting anything.
+- Deleted `src/`, `package.json`, `package-lock.json`, `tsconfig.json`, `eslint.config.js`, `scripts/capture-goldens.ts`, and the `goldens`/`ts-*` just targets.
+- `CLAUDE.md`, `README.md`, `skills/*`, and `.claude/skills/cli-output-style` now describe the Go code.
+- `testdata/ts-coverage.txt` and `testdata/ts-test-inventory.txt` stay as the record of the parity check.

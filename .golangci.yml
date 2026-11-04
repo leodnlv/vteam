@@ -14,14 +14,9 @@ linters:
         - fmt.Fprintf
         - fmt.Fprintln
   exclusions:
-    paths:
-      - node_modules
     rules:
       - path: _test\.go
         linters: [errcheck, misspell, unparam]
 formatters:
   enable:
     - gofmt
-  exclusions:
-    paths:
-      - node_modules

@@ -10,7 +10,7 @@ vteam runs Claude in headless mode (`claude -p`) as a subprocess. Each agent inv
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      vteam (TypeScript)                     │
+│                         vteam (Go)                          │
 │                                                             │
 │  Owns all state: tasks, worktrees, PRs                      │
 │                                                             │
@@ -35,7 +35,7 @@ The orchestrator never reasons about code. Claude never creates tasks, commits, 
 
 ## Prerequisites
 
-- **Node.js** >= 20
+- **Go** 1.27+ (to install from source)
 - **Claude Code** CLI — `claude` must be on your PATH ([install guide](https://docs.anthropic.com/en/docs/claude-code/getting-started))
 - **Git** — the project must be a git repository
 - **aven** — the local-first task manager CLI. `aven` must be installed and on your PATH; vteam stores all tasks in it.
@@ -43,15 +43,19 @@ The orchestrator never reasons about code. Claude never creates tasks, commits, 
 
 ## Installation
 
-vteam is not yet published to npm. Run it from source:
+```bash
+go install github.com/leodnlv/vteam/cmd/vteam@latest
+```
+
+Or from a checkout:
 
 ```bash
-git clone git@github.com:Infonautica/vteam.git
+git clone git@github.com:leodnlv/vteam.git
 cd vteam
-npm install
-npm run build
-npm link
+just build          # writes dist/vteam; put it on your PATH
 ```
+
+Run `vteam skill install` from the root of a checkout: it symlinks the `skills/` directory there into `~/.claude/skills/`, so keep the clone if you want the skills.
 
 ## Quick start
 
@@ -88,7 +92,7 @@ vteam cron start
 vteam cron status
 ```
 
-The scheduler is a foreground process — stop it with Ctrl+C. While it runs it writes its pid to `vteam/.locks/cron.pid`; a second `vteam cron start` in the same project refuses to start, and `vteam status` uses the file to report whether the scheduler is up. If an agent is still running when its next cron tick fires, the tick is skipped. Each scheduled run writes its own log file, the same as a manual `vteam run` (see [Logs](#logs)). The scheduler prints the job table from `vteam status`, then one line per job start, finish, failure, or skipped tick, stamped with the time of day; starts and failures include the path to that run's log file.
+The scheduler is a foreground process — stop it with Ctrl+C. While it runs it writes its pid to `vteam/.locks/cron.pid`; a second `vteam cron start` in the same project refuses to start, and `vteam status` uses the file to report whether the scheduler is up. If an agent is still running when its next cron tick fires, the tick is skipped. Cron expressions have 5 fields (minute hour day month weekday) and support ranges, steps, lists, month and weekday names, and `7` for Sunday; `L` and `#` are not supported. When both day-of-month and day-of-week are set, either one matching fires the job. Each scheduled run writes its own log file, the same as a manual `vteam run` (see [Logs](#logs)). The scheduler prints the job table from `vteam status`, then one line per job start, finish, failure, or skipped tick, stamped with the time of day; starts and failures include the path to that run's log file.
 
 ## Commands
 
@@ -214,7 +218,7 @@ For the full task list, use aven (`aven list --label vteam`).
 
 ### `vteam dashboard`
 
-Shows the same view as `vteam status` full-screen and refreshes it every second until you press Ctrl+C. A refresh starts only after the previous one finishes, so a large aven project (one `aven show` per task) refreshes less often instead of piling up work. If a refresh fails, the last good view stays on screen and the error appears in the footer. Output taller than the terminal is cut off with a line saying how much is hidden. It needs a terminal; use `vteam status` in scripts.
+Shows the same view as `vteam status` full-screen and refreshes it every second until you press Ctrl+C or `q`. A refresh starts only after the previous one finishes, so a large aven project (one `aven show` per task) refreshes less often instead of piling up work. If a refresh fails, the last good view stays on screen and the error appears in the footer. Output taller than the terminal is cut off with a line saying how much is hidden. It needs a terminal; use `vteam status` in scripts.
 
 ### `vteam clean`
 
@@ -546,20 +550,21 @@ Invoke from any project with `/create-vteam-agent`.
 ## Development
 
 ```bash
-just build          # tsc + copy templates to dist/
-just dev <args>     # run CLI via tsx (e.g., just dev run improver)
-just lint           # tsc --noEmit + eslint
-just test           # vitest
+just build          # go build -o dist/vteam ./cmd/vteam
+just dev <args>     # go run ./cmd/vteam (e.g., just dev run improver)
+just lint           # go vet + golangci-lint
+just test           # go test -race ./...
+just cover          # statement coverage
 just clean          # rm -rf dist/
 ```
 
 ### Dogfooding
 
-This project has its own `vteam/` directory pointing the agents at `src/`. Run `just dev run improver` to have vteam review itself.
+This project has its own `vteam/` directory pointing the agents at its own code. Run `just dev run improver` to have vteam review itself.
 
 ### Dependencies
 
-vteam aims to keep external dependencies to a minimum. Slug generation and other utilities are handled by internal modules with no external dependencies.
+vteam keeps external dependencies to a minimum: `cobra` for the CLI, `bubbletea` for the dashboard, and `golang.org/x/term`, `x/sync`, `x/text`. Cron parsing, config validation, and slug generation are internal packages. Tests use the standard library plus `go-cmp` and `testscript`.
 
 ### System dependencies
 

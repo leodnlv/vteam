@@ -4,6 +4,8 @@ Skills in `skills/` (e.g. `create-vteam-agent`) need to be available as **user-s
 
 ## Install
 
+From the root of this repo:
+
 ```bash
 vteam skill install
 ```

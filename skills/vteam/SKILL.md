@@ -9,13 +9,13 @@ You now have full context on the **vteam** framework. Use this knowledge to assi
 
 ## What vteam is
 
-vteam is an npm package that orchestrates AI agents powered by `claude -p` (Claude Code's headless mode). The user defines agent prompts, triages findings, and reviews pull requests. vteam handles everything else: scheduling agent runs, managing task lifecycle, isolating work in git worktrees, and creating branches and pull requests.
+vteam is a Go CLI that orchestrates AI agents powered by `claude -p` (Claude Code's headless mode). The user defines agent prompts, triages findings, and reviews pull requests. vteam handles everything else: scheduling agent runs, managing task lifecycle, isolating work in git worktrees, and creating branches and pull requests.
 
-**Core separation of concerns:** the TypeScript orchestrator owns all state (files, git, aven tasks, PRs). Claude owns all intelligence (reading code, finding issues, implementing fixes). If Claude crashes mid-run, no state is corrupted — the orchestrator applies state transitions only after Claude finishes and returns structured output.
+**Core separation of concerns:** the Go orchestrator owns all state (files, git, aven tasks, PRs). Claude owns all intelligence (reading code, finding issues, implementing fixes). If Claude crashes mid-run, no state is corrupted — the orchestrator applies state transitions only after Claude finishes and returns structured output.
 
 ## Prerequisites
 
-- **Node.js** >= 20
+- **vteam** binary on PATH — `go install github.com/leodnlv/vteam/cmd/vteam@latest` (Go 1.27+)
 - **Claude Code** CLI — `claude` must be on PATH
 - **Git** — the project must be a git repository
 - **aven** — local-first SQLite task manager CLI; `aven` must be installed and on PATH. All vteam tasks live in aven.
@@ -29,7 +29,7 @@ vteam run <agent>                       # run a specific agent
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
 vteam run                               # (no agent) list available agents
 vteam status                            # running agents (pid, task, worktree), scheduler state + next fires, each task agent's next pick, PRs awaiting merge, tasks/worktrees needing attention
-vteam dashboard                         # the vteam status view full-screen, refreshed every second (Ctrl+C to quit)
+vteam dashboard                         # the vteam status view full-screen, refreshed every second (Ctrl+C or q to quit)
 vteam clean                             # remove worktrees no running agent uses, break stale locks, release orphaned active tasks
 vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen done tasks whose PR is labelled or conflicting
 vteam cron start                        # start long-lived scheduler for agents with cron patterns (and the merge ensurer)
@@ -105,7 +105,7 @@ All fields are optional.
 {
   "$schema": "../../agent.schema.json",      // editor autocomplete/validation
   "model": "sonnet",                         // alias ("sonnet", "opus", "haiku") or full model ID; omit for Claude Code's default
-  "cron": "0 */6 * * *",                     // cron schedule (5 fields)
+  "cron": "0 */6 * * *",                     // cron schedule (5 fields, no L or #)
   "worktree": true,                          // run in an isolated git worktree
   "readOnly": true,                          // worktree but no commit/push/PR (requires worktree: true)
   "input": "task",                           // "task" (pick from the aven todo queue) or "pr" (respond to PR reviews)
@@ -261,7 +261,7 @@ Advisory file locking via atomic `mkdir`. Each lock contains PID + timestamp. St
 
 ## Scheduling
 
-Agents with a `cron` field, plus `vteam ensure-merge` when `mergeEnsurer.cron` is set, run on schedule via `vteam cron start` (foreground process, stop with Ctrl+C). If an agent is still running when its next tick fires, the tick is skipped. The scheduler writes its pid to `vteam/.locks/cron.pid`, refuses to start twice, and `vteam status` reads that file to report whether it is running.
+Agents with a `cron` field, plus `vteam ensure-merge` when `mergeEnsurer.cron` is set, run on schedule via `vteam cron start` (foreground process, stop with Ctrl+C). Cron expressions have 5 fields with ranges, steps, lists, and month/weekday names; `L` and `#` are rejected, and when both day-of-month and day-of-week are set either one matching fires. If an agent is still running when its next tick fires, the tick is skipped. The scheduler writes its pid to `vteam/.locks/cron.pid`, refuses to start twice, and `vteam status` reads that file to report whether it is running.
 
 Every `vteam run <agent>`, whether started by hand or by the scheduler, writes its full output to `vteam/.logs/<agent>/<ISO-timestamp>.log` and still prints to the terminal. Check there first when troubleshooting a run. The output is split into sections (Setup, Agent, Result, hooks, Cleanup) with an elapsed-time gutter. Glyphs: `•` step, `❯` Claude text, `⚙` tool call, `✗` failed tool or error, `!` warning. The file has no colors and keeps full tool inputs.
 

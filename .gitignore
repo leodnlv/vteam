@@ -1,6 +1,4 @@
-node_modules/
 dist/
-*.tsbuildinfo
 .vteam-worktrees/
 vteam/.runs/
 vteam/.locks/

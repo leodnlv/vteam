@@ -2,7 +2,7 @@
 
 ## What this project is
 
-An npm package (`vteam`) that orchestrates AI agents powered by `claude -p` (Claude Code's headless mode) to autonomously review codebases and implement fixes. The framework manages a task lifecycle (inbox → todo → active → done) in the `aven` task manager, runs agents in isolated git worktrees, and maintains a shared memory file so stateless agent invocations don't duplicate work.
+A Go CLI (`vteam`) that orchestrates AI agents powered by `claude -p` (Claude Code's headless mode) to autonomously review codebases and implement fixes. The framework manages a task lifecycle (inbox → todo → active → done) in the `aven` task manager, runs agents in isolated git worktrees, and maintains a shared memory file so stateless agent invocations don't duplicate work.
 
 The end user's workflow:
 1. Define agent prompts in `AGENT.md` files
@@ -14,7 +14,7 @@ The end user's workflow:
 
 **Core principle: the orchestrator owns all state, Claude owns all intelligence.**
 
-The TypeScript orchestrator handles state transitions — creating worktrees, updating aven tasks, creating PRs. Claude (`-p` mode) handles reasoning — reading code, finding issues, implementing fixes. If Claude crashes mid-run, no state is corrupted because the orchestrator applies changes atomically after Claude finishes.
+The Go orchestrator handles state transitions — creating worktrees, updating aven tasks, creating PRs. Claude (`-p` mode) handles reasoning — reading code, finding issues, implementing fixes. If Claude crashes mid-run, no state is corrupted because the orchestrator applies changes atomically after Claude finishes.
 
 ### How agents run
 
@@ -45,7 +45,7 @@ The optional `memoryUpdate` field is included in the output format instructions 
 
 The optional `threadReplies` field (`[{ thread, body }]`) is included only when the run is a follow-up on an existing PR with unresolved review threads. The prompt labels the threads `T1`, `T2`, …; Claude replies by label, and the orchestrator maps labels back to platform thread IDs, so Claude never handles real IDs.
 
-The output format instructions are injected into every agent's user prompt by the prompt builder (`buildOutputInstruction`). The orchestrator validates the output via a single zod schema (`agentOutputSchema`) in `orchestrator/output-schema.ts`. Markdown fences are stripped before parsing as a fallback.
+The output format instructions are injected into every agent's user prompt by the prompt builder (`outputInstruction` in `internal/prompt`). The orchestrator validates the output with `output.Parse` (`internal/output`). Unknown keys are ignored, `null` values are rejected. Markdown fences are stripped before parsing as a fallback.
 
 ### Memory management
 
@@ -57,13 +57,13 @@ Each `claude -p` call is stateless. Memory is external:
 
 ### Worktrees
 
-Agents with `worktree: true` get an isolated git worktree (`git worktree add`). `createWorktree` fetches `baseBranch` and branches from `origin/<baseBranch>` (not the local branch, which may be stale or hold unpushed commits). Task runs use the branch `vteam/<slugified-title>-<runId>` — aven refs are local and never appear in branch names, commits, or PRs. Claude edits files in the worktree but does not commit — it returns a structured JSON output with a commit message. The orchestrator then runs `git add -A` + `git commit`, pushes the branch, optionally creates a PR (if `autoPR: true`), and cleans up the worktree. A PR opened by a run without a task (e.g. test-writer) gets a receipt task (`recordPRTask` in `run.ts`): created with the commit subject as title, the commit body as description, severity `low`, `found-by=<agent>`, then set straight to `done` with `completed`/`branch`/`pr-url`, the agent's done label, and a run note. This keeps the invariant that every vteam PR is backed by a task, which the merge ensurer relies on. A failure to record it is logged and does not fail the run. The coder template's `taskFilter` includes `test-writer` so reopened test PRs get picked, and `security-analyst` so its findings get implemented.
+Agents with `worktree: true` get an isolated git worktree (`git worktree add`). `CreateWorktree` fetches `baseBranch` and branches from `origin/<baseBranch>` (not the local branch, which may be stale or hold unpushed commits). Task runs use the branch `vteam/<slugified-title>-<runId>` — aven refs are local and never appear in branch names, commits, or PRs. Claude edits files in the worktree but does not commit — it returns a structured JSON output with a commit message. The orchestrator then runs `git add -A` + `git commit`, pushes the branch, optionally creates a PR (if `autoPR: true`), and cleans up the worktree. A PR opened by a run without a task (e.g. test-writer) gets a receipt task (`recordPRTask` in `internal/run`): created with the commit subject as title, the commit body as description, severity `low`, `found-by=<agent>`, then set straight to `done` with `completed`/`branch`/`pr-url`, the agent's done label, and a run note. This keeps the invariant that every vteam PR is backed by a task, which the merge ensurer relies on. A failure to record it is logged and does not fail the run. The coder template's `taskFilter` includes `test-writer` so reopened test PRs get picked, and `security-analyst` so its findings get implemented.
 
-`pushBranch` pushes with `--force-with-lease=refs/heads/<branch>:<remoteSha>`. `WorktreeSession.remoteSha` is `""` for `createWorktree` (the branch must not exist on the remote) and the fetched `origin/<branch>` sha for `checkoutWorktree`, so commits someone else pushed to a PR branch during the run are never overwritten — the push fails and the task returns to `todo`. Transient network errors (`isTransientPushError`) are retried after 5s and 15s. Before each retry, `git ls-remote` checks whether the dropped push already landed (the lease would reject a re-push of it).
+`Push` pushes with `--force-with-lease=refs/heads/<branch>:<remoteSha>`. `git.Session`'s remote SHA is `""` for `CreateWorktree` (the branch must not exist on the remote) and the fetched `origin/<branch>` sha for `CheckoutWorktree`, so commits someone else pushed to a PR branch during the run are never overwritten — the push fails and the task returns to `todo`. Transient network errors (`IsTransientPushError`) are retried after 5s and 15s. Before each retry, `git ls-remote` checks whether the dropped push already landed (the lease would reject a re-push of it).
 
-Follow-ups on a conflicting PR merge the PR's base branch into the worktree first (`mergeBaseBranch`, see Task manager → Lifecycle step 5).
+Follow-ups on a conflicting PR merge the PR's base branch into the worktree first (`MergeBaseBranch`, see Task manager → Lifecycle step 5).
 
-Agents with `input: "pr"` use `checkoutWorktree` to check out an existing PR branch (via `git fetch` + `git worktree add` from the remote tracking branch). Claude edits files and returns a commit message. The orchestrator commits, pushes to the same branch, posts a summary comment on the PR, and removes the `prTriggerLabel`. Discovery is label-based: the orchestrator searches for open PRs matching the `prTriggerLabel`. The user adds the trigger label when they want changes; the orchestrator removes it after the agent pushes. This avoids GitHub's limitation where PR authors cannot submit "Request changes" reviews on their own PRs.
+Agents with `input: "pr"` use `CheckoutWorktree` to check out an existing PR branch (via `git fetch` + `git worktree add` from the remote tracking branch). Claude edits files and returns a commit message. The orchestrator commits, pushes to the same branch, posts a summary comment on the PR, and removes the `prTriggerLabel`. Discovery is label-based: the orchestrator searches for open PRs matching the `prTriggerLabel`. The user adds the trigger label when they want changes; the orchestrator removes it after the agent pushes. This avoids GitHub's limitation where PR authors cannot submit "Request changes" reviews on their own PRs.
 
 ### Agent configuration
 
@@ -99,13 +99,13 @@ Each agent is a directory `vteam/agents/<name>/`. `AGENT.md` (required — its p
 - `memory` / `onFinish` — `{ model?, allowedTools?, disallowedTools? }` for the memory curation agent and the on-finish hook. The `MEMORY.md` / `ON_FINISH.md` file enables the feature; the section only configures it, and a section without its markdown file is a load error.
 - `$schema` — ignored by vteam; points editors at the JSON Schema
 
-`resolveAgentConfig` (`src/config/agent.ts`) validates `agent.json` on load with `agentConfigSchema` (`src/config/schema.ts`). The schema is strict: unknown keys are rejected at every level, and cross-field rules (e.g. `readOnly` requires `worktree`) are zod refinements. A missing `agent.json` means all defaults. Any `AGENT.md`, `MEMORY.md`, or `ON_FINISH.md` that starts with `---` is a load error — YAML frontmatter is no longer supported and must be moved to `agent.json` by hand.
+`config.ResolveAgent` (`internal/config/agent.go`) validates `agent.json` on load with `ParseAgentConfig`, a hand-written validator in `internal/config/check.go` whose messages match the old zod ones. It is strict: unknown keys are rejected at every level, and cross-field rules (e.g. `readOnly` requires `worktree`) are extra checks in the validator. A missing `agent.json` means all defaults. Any `AGENT.md`, `MEMORY.md`, or `ON_FINISH.md` that starts with `---` is a load error — YAML frontmatter is no longer supported and must be moved to `agent.json` by hand.
 
-`vteam init` writes `vteam/agent.schema.json`, generated from `agentConfigSchema` with `z.toJSONSchema`, for editor autocomplete and validation. The JSON Schema cannot express the refinements; only vteam enforces those. The dogfood copy at `vteam/agent.schema.json` is checked against the zod schema by `src/config/agent.test.ts` — regenerate it when the schema changes. `vteam.config.json` contains global settings (baseBranch, platform, worktreeDir, tasks, mergeEnsurer). Add custom agents by creating `vteam/agents/<name>/AGENT.md` — no config changes needed.
+`vteam init` writes `vteam/agent.schema.json` (embedded from `internal/config/agent.schema.json`) for editor autocomplete and validation. The JSON Schema cannot express the cross-field rules; only vteam enforces those. It is maintained by hand: when `agent.json` fields change, update it and the validator together. `internal/config/config_test.go` checks that its keys match the validator's and that the dogfood copy at `vteam/agent.schema.json` is identical. `vteam.config.json` contains global settings (baseBranch, platform, worktreeDir, tasks, mergeEnsurer). Add custom agents by creating `vteam/agents/<name>/AGENT.md` — no config changes needed.
 
 ### Task manager
 
-All task operations go through the `TaskManager` interface (`src/tasks/task-manager.ts`: `listReady`, `listDone`, `getIndex`, `create`, `update`, `addNote`). The only implementation is `AvenTaskManager` (`src/tasks/aven-manager.ts`), which shells out to the `aven` CLI — it never touches aven's SQLite file directly. Configuration lives under `tasks` in `vteam.config.json`:
+All task operations go through the `tasks.Manager` interface (`internal/tasks/tasks.go`: `ListReady`, `ListDone`, `GetIndex`, `Create`, `Update`, `AddNote`). The only implementation is `tasks.Aven` (`internal/tasks/aven.go`), which shells out to the `aven` CLI — it never touches aven's SQLite file directly. Configuration lives under `tasks` in `vteam.config.json`:
 
 ```json
 {
@@ -116,32 +116,32 @@ All task operations go through the `TaskManager` interface (`src/tasks/task-mana
 - `tasks.project` (required) — aven project; aven creates it on the first `add`. `vteam init` defaults it to the directory name.
 - `tasks.label` (default `"vteam"`) — opt-in label. vteam only lists, picks, and dedups against tasks with this label, and creates the label on demand. Humans can queue their own aven tasks for the coder by adding the label.
 
-Agent labels are hardcoded conventions, all defined in `src/tasks/labels.ts`: a created task gets `<tasks.label>-<creating agent>` (e.g. `vteam-improver`), and a task set to `done` gets `<tasks.label>-<finishing agent>` (e.g. `vteam-coder`). They are never removed, so they stay when a task is reopened. `toAvenLabel` mirrors aven's label normalization (lowercase, runs of non-`[a-z0-9]` → `-`, trimmed) so the label vteam writes is the one aven stores. Each label is created (`aven label create`) before use, because `aven edit --label` rejects unknown labels.
+Agent labels are hardcoded conventions, all defined in `internal/tasks/labels.go`: a created task gets `<tasks.label>-<creating agent>` (e.g. `vteam-improver`), and a task set to `done` gets `<tasks.label>-<finishing agent>` (e.g. `vteam-coder`). They are never removed, so they stay when a task is reopened. `ToAvenLabel` mirrors aven's label normalization (lowercase, runs of non-`[a-z0-9]` → `-`, trimmed) so the label vteam writes is the one aven stores. Each label is created (`aven label create`) before use, because `aven edit --label` rejects unknown labels.
 - `tasks.workspace` (optional) — passed as `--workspace` to every aven call.
 - `mergeEnsurer.cron` (optional) — schedules `vteam ensure-merge` in `vteam cron start`.
 - `mergeEnsurer.label` (default `"vteam:changes-requested"`) — PR label a human adds to approve the review feedback; see Merge ensurer.
 
-Routing (`matchesTaskFilter` in `task-manager.ts`): `listReady()` returns every ready labelled task with its metadata; `run` keeps the tasks matching the running agent's `taskFilter` (no filter = all). There is no fallback agent — a task no filter matches is never picked. Overlaps are allowed — picking runs under a global claim lock (see Lifecycle), so exactly one run gets each task. vteam only writes `found-by`; humans set other keys such as `actor` via `aven edit <ref> --metadata actor=<agent>`. `pickNextTask` (also in `task-manager.ts`) applies the filter, the retry limit, and the severity/age ordering; `run` and `vteam status` both use it.
+Routing (`MatchesFilter` in `tasks.go`): `ListReady` returns every ready labelled task with its metadata; `run` keeps the tasks matching the running agent's `taskFilter` (no filter = all). There is no fallback agent — a task no filter matches is never picked. Overlaps are allowed — picking runs under a global claim lock (see Lifecycle), so exactly one run gets each task. vteam only writes `found-by`; humans set other keys such as `actor` via `aven edit <ref> --metadata actor=<agent>`. `PickNext` (also in `tasks.go`) applies the filter, the retry limit, and the severity/age ordering; `run` and `vteam status` both use it.
 
 Mapping: severity `critical/high/medium/low` ↔ aven priority `urgent/high/medium/low` (priority `none` reads as `low`). `found-by`, `retry-count`, `completed`, `branch`, `pr-url`, `merged`, `claimed-by`, `claimed-pid`, `claimed-host` are aven metadata (string values). The finding's description, suggested fix, and affected files become the aven description; affected files are not stored as metadata.
 
-Tasks created from `output: "task"` findings start in `inbox` and are only picked once a human moves them to `todo`. aven promotes inbox tasks with priority medium or higher to `todo` on `add`, so `create` follows up with `aven edit <ref> --status inbox`.
+Tasks created from `output: "task"` findings start in `inbox` and are only picked once a human moves them to `todo`. aven promotes inbox tasks with priority medium or higher to `todo` on `add`, so `Create` follows up with `aven edit <ref> --status inbox`.
 
 Lifecycle for `input: "task"` agents:
-1. Under the global claim lock `vteam/.locks/task-claim` (shared by all agents, held only while picking): `aven list --status todo --ready` (respects aven dependencies and `available_at`), keep tasks routed to this agent, drop tasks with `retry-count >= maxRetries`, sort by severity then oldest (`pickNextTask`) — pick the first and set it `active` with claim metadata `claimed-by` (runId), `claimed-pid`, `claimed-host`. Once `active`, the task drops out of every other agent's `listReady`. aven has no compare-and-swap, so the lock is what prevents two agents claiming the same task; it only works on one machine.
+1. Under the global claim lock `vteam/.locks/task-claim` (shared by all agents, held only while picking): `aven list --status todo --ready` (respects aven dependencies and `available_at`), keep tasks routed to this agent, drop tasks with `retry-count >= maxRetries`, sort by severity then oldest (`PickNext`) — pick the first and set it `active` with claim metadata `claimed-by` (runId), `claimed-pid`, `claimed-host`. Once `active`, the task drops out of every other agent's `ListReady`. aven has no compare-and-swap, so the lock is what prevents two agents claiming the same task; it only works on one machine.
 2. Commit pushed → `done` with `completed`/`branch`/`pr-url` metadata and the agent's done label.
 3. Worktree agent produced no changes → back to `todo` with `retry-count` incremented.
 4. Any other ending (error, crash, readOnly or non-worktree agent) → back to `todo` in `finally`, retries unchanged.
-5. Follow-up on an existing PR: when a worktree agent picks a task that already has `pr-url` metadata (typically a `done` task a human moved back to `todo`, with a note saying which review comments to apply), the orchestrator looks the PR up (`getPullRequest`). If it is merged or closed, the task goes to `backlog` with a note and the agent does not run (remove `pr-url` to start over on a new branch). If it is open, the orchestrator checks out the PR branch with `checkoutWorktree`, adds an `## Existing Pull Request` section with the PR's unresolved review threads (`getOpenReviewThreads`; resolved threads and top-level comments are left out) to the prompt, pushes to that branch, skips `autoPR`, and settles the task as in steps 2–4 with `pr-url` kept. After the push, the orchestrator posts each of the agent's `threadReplies` to its thread (`replyToReviewThread`) as `🤖 **vteam <agent>:** <body>` followed by `Fixed in <sha>`, and resolves the thread (`resolveReviewThread`) when the agent has `resolveThreads: true`. Replies to unknown labels are skipped, replies are dropped when nothing was pushed, and failed replies are logged without failing the run. The run note records `Replied to N of M review threads.` Threads Claude skipped get no reply. If the PR's `mergeable` is `conflicting`, the orchestrator runs `mergeBaseBranch` (fetch + `git merge --no-edit origin/<pr base>`) in the worktree before building the prompt and adds a `## Merge Conflicts` section listing the conflicted files. On commit, MERGE_HEAD makes `git commit` produce the merge commit with Claude's message. If `findUnresolvedConflicts` still finds `<<<<<<<`/`>>>>>>>` markers in those files, nothing is committed, the run counts as "no changes" (step 3), and the note records the files. A clean merge is pushed even if Claude made no other changes.
+5. Follow-up on an existing PR: when a worktree agent picks a task that already has `pr-url` metadata (typically a `done` task a human moved back to `todo`, with a note saying which review comments to apply), the orchestrator looks the PR up (`PullRequest`). If it is merged or closed, the task goes to `backlog` with a note and the agent does not run (remove `pr-url` to start over on a new branch). If it is open, the orchestrator checks out the PR branch with `CheckoutWorktree`, adds an `## Existing Pull Request` section with the PR's unresolved review threads (`OpenReviewThreads`; resolved threads and top-level comments are left out) to the prompt, pushes to that branch, skips `autoPR`, and settles the task as in steps 2–4 with `pr-url` kept. After the push, the orchestrator posts each of the agent's `threadReplies` to its thread (`ReplyToThread`) as `🤖 **vteam <agent>:** <body>` followed by `Fixed in <sha>`, and resolves the thread (`ResolveThread`) when the agent has `resolveThreads: true`. Replies to unknown labels are skipped, replies are dropped when nothing was pushed, and failed replies are logged without failing the run. The run note records `Replied to N of M review threads.` Threads Claude skipped get no reply. If the PR's `mergeable` is `conflicting`, the orchestrator runs `MergeBaseBranch` (fetch + `git merge --no-edit origin/<pr base>`) in the worktree before building the prompt and adds a `## Merge Conflicts` section listing the conflicted files. On commit, MERGE_HEAD makes `git commit` produce the merge commit with Claude's message. If `FindUnresolvedConflicts` still finds `<<<<<<<`/`>>>>>>>` markers in those files, nothing is committed, the run counts as "no changes" (step 3), and the note records the files. A clean merge is pushed even if Claude made no other changes.
 6. Every transition out of `active` removes the claim metadata. A hard-killed process can leave a task `active`; `vteam clean` returns `active` tasks to `todo` when their `claimed-host` is this machine and `claimed-pid` is dead. Tasks claimed on another host, or `active` without a claim (e.g. set by a human), are left alone.
 
 ### Merge ensurer
 
-`vteam ensure-merge` (`src/commands/ensure-merge.ts`) is a deterministic sweep, not a `claude -p` agent. A `done` task only means its PR is open; the ensurer moves it through review. It only sees PRs that have a task, so every PR vteam opens must have one (see Worktrees). Under `vteam/.locks/merge-ensurer`, it calls `taskManager.listDone()` and, for each task with `pr-url` and without `merged=true` metadata, calls `getPullRequest`:
+`vteam ensure-merge` (`internal/ensuremerge`) is a deterministic sweep, not a `claude -p` agent. A `done` task only means its PR is open; the ensurer moves it through review. It only sees PRs that have a task, so every PR vteam opens must have one (see Worktrees). Under `vteam/.locks/merge-ensurer`, it calls `ListDone` and, for each task with `pr-url` and without `merged=true` metadata, calls `PullRequest`:
 
 - merged → metadata `merged=true` (stays `done`, never checked again)
 - closed → `canceled` + note (canceled stays in dedup, so the finding is not re-reported)
-- open with the `mergeEnsurer.label` PR label (default `vteam:changes-requested`) → `removePRLabel` **first**, then `todo` with `retry-count` removed, then a note. If label removal throws, the task stays `done` (a left-over label would otherwise reopen the task after every push).
+- open with the `mergeEnsurer.label` PR label (default `vteam:changes-requested`) → `RemoveLabel` **first**, then `todo` with `retry-count` removed, then a note. If label removal throws, the task stays `done` (a left-over label would otherwise reopen the task after every push).
 - open and `mergeable: "conflicting"` → `todo` + note; the coder resolves the conflict (see step 5)
 - otherwise (incl. `mergeable: "unknown"`) → nothing. Review comments alone never reopen a task; the label is the human approval.
 
@@ -149,7 +149,7 @@ Per-task failures are logged and the sweep continues. Its output follows the `vt
 
 Whenever the agent returned output (every ending except an error or crash), the orchestrator appends an aven note to the task: `<agent>: <status>`, the agent's `summary`, `Blocker: <blockerReason>` if present, and `PR: <url>` if one was created. A failed note write is logged and does not fail the run. Notes (from runs and from humans) are injected into the prompt the next time an agent picks the task, so retries see why earlier attempts failed.
 
-`getIndex` and `listReady` cost one `aven show --full --json` per task (8 concurrent), because `aven list --json` omits description, metadata, and notes. `unknown-project`/`unknown-label` errors from `aven list` are treated as an empty list.
+`GetIndex` and `ListReady` cost one `aven show --full --json` per task (8 concurrent), because `aven list --json` omits description, metadata, and notes. `unknown-project`/`unknown-label` errors from `aven list` are treated as an empty list.
 
 ### On-finish hooks
 
@@ -183,9 +183,9 @@ A non-interactive skill (`skills/vteam/SKILL.md`) that injects full vteam knowle
 An interactive skill (`skills/create-vteam-agent/SKILL.md`) that scaffolds new vteam agents. It walks through clarifying questions (input mode, output mode, worktree, tools, memory, hooks, model, cron) and generates `agent.json` + `AGENT.md` + optional `MEMORY.md` / `ON_FINISH.md` files.
 
 **The skill must stay in sync with the codebase.** When any of the following change, update the skill accordingly:
-- `agent.json` fields (added, removed, renamed, new validation rules) in `src/config/schema.ts`
-- The `AgentOutput` schema or `content` type union in `src/orchestrator/output-schema.ts`
-- How prompts are assembled in `src/orchestrator/prompt-builder.ts`
+- `agent.json` fields (added, removed, renamed, new validation rules) in `internal/config`
+- The `AgentOutput` type or `content` union in `internal/model` and `internal/output`
+- How prompts are assembled in `internal/prompt`
 - `memory` / `onFinish` section fields
 - New agent capabilities or orchestrator behaviors that affect what questions the skill should ask
 
@@ -197,56 +197,53 @@ skills/
 │   └── SKILL.md                  Context injection skill — loads vteam knowledge into any session
 └── create-vteam-agent/
     └── SKILL.md                  Interactive skill for scaffolding agents
-src/
-├── bin.ts                        CLI entry point (commander)
-├── types.ts                      All shared TypeScript types
-├── ansi.ts                       ANSI colors (TTY / NO_COLOR / FORCE_COLOR aware) and stripAnsi
-├── log.ts                        Run output formatting: sections, elapsed-time gutter, glyphs, tool lines
-├── run-log.ts                    Per-run log file under vteam/.logs/<agent>/ (tees stdout/stderr, strips ANSI)
-├── run-state.ts                  Per-run state JSON under vteam/.runs/; live-run discovery from agent locks
-├── commands/
-│   ├── init.ts                   vteam init — scaffold vteam/ in any project
-│   ├── run.ts                    vteam run <agent> — main orchestration flow
-│   ├── cron.ts                   vteam cron — long-lived scheduler process
-│   ├── status.ts                 vteam status — running agents, scheduler, next picks, tasks needing attention
-│   ├── dashboard.ts              vteam dashboard — vteam status full-screen, refreshed every second
-│   ├── clean.ts                  vteam clean — remove unused worktrees, stale locks, orphaned active tasks
-│   ├── ensure-merge.ts           vteam ensure-merge — record merges, cancel closed PRs, reopen labelled/conflicting PR tasks
-│   └── skill.ts                  vteam skill install/uninstall — manage Claude Code skill symlinks
-├── config/
-│   ├── schema.ts                 Zod schemas for vteam.config.json and agent.json
-│   ├── agent.ts                  Agent resolution (agent.json + AGENT.md/MEMORY.md/ON_FINISH.md) and listing
-│   └── load.ts                   Reads and validates vteam.config.json
-├── orchestrator/
-│   ├── agent-runner.ts           Spawns claude -p, captures structured JSON output
-│   ├── output-schema.ts          Zod schema for Claude's unified AgentOutput (discriminated content union)
-│   └── prompt-builder.ts         Assembles layered prompts + output format instructions
-├── memory/
-│   └── lock.ts                   Advisory file locking (atomic mkdir)
-├── tasks/
-│   ├── task-manager.ts           TaskManager interface, TaskIndex type, severity ordering, task description format
-│   ├── labels.ts                 Task label conventions (agent labels on create/done, aven label normalization)
-│   ├── claim.ts                  Task claim metadata and orphaned-claim release for vteam clean
-│   └── aven-manager.ts           AvenTaskManager — TaskManager backed by the aven CLI
-├── worktree/
-│   └── manager.ts                Git worktree create/remove/list/cleanup
-├── integrations/
-│   ├── merge-request.ts          GitHub (gh) and GitLab (glab) MR creation
-│   └── pull-request.ts           PR review discovery, comment fetching, posting
-└── templates/                    Scaffolding templates copied by vteam init
-    ├── <agent>.agent.json        agent.json for each default agent (improver, security-analyst, coder, test-writer)
-    ├── <agent>.agent.md          AGENT.md prompt for each default agent
-    ├── <agent>.memory.md         MEMORY.md prompt for each default agent
-    └── vteam.config.json
+cmd/vteam/
+├── main.go                       Entry point; calls cli.Main
+├── main_test.go                  testscript e2e harness (fake claude/gh, real aven on a temp db)
+└── testdata/script/*.txtar       e2e scripts: init, errors, failed run, full lifecycle
+internal/
+├── cli/                          Cobra commands; wires real dependencies into the packages below
+├── model/                        Shared types (tasks, AgentOutput, Content union, PRs, run outcome)
+├── ansi/                         ANSI colors (TTY / NO_COLOR / FORCE_COLOR aware) and Strip
+├── log/                          Run output formatting: Logger (sections, elapsed-time gutter, glyphs, tool lines) and Format* helpers
+├── runlog/                       Per-run log file under vteam/.logs/<agent>/ (ANSI-stripped copy of the Logger output)
+├── runstate/                     Per-run state JSON under vteam/.runs/; live-run discovery from agent locks
+├── lock/                         Advisory file locking (atomic mkdir, stale detection)
+├── execx/                        Runner interface for every subprocess (aven, git, gh, glab) + Fake for tests
+├── config/                       vteam.config.json + agent.json validation, agent resolution, embedded agent.schema.json
+├── cron/                         5-field cron parser and next-fire computation
+├── output/                       Parses Claude's AgentOutput (fence stripping, JSON extraction)
+├── prompt/                       Assembles layered prompts + output format instructions
+├── claude/                       Spawns claude -p, renders stream-json, tool-line descriptions
+├── tasks/                        Manager interface, labels, claims, routing/pick order, Aven implementation
+│   └── taskstest/                In-memory Manager fake
+├── git/                          Git worktree create/checkout/merge/push/remove/cleanup
+│   └── gittest/                  Temp-repo helpers for tests
+├── platform/                     Platform interface; GitHub (gh) and GitLab (glab) PRs, threads, labels
+├── run/                          vteam run <agent> — main orchestration flow on injected Deps
+├── ensuremerge/                  vteam ensure-merge — record merges, cancel closed PRs, reopen labelled/conflicting PR tasks
+├── schedule/                     vteam cron — long-lived scheduler process and Scheduler section
+├── status/                       vteam status — running agents, scheduler, next picks, tasks needing attention
+├── dashboard/                    vteam dashboard — bubbletea program redrawing vteam status every second
+├── clean/                        vteam clean — remove unused worktrees, stale locks, orphaned active tasks
+├── scaffold/                     vteam init — scaffold vteam/ in any project
+│   └── templates/                Embedded templates: <agent>.agent.json/.agent.md/.memory.md for the four default agents, vteam.config.json
+├── skill/                        vteam skill install/uninstall — manage Claude Code skill symlinks
+├── slugify/
+└── golden/                       Loads testdata/golden/*.json in tests
+testdata/
+├── golden/                       Frozen goldens captured from the old TypeScript implementation
+└── claude/                       stream-json fixtures replayed by the claude runner tests
 ```
 
 ## Commands
 
 ```
-just build          # tsc + copy templates to dist/
-just dev <args>     # run CLI via tsx (e.g. just dev run improver)
-just lint           # tsc --noEmit + eslint
-just test           # vitest
+just build          # go build -o dist/vteam ./cmd/vteam
+just dev <args>     # go run ./cmd/vteam (e.g. just dev run improver)
+just lint           # go vet + golangci-lint
+just test           # go test -race ./...
+just cover          # statement coverage
 just clean          # rm -rf dist/
 ```
 
@@ -258,7 +255,7 @@ vteam run                               # list available agents
 vteam run <agent>                       # run a specific agent
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
 vteam status                            # show running agents, scheduler state, next picks, tasks needing attention
-vteam dashboard                         # vteam status full-screen, refreshed every second until Ctrl+C
+vteam dashboard                         # vteam status full-screen, refreshed every second until Ctrl+C or q
 vteam clean                             # remove worktrees no running agent uses, break stale locks, release orphaned active tasks
 vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen labelled or conflicting PR tasks
 vteam cron start                        # start long-lived scheduler for agents with cron patterns
@@ -267,21 +264,21 @@ vteam skill install                     # symlink skills from skills/ into ~/.cl
 vteam skill uninstall                   # remove skill symlinks from ~/.claude/skills/
 ```
 
-`vteam cron start` runs a foreground Node.js process that schedules agents based on `cron` patterns in their `agent.json` (parsed via `croner`), plus `vteam ensure-merge` when `mergeEnsurer.cron` is set. Each agent run spawns a subprocess (`vteam run <agent>`). If an agent is still running when its next cron tick fires, the tick is skipped. The scheduler discards the child's stdout/stderr because the child writes its own log; it picks that log's path itself and passes it in the `VTEAM_RUN_LOG` env var (honored by `startRunLog`), so it can print the exact file. Its output uses `src/log.ts`: a banner, the same `Scheduler` section as `vteam status` (`renderScheduler`), then an `Activity` section with a wall-clock gutter (`useWallClock`) logging each job start (with its log path), finish, failure, and skipped tick. It writes its pid to `vteam/.locks/cron.pid` and refuses to start while that pid is alive; the file is removed on Ctrl+C/SIGTERM. Stop with Ctrl+C.
+`vteam cron start` runs a foreground process that schedules agents based on `cron` patterns in their `agent.json` (parsed by `internal/cron`: 5 fields, ranges, steps, lists, month and weekday names, `7` = Sunday, day-of-month and day-of-week OR'ed when both are set; `L` and `#` are not supported), plus `vteam ensure-merge` when `mergeEnsurer.cron` is set. Each agent run spawns a subprocess (`vteam run <agent>`). If an agent is still running when its next cron tick fires, the tick is skipped. The scheduler discards the child's stdout/stderr because the child writes its own log; it picks that log's path itself and passes it in the `VTEAM_RUN_LOG` env var (honored by `runlog.Start`), so it can print the exact file. Its output uses `internal/log`: a banner, the same `Scheduler` section as `vteam status` (`RenderScheduler`), then an `Activity` section with a wall-clock gutter (`UseWallClock`) logging each job start (with its log path), finish, failure, and skipped tick. It writes its pid to `vteam/.locks/cron.pid` and refuses to start while that pid is alive; the file is removed on Ctrl+C/SIGTERM. Stop with Ctrl+C.
 
-`vteam status` (`src/commands/status.ts`) reads only local state plus one `getIndex` and one `listReady`: `findLiveRuns` (`src/run-state.ts`) turns live agent locks in `vteam/.locks/` (except `task-claim`) into running jobs, each with its newest `vteam/.runs/` state started before the lock (`findLatestRunState`) for the worktree path; status matches them to `active` tasks by `claimed-pid`/`claimed-host`; `cron.pid` gives the scheduler state; `pickNextTask` per `input: "task"` agent gives the next pick. It also lists `done` tasks with an unmerged `pr-url`, plus inbox, unroutable, retry-exhausted, orphaned `active` tasks, and worktrees under `worktreeDir` no running job uses (`findOrphanedWorktrees`, which compares real paths). `vteam clean` removes exactly those worktrees (`cleanupOrphanedWorktrees`), so it is safe to run while agents work.
+`vteam status` (`internal/status`) reads only local state plus one `GetIndex` and one `ListReady`: `runstate.FindLive` turns live agent locks in `vteam/.locks/` (except `task-claim`) into running jobs, each with its newest `vteam/.runs/` state started before the lock (`runstate.FindLatest`) for the worktree path; status matches them to `active` tasks by `claimed-pid`/`claimed-host`; `cron.pid` gives the scheduler state; `PickNext` per `input: "task"` agent gives the next pick. It also lists `done` tasks with an unmerged `pr-url`, plus inbox, unroutable, retry-exhausted, orphaned `active` tasks, and worktrees under `worktreeDir` no running job uses (`git.FindOrphaned`, which compares real paths). `vteam clean` removes exactly those worktrees (`git.CleanupOrphaned`), so it is safe to run while agents work.
 
-`vteam dashboard` (`src/commands/dashboard.ts`) redraws `renderStatus` output on the terminal's alternate screen (cursor hidden, line wrap off). Each refresh starts at least 1s after the previous one started and never before it finished. A failed refresh keeps the last frame and shows the error in the footer. `composeFrame` cuts the frame to the terminal height. Without a TTY it exits with an error. `status`, `cron status`, and `dashboard` all build their output as lines with the `format*` helpers in `src/log.ts`, so they look the same as `vteam run` output.
+`vteam dashboard` (`internal/dashboard`) is a bubbletea program that redraws `status.Render` output on the terminal's alternate screen. Each refresh starts at least 1s after the previous one started and never before it finished. A failed refresh keeps the last frame and shows the error in the footer. `ComposeFrame` cuts the frame to the terminal height. It quits on Ctrl+C or `q`. Without a TTY it exits with an error. `status`, `cron status`, and `dashboard` all build their output as lines with the `Format*` helpers in `internal/log`, so they look the same as `vteam run` output.
 
-Every `vteam run <agent>` writes a log file for that run at `vteam/.logs/<agent>/<ISO-timestamp>.log` (`src/run-log.ts`), whether it was started by hand or by the scheduler. It copies `process.stdout`/`process.stderr` into the file with synchronous writes, so nothing is lost on `process.exit`, and it records the error stack if the run throws. ANSI colors are stripped from the file. `vteam run` output goes through `src/log.ts`: sections (`Setup`, `Agent: <name>`, `Result`, `On-finish hook`, `Memory curation`, `Cleanup`), an elapsed-time gutter, and glyphs per line kind (`•` step, `❯` Claude text, `⚙` tool call, `✓`/`!`/`✗`). `agent-runner.ts` renders tool calls (`describeTool`), failed tool results, and an exit line with duration, turns, and `total_cost_usd`. In a TTY, tool inputs are cut to one line with `writeSplit` (`run-log.ts`), which writes the short line to the terminal and the full input to the log file. Logging starts after the agent is resolved, so an unknown agent name creates no file.
+Every `vteam run <agent>` writes a log file for that run at `vteam/.logs/<agent>/<ISO-timestamp>.log` (`internal/runlog`), whether it was started by hand or by the scheduler. Every line the run's `log.Logger` prints is also written to the file, ANSI colors stripped, including the final error. `vteam run` output goes through `internal/log`: sections (`Setup`, `Agent: <name>`, `Result`, `On-finish hook`, `Memory curation`, `Cleanup`), an elapsed-time gutter, and glyphs per line kind (`•` step, `❯` Claude text, `⚙` tool call, `✓`/`!`/`✗`). `internal/claude` renders tool calls (`DescribeTool`), failed tool results, and an exit line with duration, turns, and `total_cost_usd`. In a TTY, `Logger.ToolCall` cuts tool inputs to one line on the terminal and writes the full input to the log file. Logging starts after the agent is resolved, so an unknown agent name creates no file.
 
 ## Before submitting changes
 
 All three must pass before any commit or PR:
 
-1. **`just test`** — all vitest tests must pass
-2. **`just lint`** — no TypeScript errors, no eslint violations
-3. **`just build`** — clean compilation to dist/
+1. **`just test`** — all Go tests must pass (with `-race`)
+2. **`just lint`** — no `go vet` or golangci-lint issues
+3. **`just build`** — clean compilation to `dist/vteam`
 
 ## v1 scope and constraints
 
@@ -290,18 +287,21 @@ All three must pass before any commit or PR:
 - No Slack integration yet.
 - No `--max-budget-usd` caps on agent runs.
 - Requires the `aven` CLI on PATH for task management.
-- ESM-only (`"type": "module"`), Node >= 20, TypeScript with strict mode.
-- Templates are non-TS files in `src/templates/` — the build step copies them to `dist/templates/`.
+- Go 1.27+ (see `go.mod`), single binary. Installed with `go install github.com/leodnlv/vteam/cmd/vteam@latest`.
+- Templates live in `internal/scaffold/templates/` and are embedded with `go:embed`.
 
 ## Conventions
 
 - Self-documenting code, no comments unless the why is non-obvious.
-- Terminal output of every CLI command uses the helpers in `src/log.ts` (banner, sections, gutter, glyphs, fields). The conventions are in the project skill `.claude/skills/cli-output-style/SKILL.md`; load it before adding a command or changing what one prints.
+- Terminal output of every CLI command uses the helpers in `internal/log` (banner, sections, gutter, glyphs, fields). The conventions are in the project skill `.claude/skills/cli-output-style/SKILL.md`; load it before adding a command or changing what one prints.
 - Task refs (e.g. `APP-7KQ9`) are local to the user's aven database. Never put them in branch names, commit messages, or PR bodies.
 - Locking uses atomic `mkdir` with stale detection (30 min timeout).
 - Tasks live in the user's aven database, not the repo. The real shared artifacts are PRs.
 - All agents return a unified `AgentOutput` JSON. The orchestrator handles all state mutations based on the output fields: creates aven tasks from `content.type: "task"`, commits from `commitMessage` + `filesChanged`, and passes `content` through to ON_FINISH hooks.
-- `src/commands/pipeline.test.ts` is the integration test for the agent → ON_FINISH → MEMORY data flow and the task lifecycle (it mocks `AvenTaskManager` with an in-memory fake). `src/tasks/aven-manager.test.ts` includes a round-trip test against the real `aven` binary using a temp `--db`; it is skipped when `aven` is not installed. When adding new hooks, output fields, or changing how agent output is routed to downstream stages, update this test.
+- No module mocking: code that talks to the outside world takes an interface (`execx.Runner`, `tasks.Manager`, `run.Worktrees`, `platform.Platform`, the claude runner) and tests pass fakes. `run.Deps` bundles them for the orchestrator.
+- `internal/run/run_test.go` is the integration test for the agent → ON_FINISH → MEMORY data flow and the task lifecycle (it uses the in-memory `taskstest.Fake`). When adding new hooks, output fields, or changing how agent output is routed to downstream stages, update this test.
+- `internal/tasks/aven_test.go` includes a round-trip test against the real `aven` binary using a temp `--db`, and the e2e scripts in `cmd/vteam/testdata/script/` run the built CLI against real `aven` and `git`. Both are skipped when `aven` is not installed.
+- `testdata/golden/*.json` pin byte-exact prompts, log formatting, validation messages, and cron results from the old TypeScript implementation. Treat them as frozen; when behavior changes on purpose, edit the golden and the code together.
 
 ## Keeping CLAUDE.md and README.md current
 
@@ -321,4 +321,4 @@ Do not update CLAUDE.md or README.md for internal refactors that don't change ex
 
 ## Dogfooding
 
-This project has a `vteam/` directory that points the improver and coder at its own `src/`. Run `just dev run improver` to have vteam review itself.
+This project has a `vteam/` directory that points the improver and coder at its own code. Run `just dev run improver` to have vteam review itself.
