@@ -284,4 +284,3 @@ func TestNextRun(t *testing.T) {
 		t.Error("invalid expression has a next run")
 	}
 }
-

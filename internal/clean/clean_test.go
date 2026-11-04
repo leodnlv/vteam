@@ -109,8 +109,10 @@ func TestRunWithoutGitOrConfig(t *testing.T) {
 	var out bytes.Buffer
 	Run(context.Background(), Deps{
 		Cwd: t.TempDir(), Out: &out, IsAlive: lock.IsProcessAlive,
-		Cleanup: func(context.Context, string, string, []string) ([]string, error) { return nil, errors.New("not a git repo") },
-		Tasks:   func() (tasks.Manager, error) { return nil, errors.New("vteam.config.json not found") },
+		Cleanup: func(context.Context, string, string, []string) ([]string, error) {
+			return nil, errors.New("not a git repo")
+		},
+		Tasks: func() (tasks.Manager, error) { return nil, errors.New("vteam.config.json not found") },
 	})
 	want := "=== vteam clean ===\n\nNo worktrees to clean (or not a git repo).\nSkipped task cleanup: vteam.config.json not found\n\nDone.\n"
 	if diff := cmp.Diff(want, out.String()); diff != "" {

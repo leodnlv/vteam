@@ -143,7 +143,9 @@ func TestRenderNothingReady(t *testing.T) {
 func TestRenderIgnoresOrphanLookupErrors(t *testing.T) {
 	cwd := t.TempDir()
 	d := deps(cwd, taskstest.New(), time.Now(), nil)
-	d.Orphans = func(context.Context, string, string, []string) ([]string, error) { return nil, errors.New("not a git repo") }
+	d.Orphans = func(context.Context, string, string, []string) ([]string, error) {
+		return nil, errors.New("not a git repo")
+	}
 	if _, err := Render(context.Background(), d); err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +153,9 @@ func TestRenderIgnoresOrphanLookupErrors(t *testing.T) {
 
 type failingTasks struct{ *taskstest.Fake }
 
-func (failingTasks) ListReady(context.Context) ([]model.Task, error) { return nil, errors.New("aven down") }
+func (failingTasks) ListReady(context.Context) ([]model.Task, error) {
+	return nil, errors.New("aven down")
+}
 
 func TestRenderFailsWhenTasksCannotBeRead(t *testing.T) {
 	d := deps(t.TempDir(), taskstest.New(), time.Now(), nil)
