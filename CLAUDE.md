@@ -240,6 +240,7 @@ testdata/
 
 ```
 just build          # go build -o dist/vteam ./cmd/vteam
+just install        # go install ./cmd/vteam (into $(go env GOBIN), usually ~/go/bin)
 just dev <args>     # go run ./cmd/vteam (e.g. just dev run improver)
 just lint           # go vet + golangci-lint
 just test           # go test -race ./...

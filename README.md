@@ -52,7 +52,7 @@ Or from a checkout:
 ```bash
 git clone git@github.com:leodnlv/vteam.git
 cd vteam
-just build          # writes dist/vteam; put it on your PATH
+just install        # installs vteam into $(go env GOBIN), usually ~/go/bin; put that on your PATH
 ```
 
 Run `vteam skill install` from the root of a checkout: it symlinks the `skills/` directory there into `~/.claude/skills/`, so keep the clone if you want the skills.
@@ -551,6 +551,7 @@ Invoke from any project with `/create-vteam-agent`.
 
 ```bash
 just build          # go build -o dist/vteam ./cmd/vteam
+just install        # go install ./cmd/vteam (into $(go env GOBIN), usually ~/go/bin)
 just dev <args>     # go run ./cmd/vteam (e.g., just dev run improver)
 just lint           # go vet + golangci-lint
 just test           # go test -race ./...

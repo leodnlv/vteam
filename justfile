@@ -4,6 +4,9 @@ default:
 build:
     go build -o dist/vteam ./cmd/vteam
 
+install:
+    go install ./cmd/vteam
+
 dev *args:
     go run ./cmd/vteam {{args}}
 
