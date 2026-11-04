@@ -2,6 +2,7 @@
 package log
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -195,3 +196,6 @@ func (l *Logger) Finished(agent, failure string) {
 	}
 	l.Println("\n" + ansi.Bold(ansi.Green("✓ "+agent+" completed in "+elapsed)))
 }
+
+// ErrReported marks an error that the command already printed; main exits non-zero without printing it again.
+var ErrReported = errors.New("failure already reported")

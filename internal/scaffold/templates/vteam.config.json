@@ -1,0 +1,14 @@
+{
+  "baseBranch": "main",
+  "platform": "github",
+  "worktreeDir": ".vteam-worktrees",
+  "tasks": {
+    "maxRetries": 3,
+    "project": "",
+    "label": "vteam"
+  },
+  "mergeEnsurer": {
+    "cron": "*/15 * * * *",
+    "label": "vteam:changes-requested"
+  }
+}

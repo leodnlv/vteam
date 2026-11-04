@@ -68,7 +68,7 @@ func NewDeps(cwd string, cfg *config.Config, logger *log.Logger) Deps {
 }
 
 // ErrFailed means the run failed and the failure was already reported in the run output.
-var ErrFailed = errors.New("agent run failed")
+var ErrFailed = fmt.Errorf("agent run failed: %w", log.ErrReported)
 
 type Options struct {
 	Focus string
