@@ -227,6 +227,14 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 		LoadConfig:   func() (*config.Config, error) { return config.Load(dir) },
 		SchedulerPID: func() int { return schedule.ReadPID(dir) },
 		Now:          time.Now,
+		RunOnce: func(name string) error {
+			_, err := schedule.SpawnRun(dir, name, time.Now())
+			return err
+		},
+		EnableCron:     func(name, expr string) error { return schedule.Enable(dir, name, expr) },
+		DisableCron:    func(name string) error { return schedule.Disable(dir, name) },
+		SaveCron:       func(name, expr string) error { return schedule.SaveDefaultCron(dir, name, expr) },
+		StartScheduler: func() (int, error) { return schedule.StartDetached(dir) },
 	})
 }
 
@@ -347,41 +355,80 @@ func ensureMerge(ctx context.Context, dir string) error {
 }
 
 func cronCmd() *cobra.Command {
-	cmd := &cobra.Command{Use: "cron", Short: "Run agents on their cron schedules in a long-lived process"}
+	cmd := &cobra.Command{Use: "cron", Short: "Enable agent crons and run them in a long-lived scheduler"}
+	inProject := func(fn func(cmd *cobra.Command, dir string, args []string) error) func(*cobra.Command, []string) error {
+		return func(cmd *cobra.Command, args []string) error {
+			dir, err := cwd()
+			if err != nil {
+				return err
+			}
+			if err := requireVteamDir(dir, cmd.ErrOrStderr()); err != nil {
+				return err
+			}
+			return fn(cmd, dir, args)
+		}
+	}
 	cmd.AddCommand(&cobra.Command{
 		Use:   "start",
-		Short: "Start the scheduler (runs in foreground)",
+		Short: "Start the scheduler for the enabled crons (runs in foreground)",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			dir, err := cwd()
-			if err != nil {
-				return err
-			}
-			cfg, err := config.Load(dir)
-			if err != nil {
-				return err
-			}
-			return schedule.New(dir, cfg, log.Std()).Run(cmd.Context())
-		},
+		RunE: inProject(func(cmd *cobra.Command, dir string, _ []string) error {
+			return schedule.New(dir, log.Std()).Run(cmd.Context())
+		}),
 	}, &cobra.Command{
 		Use:   "status",
-		Short: "Show whether the scheduler is running and the next fire time of each job",
+		Short: "Show whether the scheduler is running and the next fire time of each enabled cron",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			dir, err := cwd()
-			if err != nil {
-				return err
-			}
-			cfg, err := config.Load(dir)
-			if err != nil {
-				return err
-			}
-			lines := append([]string{log.FormatBanner("cron status", "")}, schedule.RenderScheduler(dir, cfg, time.Now())...)
+		RunE: inProject(func(cmd *cobra.Command, dir string, _ []string) error {
+			lines := append([]string{log.FormatBanner("cron status", "")}, schedule.RenderScheduler(dir, time.Now())...)
 			fmt.Fprintln(cmd.OutOrStdout(), strings.Join(lines, "\n")+"\n")
 			return nil
-		},
+		}),
+	}, &cobra.Command{
+		Use:   "enable <agent> [cron expression]",
+		Short: "Enable an agent's cron (default: the cron in its agent.json)",
+		Args:  cobra.RangeArgs(1, 2),
+		RunE: inProject(func(cmd *cobra.Command, dir string, args []string) error {
+			return cronEnable(cmd.OutOrStdout(), dir, args)
+		}),
+	}, &cobra.Command{
+		Use:   "disable <agent>",
+		Short: "Disable an agent's cron",
+		Args:  cobra.ExactArgs(1),
+		RunE: inProject(func(cmd *cobra.Command, dir string, args []string) error {
+			if err := schedule.Disable(dir, args[0]); err != nil {
+				return err
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), log.FormatListItem(ansi.Green("✓"), ansi.Bold(args[0])+" cron disabled"))
+			return nil
+		}),
 	})
 	return cmd
+}
+
+func cronEnable(out io.Writer, dir string, args []string) error {
+	name, expr := args[0], schedule.DefaultCron(dir, args[0])
+	if len(args) == 2 {
+		expr = args[1]
+	}
+	if expr == "" {
+		return fmt.Errorf("%s has no default cron in %s; pass a cron expression", name, schedule.DefaultCronFile(name))
+	}
+	if err := schedule.Enable(dir, name, expr); err != nil {
+		return err
+	}
+	now := time.Now()
+	lines := []string{log.FormatListItem(ansi.Green("✓"), ansi.Bold(name)+" cron enabled "+ansi.Gray(expr))}
+	if next := schedule.NextRun(expr, now); !next.IsZero() {
+		lines = append(lines, log.FormatListDetail("next", log.FormatTimeOfDay(next, now)+" "+ansi.Gray("(in "+log.FormatAge(next.Sub(now))+")")))
+	}
+	if pid := schedule.ReadPID(dir); pid != 0 {
+		lines = append(lines, log.FormatListDetail("scheduler", fmt.Sprintf("running (pid %d), picks it up within %s", pid, schedule.PollInterval)))
+	} else {
+		lines = append(lines, log.FormatListDetail("scheduler", ansi.Yellow("not running")+" "+ansi.Gray("(start it with 'vteam cron start')")))
+	}
+	fmt.Fprintln(out, strings.Join(lines, "\n"))
+	return nil
 }
 
 func skillCmd() *cobra.Command {

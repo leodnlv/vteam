@@ -112,7 +112,28 @@ func (m Model) logPaneWidth() int {
 }
 
 func (m Model) logBodyHeight() int {
-	return max(1, m.bodyHeight()-2)
+	return max(1, m.bodyHeight()-2-len(m.cronBanner()))
+}
+
+// cronBanner is the line above the log saying the selected agent runs on cron, or nothing when its cron is off.
+func (m Model) cronBanner() []string {
+	a, ok := m.agents.current()
+	if !ok || a.Cron == "" {
+		return nil
+	}
+	if !m.schedulerRunning() {
+		return []string{styleYellow.Render("◷ cron "+a.Cron+" paused · scheduler not running") + styleGray.Render(" (S to start it)")}
+	}
+	now := m.deps.Now()
+	text := styleCron.Render("◷ on cron ") + styleCron.Bold(true).Render(a.Cron)
+	if desc := describeCron(a.Cron); desc != "" {
+		text += styleCron.Render(" · " + desc)
+	}
+	if !a.NextRun.IsZero() {
+		text += styleCron.Render(" · next "+log.FormatTimeOfDay(a.NextRun.Local(), now.Local())) +
+			styleGray.Render(" (in "+log.FormatAge(a.NextRun.Sub(now))+")")
+	}
+	return []string{text}
 }
 
 func (m Model) logRows() []string {
@@ -169,6 +190,13 @@ func (m Model) renderSidebar(height int) []string {
 		case a.LoadError != "":
 			glyph = styleRed.Render("✗")
 		}
+		if a.Cron != "" {
+			clock := styleCron.Render("◷")
+			if !m.schedulerRunning() {
+				clock = styleYellow.Render("◷")
+			}
+			age = clock + " " + age
+		}
 		row := spread(" "+glyph+" "+log.Truncate(a.Name, sidebarWidth-12), age+" ", sidebarWidth)
 		switch {
 		case i != s.selected:
@@ -208,14 +236,24 @@ func (m Model) agentDetails(a Agent) []string {
 	} else {
 		field("status", styleGray.Render("idle"))
 	}
+	switch {
+	case a.Cron != "" && m.schedulerRunning():
+		field("cron", styleCron.Render(a.Cron))
+		if !a.NextRun.IsZero() {
+			field("next", styleCron.Render(log.FormatTimeOfDay(a.NextRun.Local(), m.deps.Now().Local())))
+		}
+	case a.Cron != "":
+		field("cron", styleYellow.Render(a.Cron+" paused"))
+	case a.DefaultCron != "":
+		field("cron", styleGray.Render("off ("+a.DefaultCron+")"))
+	case a.Runnable():
+		field("cron", styleGray.Render("off"))
+	}
 	if a.Config != nil && a.Config.Model != "" {
 		field("model", a.Config.Model)
 	}
 	if a.Config != nil && a.Config.Input != "" {
 		field("input", a.Config.Input)
-	}
-	if !a.NextRun.IsZero() {
-		field("next", log.FormatTimeOfDay(a.NextRun.Local(), m.deps.Now().Local()))
 	}
 	if a.LoadError != "" {
 		lines = append(lines, styleRed.Render(firstLine(a.LoadError)))
@@ -232,7 +270,11 @@ func (m Model) renderLogPane(height int) []string {
 		if ok {
 			empty = "no logs yet for " + styleBold.Render(a.Name)
 		}
-		return window([]string{" " + styleGray.Render(empty)}, 0, height, width)
+		lines := []string{}
+		for _, b := range m.cronBanner() {
+			lines = append(lines, " "+b, "")
+		}
+		return window(append(lines, " "+styleGray.Render(empty)), 0, height, width)
 	}
 
 	parts := []string{styleBold.Render(a.Name)}
@@ -257,6 +299,9 @@ func (m Model) renderLogPane(height int) []string {
 	rows := m.logRows()
 	body := window(rows, m.logOffset(len(rows)), m.logBodyHeight(), width-1)
 	lines := []string{fit(title, width), fit(" "+rule(width-2), width)}
+	for _, b := range m.cronBanner() {
+		lines = append(lines, fit(" "+b, width))
+	}
 	for _, r := range body {
 		lines = append(lines, " "+r)
 	}

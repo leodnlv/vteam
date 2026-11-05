@@ -4,9 +4,11 @@ package schedule
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,9 +16,7 @@ import (
 	"time"
 
 	"github.com/leodnlv/vteam/internal/ansi"
-	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/cron"
-	"github.com/leodnlv/vteam/internal/ensuremerge"
 	"github.com/leodnlv/vteam/internal/lock"
 	"github.com/leodnlv/vteam/internal/log"
 	"github.com/leodnlv/vteam/internal/runlog"
@@ -29,17 +29,17 @@ type Job struct {
 	Command []string
 }
 
-// FindJobs returns every agent with a cron schedule, plus the merge ensurer when it has one. Agents that fail to load are skipped.
-func FindJobs(cwd string, cfg *config.Config) []Job {
-	var jobs []Job
-	for _, name := range config.ListAgentNames(cwd) {
-		agent, err := config.ResolveAgent(name, cwd)
-		if err == nil && agent.Cron != "" {
-			jobs = append(jobs, Job{Name: name, Cron: agent.Cron, Command: []string{"run", name}})
-		}
+// FindJobs returns the enabled jobs (see Enabled), sorted by name. Jobs whose agent no longer loads are skipped.
+func FindJobs(cwd string) []Job {
+	enabled, err := Enabled(cwd)
+	if err != nil {
+		return nil
 	}
-	if cfg.MergeEnsurer.Cron != "" {
-		jobs = append(jobs, Job{Name: ensuremerge.Name, Cron: cfg.MergeEnsurer.Cron, Command: []string{"ensure-merge"}})
+	var jobs []Job
+	for _, name := range slices.Sorted(maps.Keys(enabled)) {
+		if checkJobName(cwd, name) == nil {
+			jobs = append(jobs, Job{Name: name, Cron: enabled[name], Command: JobCommand(name)})
+		}
 	}
 	return jobs
 }
@@ -72,16 +72,19 @@ func NextRun(expr string, now time.Time) time.Time {
 func padEnd(s string, n int) string { return log.PadEnd(s, n) }
 
 // RenderScheduler renders the Scheduler section shared by vteam status, vteam cron status, and vteam cron start.
-func RenderScheduler(cwd string, cfg *config.Config, now time.Time) []string {
+func RenderScheduler(cwd string, now time.Time) []string {
 	lines := []string{log.FormatSection("Scheduler")}
-	jobs := FindJobs(cwd, cfg)
-	if len(jobs) == 0 {
-		return append(lines, log.FormatListItem(ansi.Gray("·"), ansi.Dim("no agents have a cron schedule")))
-	}
-	if pid := ReadPID(cwd); pid != 0 {
+	jobs := FindJobs(cwd)
+	switch pid := ReadPID(cwd); {
+	case pid != 0:
 		lines = append(lines, log.FormatListItem(ansi.Green("✓"), "running "+ansi.Gray(fmt.Sprintf("(pid %d)", pid))))
-	} else {
-		lines = append(lines, log.FormatListItem(ansi.Yellow("!"), ansi.Yellow("not running (start it with 'vteam cron start')")))
+	case len(jobs) > 0:
+		lines = append(lines, log.FormatListItem(ansi.Yellow("!"), ansi.Yellow("not running, crons paused (start it with 'vteam cron start')")))
+	default:
+		lines = append(lines, log.FormatListItem(ansi.Gray("·"), ansi.Dim("not running")))
+	}
+	if len(jobs) == 0 {
+		return append(lines, log.FormatListItem(ansi.Gray("·"), ansi.Dim("no crons enabled (enable one in the vteam TUI or with 'vteam cron enable <agent>')")))
 	}
 	nameWidth, cronWidth := 0, 0
 	for _, j := range jobs {
@@ -99,19 +102,22 @@ func RenderScheduler(cwd string, cfg *config.Config, now time.Time) []string {
 	return lines
 }
 
+// PollInterval is the longest the scheduler sleeps before rereading the enabled jobs.
+const PollInterval = 2 * time.Second
+
 type Scheduler struct {
-	Cwd    string
-	Config *config.Config
-	Log    *log.Logger
-	Now    func() time.Time
+	Cwd  string
+	Log  *log.Logger
+	Now  func() time.Time
+	Poll time.Duration
 	// Sleep waits for d or until ctx is done.
 	Sleep func(ctx context.Context, d time.Duration) error
 	// Command builds the child process for a job; it runs with VTEAM_RUN_LOG set to logPath.
 	Command func(job Job, logPath string) (*exec.Cmd, error)
 }
 
-func New(cwd string, cfg *config.Config, logger *log.Logger) *Scheduler {
-	return &Scheduler{Cwd: cwd, Config: cfg, Log: logger, Now: time.Now, Sleep: sleep, Command: selfCommand}
+func New(cwd string, logger *log.Logger) *Scheduler {
+	return &Scheduler{Cwd: cwd, Log: logger, Now: time.Now, Poll: PollInterval, Sleep: sleep, Command: selfCommand}
 }
 
 func sleep(ctx context.Context, d time.Duration) error {
@@ -154,6 +160,12 @@ func (r *runningJobs) done(name string) {
 	delete(r.cmds, name)
 }
 
+func (r *runningJobs) empty() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.cmds) == 0
+}
+
 func (r *runningJobs) snapshot() map[string]*exec.Cmd {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -164,14 +176,14 @@ func (r *runningJobs) snapshot() map[string]*exec.Cmd {
 	return out
 }
 
-// Run schedules every job until ctx is canceled, then kills running children and removes the pid file.
+// Run schedules the enabled jobs until ctx is canceled, then kills running children and removes the pid file.
+// It rereads the enabled jobs at least every Poll, and stops on its own once none are enabled and none run.
 func (s *Scheduler) Run(ctx context.Context) error {
 	s.Log.UseWallClock()
 	s.Log.Banner("cron start", fmt.Sprintf("pid %d", os.Getpid()))
-	jobs := FindJobs(s.Cwd, s.Config)
-	if len(jobs) == 0 {
+	if len(FindJobs(s.Cwd)) == 0 {
 		s.Log.Println("")
-		s.Log.Warn("No agents with cron patterns found.")
+		s.Log.Warn("No crons enabled. Enable one in the vteam TUI or with 'vteam cron enable <agent>'.")
 		return nil
 	}
 	if pid := ReadPID(s.Cwd); pid != 0 {
@@ -187,39 +199,87 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	}
 	defer func() { _ = os.Remove(PIDPath(s.Cwd)) }()
 
-	s.Log.Println(strings.Join(RenderScheduler(s.Cwd, s.Config, s.Now()), "\n"))
+	s.Log.Println(strings.Join(RenderScheduler(s.Cwd, s.Now()), "\n"))
 	s.Log.Section("Activity")
 	s.Log.Step("waiting for jobs " + ansi.Gray("(Ctrl+C to stop)"))
 
 	running := &runningJobs{cmds: map[string]*exec.Cmd{}}
-	var children, tickers sync.WaitGroup
-	for _, job := range jobs {
-		schedule, err := cron.Parse(job.Cron)
-		if err != nil {
-			continue
+	var children sync.WaitGroup
+	timers := map[string]*jobTimer{}
+	first := true
+	for {
+		now := s.Now()
+		jobs := FindJobs(s.Cwd)
+		s.syncTimers(timers, jobs, now, first)
+		first = false
+		if len(jobs) == 0 && running.empty() {
+			s.Log.Step("no crons enabled, stopping")
+			break
 		}
-		tickers.Go(func() {
-			for {
-				now := s.Now()
-				next := schedule.Next(now)
-				if next.IsZero() || s.Sleep(ctx, next.Sub(now)) != nil {
-					return
-				}
-				s.tick(job, running, &children)
+		wait := s.Poll
+		for _, t := range timers {
+			if !now.Before(t.next) {
+				s.tick(t.job, running, &children)
+				t.next = t.schedule.Next(now)
 			}
-		})
+			if !t.next.IsZero() {
+				wait = min(wait, t.next.Sub(now))
+			}
+		}
+		if s.Sleep(ctx, max(0, wait)) != nil {
+			break
+		}
 	}
-	tickers.Wait()
 
-	s.Log.Println("")
-	s.Log.Step("stopping scheduler")
-	for name, cmd := range running.snapshot() {
-		_ = cmd.Process.Signal(syscall.SIGTERM)
-		s.Log.Warn("killed " + name)
+	if ctx.Err() != nil {
+		s.Log.Println("")
+		s.Log.Step("stopping scheduler")
+		for name, cmd := range running.snapshot() {
+			_ = cmd.Process.Signal(syscall.SIGTERM)
+			s.Log.Warn("killed " + name)
+		}
 	}
 	children.Wait()
 	s.Log.OK("scheduler stopped")
 	return nil
+}
+
+type jobTimer struct {
+	job      Job
+	schedule *cron.Schedule
+	next     time.Time
+}
+
+// syncTimers makes timers match jobs: new and changed jobs get their next fire time from now, disabled ones are dropped.
+func (s *Scheduler) syncTimers(timers map[string]*jobTimer, jobs []Job, now time.Time, quiet bool) {
+	seen := map[string]bool{}
+	for _, job := range jobs {
+		seen[job.Name] = true
+		if t, ok := timers[job.Name]; ok && t.job.Cron == job.Cron {
+			continue
+		}
+		schedule, err := cron.Parse(job.Cron)
+		if err != nil {
+			continue
+		}
+		_, changed := timers[job.Name]
+		t := &jobTimer{job: job, schedule: schedule, next: schedule.Next(now)}
+		timers[job.Name] = t
+		if quiet {
+			continue
+		}
+		verb := "cron enabled"
+		if changed {
+			verb = "cron changed"
+		}
+		s.Log.Step(ansi.Bold(job.Name) + " " + verb + " " + ansi.Gray(job.Cron+" · next "+log.FormatTimeOfDay(t.next, now)))
+	}
+	for name := range timers {
+		if !seen[name] {
+			delete(timers, name)
+			s.Log.Step(ansi.Bold(name) + " cron disabled")
+		}
+	}
 }
 
 func (s *Scheduler) tick(job Job, running *runningJobs, children *sync.WaitGroup) {

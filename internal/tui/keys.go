@@ -39,6 +39,9 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 	if key == "ctrl+c" {
 		return m, tea.Quit
 	}
+	if m.dialog.kind != dialogNone {
+		return m.handleDialogKey(key), nil
+	}
 	if key == "?" {
 		m.help = !m.help
 		return m, nil
@@ -105,6 +108,8 @@ func (m Model) handleAgentsKey(key string, pendingG bool) Model {
 		s = s.stepRun(1)
 	case "ctrl+d", "ctrl+u", "pgdown", "pgup":
 		return m.scrollLog(key, pendingG)
+	case "x", "c", "s", "S", "a":
+		return m.agentAction(key)
 	default:
 		if !s.focusLog {
 			return m.handleSidebarKey(key, pendingG)
@@ -139,6 +144,8 @@ func (m Model) handleSidebarKey(key string, pendingG bool) Model {
 		}
 	case "l", "enter", "right":
 		s.focusLog = true
+	case "space":
+		return m.agentAction(key)
 	}
 	m.agents = s
 	return m

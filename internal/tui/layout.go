@@ -87,8 +87,13 @@ func overlay(base []string, box string, width, height int) []string {
 	}
 	x := max(0, (width-lipgloss.Width(box))/2)
 	y := max(0, (height-lipgloss.Height(box))/2)
+	return overlayAt(dimmed, box, x, y, width, height)
+}
+
+// overlayAt draws box on top of base with its top-left corner at column x, row y.
+func overlayAt(base []string, box string, x, y, width, height int) []string {
 	composed := lipgloss.NewCompositor(
-		lipgloss.NewLayer(strings.Join(dimmed, "\n")),
+		lipgloss.NewLayer(strings.Join(base, "\n")),
 		lipgloss.NewLayer(box).X(x).Y(y).Z(1),
 	).Render()
 	return window(strings.Split(composed, "\n"), 0, height, width)

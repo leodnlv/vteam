@@ -11,6 +11,7 @@ import (
 
 	xansi "github.com/charmbracelet/x/ansi"
 	"github.com/leodnlv/vteam/internal/lock"
+	"github.com/leodnlv/vteam/internal/schedule"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -49,7 +50,7 @@ func TestLoadAgentsListsAgentsLogsLocksAndMergeEnsurer(t *testing.T) {
 		t.Fatalf("names = %s", got)
 	}
 	coder := byName["coder"]
-	if coder.Config == nil || coder.Config.Model != "sonnet" || coder.Running == nil || coder.NextRun.IsZero() {
+	if coder.Config == nil || coder.Config.Model != "sonnet" || coder.Running == nil || coder.DefaultCron != "*/5 * * * *" || coder.Cron != "" || !coder.NextRun.IsZero() {
 		t.Errorf("coder = %+v", coder)
 	}
 	if len(coder.Logs) != 2 || !strings.HasSuffix(coder.Logs[0], "2026-11-04T09-00-00-000Z.log") {
@@ -58,8 +59,20 @@ func TestLoadAgentsListsAgentsLogsLocksAndMergeEnsurer(t *testing.T) {
 	if byName["broken"].LoadError == "" {
 		t.Error("broken agent.json should surface a load error")
 	}
-	if me := byName["merge-ensurer"]; !me.Builtin || me.NextRun.IsZero() {
+	if me := byName["merge-ensurer"]; !me.Builtin || me.DefaultCron != "*/15 * * * *" || !me.Runnable() {
 		t.Errorf("merge-ensurer = %+v", me)
+	}
+	if byName["broken"].Runnable() || byName["retired"].Runnable() {
+		t.Error("broken and logs-only agents should not be runnable")
+	}
+
+	if err := schedule.Enable(cwd, "coder", "0 * * * *"); err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range LoadAgents(cwd, fixedNow) {
+		if a.Name == "coder" && (a.Cron != "0 * * * *" || !a.NextRun.Equal(fixedNow.Add(time.Hour))) {
+			t.Errorf("enabled coder = %+v", a)
+		}
 	}
 }
 

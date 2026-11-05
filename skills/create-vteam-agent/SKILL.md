@@ -56,7 +56,7 @@ Let the user choose a preset and customize.
 
 **6. Model** — Which Claude model? Default to `sonnet` for most agents. Suggest `opus` for complex reasoning tasks, `haiku` for simple/fast tasks.
 
-**7. Cron schedule** — Should this agent run on a schedule? If so, ask for a cron expression (5 fields: minute hour day month weekday; `L` and `#` are not supported). Examples: `0 */6 * * *` (every 6 hours), `0 9 * * 1-5` (weekdays at 9am).
+**7. Cron schedule** — Should this agent run on a schedule? If so, ask for a cron expression (5 fields: minute hour day month weekday; `L` and `#` are not supported). Examples: `0 */6 * * *` (every 6 hours), `0 9 * * 1-5` (weekdays at 9am). The `cron` field is only the default pattern: the agent runs on it once the user enables the cron in the TUI or with `vteam cron enable <name>`.
 
 ## Step 3 — Derive agent.json from answers
 
@@ -165,7 +165,7 @@ Plain markdown — no frontmatter. Put its model and tools in the `onFinish` sec
 After writing files, print:
 - The path to each created file
 - How to test-run the agent: `vteam run <name>` (or `just dev run <name>` if developing vteam itself)
-- If the agent has a cron, mention `vteam cron start` (and `vteam cron status` to see the next fire time)
+- If the agent has a cron, say it is only a default: enable it in the TUI (`vteam` → Agents tab → `space` → "Run on cron…"), which also starts the scheduler, or with `vteam cron enable <name>` followed by `vteam cron start`. `vteam cron status` shows the next fire time.
 
 ## Important notes
 

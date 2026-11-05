@@ -82,9 +82,12 @@ func (m Model) infoLines() []string {
 	section("Scheduler")
 	if pid := m.info.schedulerPID; pid > 0 {
 		field("state", styleGreen.Render(fmt.Sprintf("running (pid %d)", pid)))
+	} else if n := m.enabledCrons(); n > 0 {
+		field("state", styleYellow.Render(fmt.Sprintf("not running · %d crons paused", n))+styleGray.Render(" (S in the Agents tab, or 'vteam cron start')"))
 	} else {
-		field("state", styleYellow.Render("not running")+styleGray.Render(" (start it with 'vteam cron start')"))
+		field("state", styleGray.Render("not running · no crons enabled"))
 	}
+	field("crons", fmt.Sprintf("%d enabled", m.enabledCrons())+styleGray.Render(" (space on an agent in the Agents tab)"))
 
 	section("Agents")
 	for _, a := range m.agents.list {
@@ -120,9 +123,7 @@ func (m Model) agentInfo(a Agent) []string {
 		return lines
 	case a.Builtin:
 		lines = append(lines, "      "+styleGray.Render("built-in sweep (vteam ensure-merge)"))
-		if !a.NextRun.IsZero() {
-			detail("next", log.FormatTimeOfDay(a.NextRun.Local(), m.deps.Now().Local()))
-		}
+		detail("cron", m.cronInfo(a))
 		return lines
 	case a.Config == nil:
 		lines = append(lines, "      "+styleGray.Render("no agent directory (logs only)"))
@@ -136,15 +137,7 @@ func (m Model) agentInfo(a Agent) []string {
 		output = "generic"
 	}
 	detail("io", styleGray.Render("in ")+orDefault(c.Input, "—")+styleGray.Render("  out ")+output)
-	if c.Cron != "" {
-		next := ""
-		if !a.NextRun.IsZero() {
-			next = styleGray.Render("  next " + log.FormatTimeOfDay(a.NextRun.Local(), m.deps.Now().Local()))
-		}
-		detail("cron", c.Cron+next)
-	} else {
-		detail("cron", styleGray.Render("manual"))
-	}
+	detail("cron", m.cronInfo(a))
 	detail("flags", strings.Join([]string{
 		flag(c.Worktree, "worktree"), flag(c.ReadOnly, "readOnly"), flag(c.AutoPR, "autoPR"),
 		flag(c.ResolveThreads, "resolveThreads"), flag(c.Memory != nil, "memory"), flag(c.OnFinish != nil, "onFinish"),
@@ -161,6 +154,23 @@ func (m Model) agentInfo(a Agent) []string {
 		detailList("denied", c.DisallowedTools)
 	}
 	return lines
+}
+
+// cronInfo is the enabled cron with its next run, or "off" with the default pattern.
+func (m Model) cronInfo(a Agent) string {
+	if a.Cron == "" {
+		if a.DefaultCron != "" {
+			return styleGray.Render("off  default " + a.DefaultCron)
+		}
+		return styleGray.Render("off")
+	}
+	if !m.schedulerRunning() {
+		return a.Cron + styleYellow.Render("  paused")
+	}
+	if a.NextRun.IsZero() {
+		return a.Cron
+	}
+	return a.Cron + styleGray.Render("  next "+log.FormatTimeOfDay(a.NextRun.Local(), m.deps.Now().Local()))
 }
 
 // packItems joins items with ", " into rows no wider than width, never splitting an item.

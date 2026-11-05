@@ -60,17 +60,18 @@ func TestInfoAgentDetails(t *testing.T) {
 			Model: "sonnet", Input: "task", Cron: "*/5 * * * *", Worktree: true, AutoPR: true,
 			TaskFilter:   config.TaskFilter{"found-by": {"improver", ""}},
 			AllowedTools: []string{"Read", "Bash(git *)"}, DisallowedTools: []string{"WebFetch"},
-		}, NextRun: fixedNow.Add(5 * time.Minute)},
+		}, Cron: "*/5 * * * *", NextRun: fixedNow.Add(5 * time.Minute)},
 		{Name: "plain", Config: &config.Agent{}},
+		{Name: "defaulted", Config: &config.Agent{Cron: "0 * * * *"}, DefaultCron: "0 * * * *"},
 		{Name: "broken", LoadError: "invalid agent.json\nmore detail"},
 		{Name: "retired"},
 		{Name: "merge-ensurer", Builtin: true},
 	}
-	out := infoText(infoModel(t, agents, testConfig, 0))
+	out := infoText(infoModel(t, agents, testConfig, 4242))
 	for _, want := range []string{
 		"● coder", "model     sonnet", "in task  out generic", "*/5 * * * *  next", "worktree readOnly autoPR",
 		"filter    found-by: improver | (unset)", "tools     Read, Bash(git *)", "denied    WebFetch",
-		"○ plain", "model     default", "cron      manual", "tools     Claude Code default set",
+		"○ plain", "model     default", "cron      off\n", "cron      off  default 0 * * * *", "crons         1 enabled", "tools     Claude Code default set",
 		"✗ broken", "invalid agent.json", "no agent directory (logs only)", "built-in sweep (vteam ensure-merge)",
 	} {
 		if !strings.Contains(out, want) {
@@ -79,6 +80,16 @@ func TestInfoAgentDetails(t *testing.T) {
 	}
 	if strings.Contains(out, "more detail") {
 		t.Error("only the first line of a load error should show")
+	}
+}
+
+func TestInfoShowsPausedCronsWhenTheSchedulerIsDown(t *testing.T) {
+	agents := []Agent{{Name: "coder", Config: &config.Agent{}, Cron: "*/5 * * * *"}}
+	out := infoText(infoModel(t, agents, testConfig, 0))
+	for _, want := range []string{"not running · 1 crons paused", "cron      */5 * * * *  paused"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("info is missing %q:\n%s", want, out)
+		}
 	}
 }
 

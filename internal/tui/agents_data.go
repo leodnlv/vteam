@@ -24,13 +24,24 @@ type Agent struct {
 	Builtin bool
 	Running *lock.Info
 	// Logs are run log paths, oldest first.
-	Logs    []string
+	Logs []string
+	// Cron is the enabled cron pattern; "" when the agent's cron is off.
+	Cron string
+	// DefaultCron is the pattern from agent.json, or mergeEnsurer.cron for the merge ensurer.
+	DefaultCron string
+	// NextRun is the next fire time of the enabled cron.
 	NextRun time.Time
+}
+
+// Runnable reports whether the agent can be started: it loads and is an agent or the merge ensurer.
+func (a Agent) Runnable() bool {
+	return a.LoadError == "" && (a.Config != nil || a.Builtin)
 }
 
 // LoadAgents lists every agent, the merge ensurer, and any other name with a log directory.
 func LoadAgents(cwd string, now time.Time) []Agent {
 	cfg, _ := config.Load(cwd)
+	enabled, _ := schedule.Enabled(cwd)
 	live := map[string]lock.Info{}
 	for _, run := range runstate.FindLive(cwd) {
 		live[run.Name] = run.Lock
@@ -50,22 +61,23 @@ func LoadAgents(cwd string, now time.Time) []Agent {
 
 	agents := make([]Agent, 0, len(names))
 	for name := range names {
-		a := Agent{Name: name, Logs: listLogs(cwd, name)}
+		a := Agent{Name: name, Logs: listLogs(cwd, name), Cron: enabled[name]}
 		if info, ok := live[name]; ok {
 			a.Running = &info
 		}
 		if name == ensuremerge.Name {
 			a.Builtin = true
-			if cfg != nil && cfg.MergeEnsurer.Cron != "" {
-				a.NextRun = schedule.NextRun(cfg.MergeEnsurer.Cron, now)
+			if cfg != nil {
+				a.DefaultCron = cfg.MergeEnsurer.Cron
 			}
 		} else if resolved, err := config.ResolveAgent(name, cwd); err != nil {
 			a.LoadError = err.Error()
 		} else {
 			a.Config = resolved
-			if resolved.Cron != "" {
-				a.NextRun = schedule.NextRun(resolved.Cron, now)
-			}
+			a.DefaultCron = resolved.Cron
+		}
+		if a.Cron != "" {
+			a.NextRun = schedule.NextRun(a.Cron, now)
 		}
 		agents = append(agents, a)
 	}

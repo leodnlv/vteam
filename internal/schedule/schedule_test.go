@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -19,9 +21,71 @@ import (
 	"github.com/leodnlv/vteam/internal/runlog"
 )
 
+// TestMain doubles as a stand-in vteam binary for the detached-spawn tests, which re-exec os.Executable.
 func TestMain(m *testing.M) {
+	if len(os.Args) > 1 && (os.Args[1] == "run" || os.Args[1] == "cron") {
+		fakeVteam(os.Args[1:])
+		return
+	}
 	os.Setenv("NO_COLOR", "1")
 	os.Exit(m.Run())
+}
+
+func fakeVteam(args []string) {
+	line := strings.Join(args, " ") + " sid-leader=" + strconv.FormatBool(isSessionLeader())
+	if path := os.Getenv(runlog.Env); path != "" {
+		_ = os.MkdirAll(filepath.Dir(path), 0o755)
+		_ = os.WriteFile(path, []byte(line), 0o644)
+		return
+	}
+	fmt.Println(line)
+}
+
+func isSessionLeader() bool {
+	sid, err := syscall.Getsid(0)
+	return err == nil && sid == os.Getpid()
+}
+
+func waitForFile(t *testing.T, path, want string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		data, _ := os.ReadFile(path)
+		if strings.Contains(string(data), want) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%s = %q, want it to contain %q", path, data, want)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestSpawnRunStartsADetachedRunWithItsLogPath(t *testing.T) {
+	cwd := t.TempDir()
+	path, err := SpawnRun(cwd, "improver", time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != runlog.Path(cwd, "improver", time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC)) {
+		t.Errorf("log path = %s", path)
+	}
+	waitForFile(t, path, "run improver sid-leader=true")
+}
+
+func TestStartDetachedWritesToTheSchedulerLog(t *testing.T) {
+	cwd := t.TempDir()
+	pid, err := StartDetached(cwd)
+	if err != nil || pid <= 0 {
+		t.Fatalf("pid = %d, err = %v", pid, err)
+	}
+	waitForFile(t, LogPath(cwd), "cron start sid-leader=true")
+
+	_ = os.MkdirAll(filepath.Dir(PIDPath(cwd)), 0o755)
+	_ = os.WriteFile(PIDPath(cwd), []byte(strconv.Itoa(os.Getpid())), 0o644)
+	if _, err := StartDetached(cwd); err == nil {
+		t.Error("a second scheduler should not start while one is running")
+	}
 }
 
 func writeAgent(t *testing.T, cwd, name, agentJSON string) {
@@ -34,46 +98,96 @@ func writeAgent(t *testing.T, cwd, name, agentJSON string) {
 	}
 }
 
-var cfg = &config.Config{MergeEnsurer: config.MergeEnsurer{Label: "x"}}
+func enable(t *testing.T, cwd, name, expr string) {
+	t.Helper()
+	if err := Enable(cwd, name, expr); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestFindJobs(t *testing.T) {
-	t.Run("returns agents with cron patterns", func(t *testing.T) {
+	t.Run("returns the enabled crons, not the agent.json defaults", func(t *testing.T) {
 		cwd := t.TempDir()
 		writeAgent(t, cwd, "improver", `{"cron":"0 */6 * * *"}`)
 		writeAgent(t, cwd, "coder", `{"cron":"*/5 * * * *"}`)
-		writeAgent(t, cwd, "manual", ``)
-		want := []Job{{"coder", "*/5 * * * *", []string{"run", "coder"}}, {"improver", "0 */6 * * *", []string{"run", "improver"}}}
-		if diff := cmp.Diff(want, FindJobs(cwd, cfg)); diff != "" {
+		if jobs := FindJobs(cwd); len(jobs) != 0 {
+			t.Errorf("jobs before enabling = %v", jobs)
+		}
+		enable(t, cwd, "improver", "0 * * * *")
+		enable(t, cwd, "coder", "*/5 * * * *")
+		want := []Job{{"coder", "*/5 * * * *", []string{"run", "coder"}}, {"improver", "0 * * * *", []string{"run", "improver"}}}
+		if diff := cmp.Diff(want, FindJobs(cwd)); diff != "" {
 			t.Error(diff)
 		}
 	})
-	t.Run("returns nothing when no agents exist or have cron", func(t *testing.T) {
+	t.Run("skips agents that no longer load", func(t *testing.T) {
 		cwd := t.TempDir()
-		if jobs := FindJobs(cwd, cfg); len(jobs) != 0 {
-			t.Errorf("jobs = %v", jobs)
-		}
-		writeAgent(t, cwd, "manual", `{"model":"sonnet"}`)
-		if jobs := FindJobs(cwd, cfg); len(jobs) != 0 {
+		writeAgent(t, cwd, "good", ``)
+		writeAgent(t, cwd, "broken", ``)
+		enable(t, cwd, "good", "*/5 * * * *")
+		enable(t, cwd, "broken", "*/5 * * * *")
+		writeAgent(t, cwd, "broken", `{"bogus":1}`)
+		if jobs := FindJobs(cwd); len(jobs) != 1 || jobs[0].Name != "good" {
 			t.Errorf("jobs = %v", jobs)
 		}
 	})
-	t.Run("skips agents with invalid config", func(t *testing.T) {
+	t.Run("runs the merge ensurer with ensure-merge", func(t *testing.T) {
 		cwd := t.TempDir()
-		writeAgent(t, cwd, "broken", `{"cron":"*/5 * * * *","bogus":1}`)
-		writeAgent(t, cwd, "good", `{"cron":"*/5 * * * *"}`)
-		if jobs := FindJobs(cwd, cfg); len(jobs) != 1 || jobs[0].Name != "good" {
-			t.Errorf("jobs = %v", jobs)
+		enable(t, cwd, "merge-ensurer", "*/15 * * * *")
+		if diff := cmp.Diff([]Job{{"merge-ensurer", "*/15 * * * *", []string{"ensure-merge"}}}, FindJobs(cwd)); diff != "" {
+			t.Error(diff)
 		}
 	})
-	t.Run("schedules the merge ensurer next to cron agents when it has a cron", func(t *testing.T) {
-		cwd := t.TempDir()
-		writeAgent(t, cwd, "coder", `{"cron":"*/5 * * * *"}`)
-		withEnsurer := &config.Config{MergeEnsurer: config.MergeEnsurer{Cron: "*/15 * * * *"}}
-		jobs := FindJobs(cwd, withEnsurer)
-		if len(jobs) != 2 || !cmp.Equal(Job{"merge-ensurer", "*/15 * * * *", []string{"ensure-merge"}}, jobs[1]) {
-			t.Errorf("jobs = %v", jobs)
+}
+
+func TestEnableAndDisable(t *testing.T) {
+	cwd := t.TempDir()
+	writeAgent(t, cwd, "coder", ``)
+	if err := Enable(cwd, "coder", "every minute"); err == nil || !strings.Contains(err.Error(), "invalid cron expression") {
+		t.Errorf("bad pattern: %v", err)
+	}
+	if err := Enable(cwd, "ghost", "* * * * *"); err == nil {
+		t.Error("unknown agent enabled")
+	}
+	enable(t, cwd, "coder", "* * * * *")
+	enable(t, cwd, "coder", "*/5 * * * *")
+	if got, _ := Enabled(cwd); !cmp.Equal(map[string]string{"coder": "*/5 * * * *"}, got) {
+		t.Errorf("enabled = %v", got)
+	}
+	ignore, _ := os.ReadFile(filepath.Join(StateDir(cwd), ".gitignore"))
+	if string(ignore) != "*\n" {
+		t.Errorf(".gitignore = %q", ignore)
+	}
+	if err := Disable(cwd, "coder"); err != nil {
+		t.Fatal(err)
+	}
+	if err := Disable(cwd, "coder"); err == nil {
+		t.Error("disabling twice should fail")
+	}
+	if got, _ := Enabled(cwd); len(got) != 0 {
+		t.Errorf("enabled = %v", got)
+	}
+}
+
+func TestDefaultCron(t *testing.T) {
+	cwd := t.TempDir()
+	writeAgent(t, cwd, "coder", `{"cron":"*/5 * * * *"}`)
+	writeAgent(t, cwd, "manual", ``)
+	_ = os.WriteFile(config.ConfigPath(cwd), []byte(`{"baseBranch":"main","platform":"github","worktreeDir":".wt","tasks":{"project":"p","maxRetries":3},"mergeEnsurer":{"cron":"0 * * * *"}}`), 0o644)
+	for name, want := range map[string]string{"coder": "*/5 * * * *", "manual": "", "merge-ensurer": "0 * * * *", "ghost": ""} {
+		if got := DefaultCron(cwd, name); got != want {
+			t.Errorf("DefaultCron(%s) = %q, want %q", name, got, want)
 		}
-	})
+	}
+	if err := SaveDefaultCron(cwd, "manual", "15 * * * *"); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveDefaultCron(cwd, "merge-ensurer", "*/30 * * * *"); err != nil {
+		t.Fatal(err)
+	}
+	if DefaultCron(cwd, "manual") != "15 * * * *" || DefaultCron(cwd, "merge-ensurer") != "*/30 * * * *" {
+		t.Errorf("saved defaults not read back: %q %q", DefaultCron(cwd, "manual"), DefaultCron(cwd, "merge-ensurer"))
+	}
 }
 
 func TestReadPID(t *testing.T) {
@@ -95,30 +209,37 @@ func TestReadPID(t *testing.T) {
 func TestRenderScheduler(t *testing.T) {
 	now := time.Date(2026, 3, 7, 10, 2, 0, 0, time.Local)
 
-	t.Run("says when nothing is scheduled", func(t *testing.T) {
-		lines := RenderScheduler(t.TempDir(), cfg, now)
-		if diff := cmp.Diff([]string{log.FormatSection("Scheduler"), "  · no agents have a cron schedule"}, lines); diff != "" {
+	t.Run("says when no cron is enabled", func(t *testing.T) {
+		cwd := t.TempDir()
+		writeAgent(t, cwd, "coder", `{"cron":"*/5 * * * *"}`)
+		want := []string{
+			log.FormatSection("Scheduler"),
+			"  · not running",
+			"  · no crons enabled (enable one in the vteam TUI or with 'vteam cron enable <agent>')",
+		}
+		if diff := cmp.Diff(want, RenderScheduler(cwd, now)); diff != "" {
 			t.Error(diff)
 		}
 	})
 
-	t.Run("lists each job with its next run and the scheduler state", func(t *testing.T) {
+	t.Run("lists each enabled cron with its next run and the scheduler state", func(t *testing.T) {
 		cwd := t.TempDir()
-		writeAgent(t, cwd, "coder", `{"cron":"*/5 * * * *"}`)
-		writeAgent(t, cwd, "improver", `{"cron":"0 0 * * *"}`)
-		lines := RenderScheduler(cwd, cfg, now)
+		writeAgent(t, cwd, "coder", ``)
+		writeAgent(t, cwd, "improver", ``)
+		enable(t, cwd, "coder", "*/5 * * * *")
+		enable(t, cwd, "improver", "0 0 * * *")
 		want := []string{
 			log.FormatSection("Scheduler"),
-			"  ! not running (start it with 'vteam cron start')",
+			"  ! not running, crons paused (start it with 'vteam cron start')",
 			"  • coder     */5 * * * *  next 10:05 (in 3m)",
 			"  • improver  0 0 * * *    next Mar 8 00:00 (in 13h 58m)",
 		}
-		if diff := cmp.Diff(want, lines); diff != "" {
+		if diff := cmp.Diff(want, RenderScheduler(cwd, now)); diff != "" {
 			t.Error(diff)
 		}
 		_ = os.MkdirAll(filepath.Dir(PIDPath(cwd)), 0o755)
 		_ = os.WriteFile(PIDPath(cwd), []byte(strconv.Itoa(os.Getpid())), 0o644)
-		if got := RenderScheduler(cwd, cfg, now)[1]; got != "  ✓ running (pid "+strconv.Itoa(os.Getpid())+")" {
+		if got := RenderScheduler(cwd, now)[1]; got != "  ✓ running (pid "+strconv.Itoa(os.Getpid())+")" {
 			t.Errorf("state line = %q", got)
 		}
 	})
@@ -141,25 +262,45 @@ func (b *syncBuffer) String() string {
 	return b.buf.String()
 }
 
+type fakeClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func (c *fakeClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+func (c *fakeClock) advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
+}
+
+// harness runs a Scheduler on a fake clock: each value sent on ticks ends one Sleep, advancing the clock past it.
 type harness struct {
 	cwd   string
 	out   *syncBuffer
 	ticks chan string
 	s     *Scheduler
-	envs  chan string
 }
 
 func newHarness(t *testing.T, script map[string]string) *harness {
 	cwd := t.TempDir()
 	for name := range script {
-		writeAgent(t, cwd, name, `{"cron":"* * * * *"}`)
+		writeAgent(t, cwd, name, ``)
+		enable(t, cwd, name, "* * * * *")
 	}
-	h := &harness{cwd: cwd, out: &syncBuffer{}, ticks: make(chan string), envs: make(chan string, 10)}
+	clock := &fakeClock{now: time.Date(2026, 3, 7, 10, 0, 30, 0, time.Local)}
+	h := &harness{cwd: cwd, out: &syncBuffer{}, ticks: make(chan string)}
 	h.s = &Scheduler{
-		Cwd: cwd, Config: cfg, Log: log.New(h.out, h.out), Now: time.Now,
-		Sleep: func(ctx context.Context, _ time.Duration) error {
+		Cwd: cwd, Log: log.New(h.out, h.out), Now: clock.Now, Poll: time.Hour,
+		Sleep: func(ctx context.Context, d time.Duration) error {
 			select {
 			case <-h.ticks:
+				clock.advance(d)
 				return nil
 			case <-ctx.Done():
 				return ctx.Err()
@@ -186,20 +327,20 @@ func (h *harness) waitFor(t *testing.T, text string) {
 	}
 }
 
-func (h *harness) start(t *testing.T) (cancel func() error) {
+func (h *harness) start(t *testing.T) (cancel func() error, done chan error) {
 	ctx, stop := context.WithCancel(context.Background())
-	done := make(chan error, 1)
+	done = make(chan error, 1)
 	go func() { done <- h.s.Run(ctx) }()
 	h.waitFor(t, "waiting for jobs")
 	return func() error {
 		stop()
 		return <-done
-	}
+	}, done
 }
 
 func TestSchedulerRunsJobsAndReportsTheirEnd(t *testing.T) {
 	h := newHarness(t, map[string]string{"coder": "exit 0"})
-	stop := h.start(t)
+	stop, _ := h.start(t)
 	if ReadPID(h.cwd) != os.Getpid() {
 		t.Error("pid file not written")
 	}
@@ -225,7 +366,7 @@ func TestSchedulerRunsJobsAndReportsTheirEnd(t *testing.T) {
 
 func TestSchedulerSkipsATickWhileTheJobStillRuns(t *testing.T) {
 	h := newHarness(t, map[string]string{"coder": "sleep 30"})
-	stop := h.start(t)
+	stop, _ := h.start(t)
 	h.ticks <- "tick"
 	h.waitFor(t, "coder started")
 	h.ticks <- "tick"
@@ -242,7 +383,7 @@ func TestSchedulerSkipsATickWhileTheJobStillRuns(t *testing.T) {
 
 func TestSchedulerReportsFailedJobs(t *testing.T) {
 	h := newHarness(t, map[string]string{"coder": "exit 3", "unstartable": ""})
-	stop := h.start(t)
+	stop, _ := h.start(t)
 	h.ticks <- "tick"
 	h.ticks <- "tick"
 	h.waitFor(t, "coder exited 3 after")
@@ -267,11 +408,41 @@ func TestSchedulerWithoutJobs(t *testing.T) {
 	if err := h.s.Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(h.out.String(), "No agents with cron patterns found.") {
+	if !strings.Contains(h.out.String(), "No crons enabled.") {
 		t.Errorf("output:\n%s", h.out.String())
 	}
 	if _, err := os.Stat(PIDPath(h.cwd)); !os.IsNotExist(err) {
 		t.Error("pid file written")
+	}
+}
+
+func TestSchedulerPicksUpCronChangesAndStopsWhenNoneAreLeft(t *testing.T) {
+	h := newHarness(t, map[string]string{"coder": "exit 0"})
+	writeAgent(t, h.cwd, "improver", ``)
+	_, done := h.start(t)
+	enable(t, h.cwd, "improver", "*/5 * * * *")
+	enable(t, h.cwd, "coder", "*/2 * * * *")
+	h.ticks <- "tick"
+	h.waitFor(t, "improver cron enabled */5 * * * *")
+	h.waitFor(t, "coder cron changed */2 * * * *")
+	_ = Disable(h.cwd, "improver")
+	_ = Disable(h.cwd, "coder")
+	h.ticks <- "tick"
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatalf("scheduler did not stop:\n%s", h.out.String())
+	}
+	for _, want := range []string{"improver cron disabled", "coder cron disabled", "no crons enabled, stopping", "scheduler stopped"} {
+		if !strings.Contains(h.out.String(), want) {
+			t.Errorf("missing %q in:\n%s", want, h.out.String())
+		}
+	}
+	if _, err := os.Stat(PIDPath(h.cwd)); !os.IsNotExist(err) {
+		t.Error("pid file left behind")
 	}
 }
 

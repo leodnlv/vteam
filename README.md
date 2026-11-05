@@ -82,17 +82,26 @@ vteam run coder
 
 ### Running on a schedule
 
-Agents with a `cron` field in their `agent.json`, and the [merge ensurer](#vteam-ensure-merge) when `mergeEnsurer.cron` is set, can be scheduled with `vteam cron`:
+Crons are opt-in per agent. The `cron` in an agent's `agent.json` (and `mergeEnsurer.cron` for the [merge ensurer](#vteam-ensure-merge)) is only the default pattern; nothing runs on a schedule until you enable it. The easiest way is the [TUI](#vteam-interactive-tui): select an agent in the Agents tab, press `space`, and pick "Run on cron…". That edits the pattern, enables it, and starts the scheduler in the background. From the shell:
 
 ```bash
-# Start the scheduler — runs agents on their cron schedules
+# Enable a cron (the pattern defaults to the one in agent.json)
+vteam cron enable improver
+vteam cron enable coder '*/10 * * * *'
+
+# Start the scheduler for the enabled crons (foreground)
 vteam cron start
 
-# Check whether the scheduler is running, which jobs it has, and when they fire next
+# Check whether the scheduler is running, which crons are enabled, and when they fire next
 vteam cron status
+
+# Disable a cron
+vteam cron disable improver
 ```
 
-The scheduler is a foreground process — stop it with Ctrl+C. While it runs it writes its pid to `vteam/.locks/cron.pid`; a second `vteam cron start` in the same project refuses to start, and `vteam status` uses the file to report whether the scheduler is up. If an agent is still running when its next cron tick fires, the tick is skipped. Cron expressions have 5 fields (minute hour day month weekday) and support ranges, steps, lists, month and weekday names, and `7` for Sunday; `L` and `#` are not supported. When both day-of-month and day-of-week are set, either one matching fires the job. Each scheduled run writes its own log file, the same as a manual `vteam run` (see [Logs](#logs)). The scheduler prints the job table from `vteam status`, then one line per job start, finish, failure, or skipped tick, stamped with the time of day; starts and failures include the path to that run's log file.
+Enabled crons live in `vteam/.cron/schedules.json`. That file is local to your machine, and its directory has its own `.gitignore`. The scheduler rereads it every 2 seconds, so enabling, changing, or disabling a cron takes effect without a restart. When no crons are left enabled and no scheduled run is still going, the scheduler stops on its own. Enabled crons survive a scheduler stop or a reboot: they show as paused until the scheduler starts again (`vteam cron start`, or `S` in the TUI).
+
+`vteam cron start` is a foreground process — stop it with Ctrl+C. A scheduler the TUI starts runs in the background and writes its output to `vteam/.cron/scheduler.log`. While a scheduler runs it writes its pid to `vteam/.locks/cron.pid`; a second `vteam cron start` in the same project refuses to start, and `vteam status` uses the file to report whether the scheduler is up. If an agent is still running when its next cron tick fires, the tick is skipped. Cron expressions have 5 fields (minute hour day month weekday) and support ranges, steps, lists, month and weekday names, and `7` for Sunday; `L` and `#` are not supported. When both day-of-month and day-of-week are set, either one matching fires the job. Each scheduled run writes its own log file, the same as a manual `vteam run` (see [Logs](#logs)). The scheduler prints the job table from `vteam status`, then one line per job start, finish, failure, or skipped tick, stamped with the time of day; starts and failures include the path to that run's log file.
 
 ## Commands
 
@@ -140,7 +149,7 @@ vteam run security-analyst --focus "file upload endpoints"
 
 ### Logs
 
-Every `vteam run <agent>` writes its full output to a new file at `vteam/.logs/<agent>/<ISO-timestamp>.log`, whether you start it by hand or `vteam cron start` starts it. The output still goes to your terminal; the log file gets a copy of it. This includes Claude's tool calls, orchestrator messages, the ON_FINISH hook and memory curation, plus the error if the run crashes. The path is printed when the run starts.
+Every `vteam run <agent>` writes its full output to a new file at `vteam/.logs/<agent>/<ISO-timestamp>.log`, whether you start it by hand, from the TUI, or the scheduler starts it. The output still goes to your terminal; the log file gets a copy of it. This includes Claude's tool calls, orchestrator messages, the ON_FINISH hook and memory curation, plus the error if the run crashes. The path is printed when the run starts.
 
 The output is grouped into sections (Setup, Agent, Result, hooks, Cleanup), and each line starts with the time since the run started. Glyphs mark the kind of line: `•` orchestrator step, `❯` Claude text, `⚙` tool call, `✓` success, `!` warning, `✗` error (including failed tool calls). In a terminal the output is colored and tool inputs are cut to one line. The log file has no colors and keeps the full tool input. Set `NO_COLOR=1` to turn colors off, or `FORCE_COLOR=1` to force them on.
 
@@ -202,14 +211,14 @@ A coder task is `done` once its PR is open, but the PR still has to get through 
 | open, conflicting with its base branch | Moves the task to `todo` with a note. The coder [merges the base branch and resolves the conflicts](#following-up-on-review-comments) |
 | open, otherwise | Nothing. Review comments alone never reopen a task; only the label you add does |
 
-The label is removed before the task is reopened. If that removal fails, the task stays `done` and the next run tries again. Removing it first means a label left behind can never reopen the task over and over. While GitHub or GitLab is still working out whether a PR is mergeable, conflicts are skipped until a later run. Set `mergeEnsurer.cron` to run the ensurer from `vteam cron start`. Each run writes a log to `vteam/.logs/merge-ensurer/`.
+The label is removed before the task is reopened. If that removal fails, the task stays `done` and the next run tries again. Removing it first means a label left behind can never reopen the task over and over. While GitHub or GitLab is still working out whether a PR is mergeable, conflicts are skipped until a later run. To run the ensurer on a schedule, enable its cron (`vteam cron enable merge-ensurer`, or the TUI). `mergeEnsurer.cron` is its default pattern. Each run writes a log to `vteam/.logs/merge-ensurer/`.
 
 ### `vteam status`
 
 Shows what is happening now and what will happen next. It reads local state and the aven project; it makes no GitHub/GitLab calls.
 
 - **Running** — each agent run (and the merge ensurer) whose lock is held by a live process: pid, elapsed time, the task it claimed, and its worktree.
-- **Scheduler** — whether `vteam cron start` is running, and each cron job with its next fire time.
+- **Scheduler** — whether the scheduler is running, and each enabled cron with its next fire time.
 - **Up next** — for each `input: "task"` agent, the task it would pick if it ran now (same routing, retry limit, and ordering as `vteam run`), marked `(PR follow-up)` when it would continue an existing PR. `input: "pr"` agents show the PR label they watch.
 - **Awaiting merge** — `done` tasks whose PR has not been recorded as merged.
 - **Needs attention** — tasks in `inbox` awaiting triage, `todo` tasks no agent's `taskFilter` matches, `todo` tasks at `maxRetries`, `active` tasks whose claiming process on this machine is dead or that have no vteam claim, and worktrees no running agent is using.
@@ -222,6 +231,10 @@ Running `vteam` with no arguments inside a project opens a full-screen, keyboard
 
 - **Overview** — the `vteam status` view, refreshed every 2 seconds. A refresh starts only after the previous one finishes, so a large aven project refreshes less often instead of piling up work. If a refresh fails, the last good view stays and the error appears in the footer.
 - **Agents** — a sidebar of your agents (plus the merge ensurer) with a live/idle marker and details for the selected one, next to its newest run log. The log pane follows the log while the agent runs; scroll up to pause, `G` to follow again. `p` / `n` step to the previous / next run, and the `run i/n` counter in the title turns yellow when you are looking at an older run. `w` toggles line wrap.
+  - **Running agents from the TUI** — `space` (or `a`) opens an action menu for the selected agent: run once, run on cron or edit its cron, stop its cron, start the scheduler, open the log. Each action also has its own key (`x`, `c`, `s`, `S`).
+    - **Run once** asks for confirmation, then starts `vteam run <agent>` in the background. The run keeps going after you quit the TUI.
+    - **Run on cron** opens a dialog prefilled with the enabled pattern, or else the `agent.json` default. As you type it shows the schedule in words, the next three fire times, or the parse error. `tab` toggles saving the pattern as the default in `agent.json` (`vteam.config.json` for the merge ensurer). Confirming enables the cron and, if no scheduler is running, starts one in the background (see [Running on a schedule](#running-on-a-schedule)).
+    - **Cron markers** — an agent on cron shows `◷` in the sidebar, its pattern and next run in the details, and a line above its log. All three turn yellow with "paused" when the scheduler is not running.
 - **Info** — the project, `vteam.config.json`, whether the scheduler is running, and each agent's settings, including the tools it is allowed.
 
 The top-right corner shows the aven project, task label, and git branch.
@@ -235,6 +248,8 @@ The top-right corner shows the aven project, task label, and git branch.
 | `l` `enter` `→` / `h` `esc` `←` | Agents tab: focus the log / the sidebar |
 | `p` / `n` | Agents tab: previous (older) / next (newer) run |
 | `f` / `w` | Agents tab: toggle follow / line wrap |
+| `space` `a` | Agents tab: action menu for the selected agent |
+| `x` / `c` / `s` / `S` | Agents tab: run once / run on cron or edit its cron / stop its cron / start the scheduler |
 | `r` | refresh now |
 | `?` | help |
 | `q` `ctrl+c` | quit |
@@ -285,7 +300,7 @@ Global settings live in `vteam/vteam.config.json`:
 | `tasks.project`    | Required. The aven project vteam's tasks live in. aven creates it on the first task. `vteam init` sets it to the current directory name. |
 | `tasks.label`      | Default `"vteam"`. vteam only sees and picks up tasks carrying this label. Created automatically. |
 | `tasks.workspace`  | Optional. aven workspace, passed to every `aven` call as `--workspace`.                 |
-| `mergeEnsurer.cron` | Optional. Cron expression for running [`vteam ensure-merge`](#vteam-ensure-merge) from `vteam cron start`. Without it, the ensurer only runs when you call it. |
+| `mergeEnsurer.cron` | Optional. Default cron pattern for [`vteam ensure-merge`](#vteam-ensure-merge), used when you enable its cron (see [Running on a schedule](#running-on-a-schedule)). |
 | `mergeEnsurer.label` | Default `"vteam:changes-requested"`. The PR label you add to approve the review feedback on a coder PR. Create it in GitHub/GitLab once. |
 
 ### Agent configuration (agent.json)
@@ -311,7 +326,7 @@ Validation is strict: unknown keys are rejected everywhere, including inside `me
 | Field             | Default    | Description                                                                                                      |
 | ----------------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
 | `model`           | —          | Claude model passed to `claude --model` (e.g. `"sonnet"`, `"opus"`, `"haiku"`, or a full model ID). Omit to use Claude Code's default. |
-| `cron`            | —          | Cron expression (5 fields: minute hour day month weekday) for scheduling via `vteam cron start`. Validated on load. |
+| `cron`            | —          | Default cron expression (5 fields: minute hour day month weekday), used when you enable the agent's cron in the TUI or with `vteam cron enable`. Setting it does not schedule the agent. Validated on load. |
 | `worktree`        | `false`    | Run in an isolated git worktree; push branch on commit                                                           |
 | `readOnly`        | `false`    | Run in a worktree but skip commit/push/PR (requires `worktree: true`, incompatible with `autoPR`). Agent runs freely — `readOnly` only prevents the orchestrator from committing/pushing afterward. |
 | `output`          | —          | `"task"` to produce findings that the orchestrator creates as aven tasks (incompatible with `autoPR` and `readOnly`). When omitted, the agent uses generic content output. All agents share a unified output schema — `output` controls only the `content` field type. |
@@ -474,7 +489,7 @@ Memory is opt-in — agents without a `MEMORY.md` skip it entirely, and a `memor
 
 ## Agents
 
-vteam ships with four default agents (improver, security-analyst, coder, test-writer). Their `agent.json` files come with cron schedules for `vteam cron start`: coder every 5 minutes (`*/5 * * * *`), improver on the hour (`0 * * * *`), security-analyst every 4 hours at quarter past (`15 */4 * * *`), and test-writer every 2 hours at half past (`30 */2 * * *`). The merge ensurer runs every 15 minutes (`mergeEnsurer.cron`). Add custom agents by creating `vteam/agents/<name>/AGENT.md` (plus an optional `agent.json`) — no config changes needed.
+vteam ships with four default agents (improver, security-analyst, coder, test-writer). Their `agent.json` files come with default cron patterns, which run once you enable them (see [Running on a schedule](#running-on-a-schedule)): coder every 5 minutes (`*/5 * * * *`), improver on the hour (`0 * * * *`), security-analyst every 4 hours at quarter past (`15 */4 * * *`), and test-writer every 2 hours at half past (`30 */2 * * *`). The merge ensurer's default is every 15 minutes (`mergeEnsurer.cron`). Add custom agents by creating `vteam/agents/<name>/AGENT.md` (plus an optional `agent.json`) — no config changes needed.
 
 ### Improver
 

@@ -24,7 +24,7 @@ vteam is a Go CLI that orchestrates AI agents powered by `claude -p` (Claude Cod
 ## CLI commands
 
 ```
-vteam                                   # interactive TUI: Overview (status), Agents (live run logs, p/n through runs), Info (config + agent settings); ? for keys
+vteam                                   # interactive TUI: Overview (status), Agents (live run logs, p/n through runs; space for actions: run once, run on cron, stop cron), Info (config + agent settings); ? for keys
 vteam init                              # scaffold vteam/ directory in the current project
 vteam run <agent>                       # run a specific agent
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
@@ -32,8 +32,10 @@ vteam run                               # (no agent) list available agents
 vteam status                            # running agents (pid, task, worktree), scheduler state + next fires, each task agent's next pick, PRs awaiting merge, tasks/worktrees needing attention
 vteam clean                             # remove worktrees no running agent uses, break stale locks, release orphaned active tasks
 vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen done tasks whose PR is labelled or conflicting
-vteam cron start                        # start long-lived scheduler for agents with cron patterns (and the merge ensurer)
-vteam cron status                       # show whether the scheduler runs, its jobs, and next fire times
+vteam cron enable <agent> [expr]        # enable an agent's cron (or merge-ensurer's); expr defaults to the agent.json cron
+vteam cron disable <agent>              # disable it
+vteam cron start                        # start the long-lived scheduler for the enabled crons (foreground)
+vteam cron status                       # show whether the scheduler runs, the enabled crons, and next fire times
 vteam skill install                     # symlink skills from skills/ into ~/.claude/skills/
 vteam skill uninstall                   # remove skill symlinks from ~/.claude/skills/
 ```
@@ -90,7 +92,7 @@ vteam/
 | `tasks.project`    | Required, non-empty. aven project for vteam's tasks; aven auto-creates it on the first task |
 | `tasks.label`      | Default `"vteam"`. Opt-in label — vteam only sees/picks up tasks carrying it. Auto-created. vteam also adds `<label>-<agent>` labels: the creating agent's on new tasks (`vteam-improver`), the finishing agent's on `done` (`vteam-coder`) |
 | `tasks.workspace`  | Optional. aven workspace, passed as `--workspace` to every `aven` call                  |
-| `mergeEnsurer.cron` | Optional. Schedules `vteam ensure-merge` in `vteam cron start`                        |
+| `mergeEnsurer.cron` | Optional. Default cron pattern for `vteam ensure-merge` once its cron is enabled     |
 | `mergeEnsurer.label` | Default `"vteam:changes-requested"`. PR label a human adds to approve review feedback; the ensurer reopens the task and removes it |
 
 ## Agent configuration (agent.json)
@@ -105,7 +107,7 @@ All fields are optional.
 {
   "$schema": "../../agent.schema.json",      // editor autocomplete/validation
   "model": "sonnet",                         // alias ("sonnet", "opus", "haiku") or full model ID; omit for Claude Code's default
-  "cron": "0 */6 * * *",                     // cron schedule (5 fields, no L or #)
+  "cron": "0 */6 * * *",                     // default cron pattern (5 fields, no L or #); does not schedule until enabled
   "worktree": true,                          // run in an isolated git worktree
   "readOnly": true,                          // worktree but no commit/push/PR (requires worktree: true)
   "input": "task",                           // "task" (pick from the aven todo queue) or "pr" (respond to PR reviews)
@@ -261,7 +263,7 @@ Advisory file locking via atomic `mkdir`. Each lock contains PID + timestamp. A 
 
 ## Scheduling
 
-Agents with a `cron` field, plus `vteam ensure-merge` when `mergeEnsurer.cron` is set, run on schedule via `vteam cron start` (foreground process, stop with Ctrl+C). Cron expressions have 5 fields with ranges, steps, lists, and month/weekday names; `L` and `#` are rejected, and when both day-of-month and day-of-week are set either one matching fires. If an agent is still running when its next tick fires, the tick is skipped. The scheduler writes its pid to `vteam/.locks/cron.pid`, refuses to start twice, and `vteam status` reads that file to report whether it is running.
+Crons are opt-in per agent. The `cron` in `agent.json` (and `mergeEnsurer.cron` for the job `merge-ensurer`) is only a default pattern. A cron runs once it is enabled, either in the TUI (Agents tab: `space` → "Run on cron…", or `c`) or with `vteam cron enable <agent> [expr]`. Enabled crons are local state in `vteam/.cron/schedules.json` (gitignored by its own `.gitignore`). `vteam cron start` (foreground, Ctrl+C to stop) runs them. It rereads that file every 2s, so enable/disable/change take effect live, and it exits by itself once no cron is enabled and nothing it started is running. The TUI starts the scheduler in the background (output in `vteam/.cron/scheduler.log`) when you enable a cron and none is running. Enabled crons with no scheduler show as paused; `S` in the TUI or `vteam cron start` resumes them. Cron expressions have 5 fields with ranges, steps, lists, and month/weekday names; `L` and `#` are rejected, and when both day-of-month and day-of-week are set either one matching fires. If an agent is still running when its next tick fires, the tick is skipped. The scheduler writes its pid to `vteam/.locks/cron.pid`, refuses to start twice, and `vteam status` reads that file to report whether it is running.
 
 Every `vteam run <agent>`, whether started by hand or by the scheduler, writes its full output to `vteam/.logs/<agent>/<ISO-timestamp>.log` and still prints to the terminal. Check there first when troubleshooting a run. The output is split into sections (Setup, Agent, Result, hooks, Cleanup) with an elapsed-time gutter. Glyphs: `•` step, `❯` Claude text, `⚙` tool call, `✗` failed tool or error, `!` warning. The file has no colors and keeps full tool inputs.
 

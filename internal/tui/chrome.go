@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/lipgloss/v2"
+	xansi "github.com/charmbracelet/x/ansi"
 	"github.com/leodnlv/vteam/internal/log"
 )
 
@@ -45,8 +47,18 @@ func (m Model) hints() []hint {
 	if m.help {
 		return []hint{{"j/k", "scroll"}, {"?/esc", "close help"}}
 	}
+	if m.tab == TabAgents && m.dialog.kind != dialogNone {
+		switch m.dialog.kind {
+		case dialogMenu:
+			return []hint{{"j/k", "move"}, {"⏎", "choose"}, {"esc", "close"}}
+		case dialogConfirm:
+			return []hint{{"⏎", "run"}, {"esc", "cancel"}}
+		default:
+			return []hint{{"⏎", "confirm"}, {"tab", "save as default"}, {"esc", "cancel"}}
+		}
+	}
 	if m.tab == TabAgents {
-		focus := []hint{{"j/k", "select"}, {"l/⏎", "open log"}}
+		focus := []hint{{"j/k", "select"}, {"space", "actions"}, {"l/⏎", "open log"}}
 		if m.agents.focusLog {
 			focus = []hint{{"j/k", "scroll"}, {"h", "agents"}, {"G", "follow"}}
 		}
@@ -56,6 +68,9 @@ func (m Model) hints() []hint {
 }
 
 func (m Model) statusText() string {
+	if t := m.toastText(); t != "" {
+		return t
+	}
 	if m.tab != TabOverview && !m.help {
 		running := 0
 		for _, a := range m.agents.list {
@@ -63,10 +78,17 @@ func (m Model) statusText() string {
 				running++
 			}
 		}
+		parts := []string{styleGray.Render("○ idle")}
 		if running > 0 {
-			return styleGreen.Render(fmt.Sprintf("● %d running", running))
+			parts[0] = styleGreen.Render(fmt.Sprintf("● %d running", running))
 		}
-		return styleGray.Render("○ idle")
+		switch crons := m.enabledCrons(); {
+		case crons > 0 && m.schedulerRunning():
+			parts = append(parts, styleCron.Render(fmt.Sprintf("◷ %d on cron", crons)))
+		case crons > 0:
+			parts = append(parts, styleYellow.Render(fmt.Sprintf("◷ %d paused", crons)))
+		}
+		return strings.Join(parts, styleGray.Render(" · "))
 	}
 	if m.overview.err != "" {
 		return styleRed.Render("✗ " + m.overview.err)
@@ -82,7 +104,11 @@ func (m Model) renderFooter() []string {
 	for _, h := range m.hints() {
 		items = append(items, styleKey.Render(h.keys)+" "+styleGray.Render(h.label))
 	}
-	return []string{rule(m.width), spread(" "+strings.Join(items, "  "), m.statusText()+" ", m.width)}
+	left, right := " "+strings.Join(items, "  "), m.statusText()+" "
+	if room := m.width - lipgloss.Width(right) - 2; lipgloss.Width(left) > room {
+		left = xansi.Truncate(left, max(0, room), "…")
+	}
+	return []string{rule(m.width), spread(left, right, m.width)}
 }
 
 var helpGroups = []struct {
@@ -106,6 +132,11 @@ var helpGroups = []struct {
 		{"l  enter  →", "focus the log"},
 		{"h  esc  ←", "back to the sidebar"},
 		{"p  n", "previous (older) / next (newer) run"},
+		{"space  a", "actions menu of the selected agent"},
+		{"x", "run the selected agent once"},
+		{"c", "run it on cron / edit its cron"},
+		{"s", "stop its cron"},
+		{"S", "start the scheduler when crons are paused"},
 		{"f", "toggle follow"},
 		{"w", "toggle line wrap"},
 	}},

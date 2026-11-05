@@ -18,10 +18,36 @@ stdout '^  improver  \(output: task\)$'
 stdout '^  security-analyst  \(output: task\)$'
 ! stdout 'invalid config'
 
+# Crons are opt-in: the agent.json patterns are only defaults until enabled.
 exec vteam cron status
 stdout 'vteam ▸ cron status'
+stdout 'no crons enabled'
+! stdout 'merge-ensurer'
+
+exec vteam cron start
+stderr 'No crons enabled'
+
+exec vteam cron enable improver
+stdout '✓ improver cron enabled 0 \* \* \* \*'
 stdout 'not running \(start it with .vteam cron start.\)'
-stdout '• merge-ensurer +\*/15 \* \* \* \*  next'
+exec vteam cron enable merge-ensurer '*/30 * * * *'
+exists vteam/.cron/schedules.json vteam/.cron/.gitignore
+exec vteam cron status
+stdout 'not running, crons paused'
+stdout '• improver +0 \* \* \* \* +next'
+stdout '• merge-ensurer +\*/30 \* \* \* \*  next'
+
+! exec vteam cron enable improver 'every hour'
+stderr 'invalid cron expression'
+! exec vteam cron enable ghost
+stderr 'ghost'
+
+exec vteam cron disable improver
+stdout '✓ improver cron disabled'
+exec vteam cron status
+! stdout 'improver'
+! exec vteam cron disable improver
+stderr 'improver has no cron enabled'
 
 exec vteam --version
 stdout 'vteam version'

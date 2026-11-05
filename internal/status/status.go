@@ -55,7 +55,7 @@ func Render(ctx context.Context, d Deps) ([]string, error) {
 
 	lines := []string{log.FormatBanner("status", fmt.Sprintf("aven: %s · label: %s", d.Config.Tasks.Project, d.Config.Tasks.Label))}
 	lines = append(lines, renderRunning(d.Cwd, running, now)...)
-	lines = append(lines, schedule.RenderScheduler(d.Cwd, d.Config, now)...)
+	lines = append(lines, schedule.RenderScheduler(d.Cwd, now)...)
 	lines = append(lines, renderUpNext(loaded.agents, ready, d.Config)...)
 	lines = append(lines, renderAwaitingMerge(idx)...)
 	lines = append(lines, renderNeedsAttention(ctx, d, loaded, idx, running)...)

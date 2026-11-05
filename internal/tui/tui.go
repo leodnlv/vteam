@@ -43,6 +43,16 @@ type Deps struct {
 	// SchedulerPID is the pid of a live `vteam cron start`, or 0.
 	SchedulerPID func() int
 	Now          func() time.Time
+
+	// RunOnce starts one run of an agent (or the merge ensurer) in the background.
+	RunOnce func(name string) error
+	// EnableCron turns on a cron with expr; DisableCron turns it off.
+	EnableCron  func(name, expr string) error
+	DisableCron func(name string) error
+	// SaveCron writes expr as the default pattern in agent.json (vteam.config.json for the merge ensurer).
+	SaveCron func(name, expr string) error
+	// StartScheduler starts `vteam cron start` in the background and returns its pid.
+	StartScheduler func() (int, error)
 }
 
 type overviewState struct {
@@ -64,6 +74,8 @@ type Model struct {
 	overview overviewState
 	agents   agentsState
 	info     infoState
+	dialog   dialog
+	toast    toast
 }
 
 func New(ctx context.Context, deps Deps) Model {
@@ -135,6 +147,9 @@ func (m Model) bodyHeight() int {
 
 func (m Model) View() tea.View {
 	body := m.renderBody()
+	if m.tab == TabAgents && m.dialog.kind != dialogNone {
+		body = m.renderDialog(body)
+	}
 	if m.help {
 		body = overlay(body, helpBox(), m.width, m.bodyHeight())
 	}
