@@ -171,4 +171,4 @@ After writing files, print:
 
 - Always use the `AskUserQuestion` tool for questions — do not ask questions in plain text.
 - Generate high-quality, specific system prompts. Avoid generic instructions — tailor the workflow and constraints to the agent's actual purpose.
-- The user may be running this skill from a project that does NOT have vteam installed yet. If there's no `vteam/` directory, tell them to run `vteam init` first (or `npx vteam init`). `vteam init` also writes `vteam/agent.schema.json`, which the `$schema` reference points to.
+- The user may be running this skill from a project that does NOT have vteam installed yet. If there's no `vteam/` directory, tell them to run `vteam init` first (install the binary with `go install github.com/leodnlv/vteam/cmd/vteam@latest` if it is missing). `vteam init` also writes `vteam/agent.schema.json`, which the `$schema` reference points to.
