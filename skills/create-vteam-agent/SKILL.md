@@ -165,7 +165,7 @@ Plain markdown — no frontmatter. Put its model and tools in the `onFinish` sec
 After writing files, print:
 - The path to each created file
 - How to test-run the agent: `vteam run <name>` (or `just dev run <name>` if developing vteam itself)
-- If the agent has a cron, say it is only a default: enable it in the TUI (`vteam` → Agents tab → `space` → "Run on cron…"), which also starts the scheduler, or with `vteam cron enable <name>` followed by `vteam cron start`. `vteam cron status` shows the next fire time.
+- If the agent has a cron, say it is only a default: enable it in the TUI (`vteam` → Agents tab → `space` → "Run on cron…"), which also starts the scheduler, or with `vteam cron enable <name>` followed by `vteam cron start`. `vteam status` shows the next fire time.
 
 ## Important notes
 

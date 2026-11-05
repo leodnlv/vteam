@@ -19,8 +19,8 @@ stdout '^  security-analyst  \(output: task\)$'
 ! stdout 'invalid config'
 
 # Crons are opt-in: the agent.json patterns are only defaults until enabled.
-exec vteam cron status
-stdout 'vteam ▸ cron status'
+exec vteam status
+stdout 'vteam ▸ status'
 stdout 'no crons enabled'
 ! stdout 'merge-ensurer'
 
@@ -32,7 +32,7 @@ stdout '✓ improver cron enabled 0 \* \* \* \*'
 stdout 'not running \(start it with .vteam cron start.\)'
 exec vteam cron enable merge-ensurer '*/30 * * * *'
 exists vteam/.cron/schedules.json vteam/.cron/.gitignore
-exec vteam cron status
+exec vteam status
 stdout 'not running, crons paused'
 stdout '• improver +0 \* \* \* \* +next'
 stdout '• merge-ensurer +\*/30 \* \* \* \*  next'
@@ -44,10 +44,16 @@ stderr 'ghost'
 
 exec vteam cron disable improver
 stdout '✓ improver cron disabled'
-exec vteam cron status
+exec vteam status
 ! stdout 'improver'
 ! exec vteam cron disable improver
 stderr 'improver has no cron enabled'
+
+# Plumbing commands the scheduler and TUI spawn stay out of help.
+exec vteam --help
+! stdout '^  run '
+! stdout '^  ensure-merge '
+stdout '^  status '
 
 exec vteam --version
 stdout 'vteam version'

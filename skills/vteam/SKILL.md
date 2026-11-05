@@ -26,16 +26,15 @@ vteam is a Go CLI that orchestrates AI agents powered by `claude -p` (Claude Cod
 ```
 vteam                                   # interactive TUI: Overview (status), Agents (live run logs, p/n through runs; space for actions: run once with an optional multiline --focus, run on cron, stop cron), Info (config + agent settings); ? for keys
 vteam init                              # scaffold vteam/ directory in the current project
-vteam run <agent>                       # run a specific agent
+vteam run <agent>                       # run a specific agent (hidden from --help, still works)
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
 vteam run                               # (no agent) list available agents
 vteam status                            # running agents (pid, task, worktree), scheduler state + next fires, each task agent's next pick, PRs awaiting merge, tasks/worktrees needing attention
 vteam clean                             # remove worktrees no running agent uses, break stale locks, release orphaned active tasks
-vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen done tasks whose PR is labelled or conflicting
+vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen done tasks whose PR is labelled or conflicting (hidden from --help, still works)
 vteam cron enable <agent> [expr]        # enable an agent's cron (or merge-ensurer's); expr defaults to the agent.json cron
 vteam cron disable <agent>              # disable it
 vteam cron start                        # start the long-lived scheduler for the enabled crons (foreground)
-vteam cron status                       # show whether the scheduler runs, the enabled crons, and next fire times
 vteam skill install                     # symlink skills from skills/ into ~/.claude/skills/
 vteam skill uninstall                   # remove skill symlinks from ~/.claude/skills/
 ```

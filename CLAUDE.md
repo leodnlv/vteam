@@ -256,19 +256,20 @@ just clean          # rm -rf dist/
 ```
 vteam                                   # interactive TUI (Overview / Agents / Info); prints help outside a terminal or a vteam project
 vteam init                              # scaffold vteam/ directory
-vteam run                               # list available agents
-vteam run <agent>                       # run a specific agent
+vteam run                               # list available agents (hidden from --help)
+vteam run <agent>                       # run a specific agent (hidden from --help)
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
 vteam status                            # show running agents, scheduler state, next picks, tasks needing attention
 vteam clean                             # remove worktrees no running agent uses, break stale locks, release orphaned active tasks
-vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen labelled or conflicting PR tasks
+vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen labelled or conflicting PR tasks (hidden from --help)
 vteam cron enable <agent> [expr]        # enable an agent's (or merge-ensurer's) cron; expr defaults to agent.json's cron
 vteam cron disable <agent>              # disable it
 vteam cron start                        # start the long-lived scheduler for the enabled crons (foreground)
-vteam cron status                       # show whether the scheduler runs, the enabled crons, and next fire times
 vteam skill install                     # symlink skills from skills/ into ~/.claude/skills/
 vteam skill uninstall                   # remove skill symlinks from ~/.claude/skills/
 ```
+
+`run` and `ensure-merge` are `Hidden` cobra commands: the TUI is the front door, but the scheduler and the TUI spawn them as subprocesses (`schedule.JobCommand`, `schedule.SpawnRun`), and scripts, system cron, and the e2e tests call them directly, so they must keep working. `vteam status` also covers what `cron status` used to show (the `Scheduler` section).
 
 Crons are opt-in per agent. The enabled ones are local state in `vteam/.cron/schedules.json` (`{"jobs": {"<name>": {"cron": "<expr>"}}}`, written atomically by `schedule.Enable`/`Disable`). The directory carries its own `.gitignore` (`*`), so projects scaffolded before it existed don't commit it. The `cron` in `agent.json` and `mergeEnsurer.cron` are only default patterns (`schedule.DefaultCron`). The job name `merge-ensurer` runs `vteam ensure-merge`; any other name runs `vteam run <name>` (`schedule.JobCommand`). `FindJobs` returns the enabled jobs whose agent still loads.
 
@@ -284,7 +285,7 @@ Crons are opt-in per agent. The enabled ones are local state in `vteam/.cron/sch
 - **Agents** — a sidebar of every agent, the merge ensurer, and any other name with a `vteam/.logs/<name>/` directory (`tui.LoadAgents`), showing live runs from agent locks and each agent's details. The log pane shows the selected agent's newest run log, re-read every 500ms when its size or mtime changes, recolored by line glyph and wrapped with a hanging indent (`w` toggles wrap). It follows the end of the log until you scroll up; `G` or scrolling to the bottom resumes. `p`/`n` step to the previous/next run, and the title's `run i/n` turns yellow on an older run. `l`/`enter` focus the log, `h`/`esc` the sidebar, and `tab`/`shift+tab` toggle between them. `space`/`a` opens an action menu for the selected agent (`internal/tui/actions.go`), and each item also has its own key. `r` opens the run dialog: a multiline focus field (bubbles `textarea`; `⏎` runs, `shift+⏎`/`alt+⏎`/`ctrl+j` adds a line, pastes are accepted) whose trimmed text is passed as `--focus` (`Deps.RunOnce` → `schedule.SpawnRun`); empty means a normal run. The merge ensurer takes no focus, so for it the dialog is a plain confirmation. `c` opens the cron dialog, prefilled with the enabled pattern, else the default, else `0 * * * *`. The dialog uses a readline-style input (`input.go`) and shows the pattern in words (`describeCron`), the next 3 fires, or the parse error; `tab` toggles saving it as the default. `⏎` enables it (`Deps.EnableCron`, plus `Deps.SaveCron` when saving), then starts a detached scheduler (`Deps.StartScheduler`) if none runs. `s` stops the cron. `S` starts the scheduler when crons are paused. An agent with an enabled cron shows `◷` in the sidebar, `cron`/`next` in its details, and a line above the log. All three turn yellow "paused" when no scheduler runs. Results and errors show as a 5s toast in the footer, which also counts `◷ N on cron` / `◷ N paused`. While a dialog is open it gets every key except `ctrl+c`.
 - **Info** — the project, `vteam.config.json`, scheduler state and enabled-cron count, and each agent's `agent.json` settings (model, input/output, enabled cron and next run or `off` with its default, flags, `taskFilter`, allowed/denied tools).
 
-`status` and `cron status` build their output as lines with the `Format*` helpers in `internal/log`, and the TUI's Overview shows the same lines, so they look the same as `vteam run` output.
+`status` builds its output as lines with the `Format*` helpers in `internal/log`, and the TUI's Overview shows the same lines, so they look the same as `vteam run` output.
 
 Every `vteam run <agent>` writes a log file for that run at `vteam/.logs/<agent>/<ISO-timestamp>.log` (`internal/runlog`), whether it was started by hand or by the scheduler. Every line the run's `log.Logger` prints is also written to the file, ANSI colors stripped, including the final error. `vteam run` output goes through `internal/log`: sections (`Setup`, `Agent: <name>`, `Result`, `On-finish hook`, `Memory curation`, `Cleanup`), an elapsed-time gutter, and glyphs per line kind (`•` step, `❯` Claude text, `⚙` tool call, `✓`/`!`/`✗`). `internal/claude` renders tool calls (`DescribeTool`), failed tool results, and an exit line with duration, turns, and `total_cost_usd`. In a TTY, `Logger.ToolCall` cuts tool inputs to one line on the terminal and writes the full input to the log file. Logging starts after the agent is resolved, so an unknown agent name creates no file.
 

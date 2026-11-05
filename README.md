@@ -93,7 +93,7 @@ vteam cron enable coder '*/10 * * * *'
 vteam cron start
 
 # Check whether the scheduler is running, which crons are enabled, and when they fire next
-vteam cron status
+vteam status
 
 # Disable a cron
 vteam cron disable improver
@@ -104,6 +104,8 @@ Enabled crons live in `vteam/.cron/schedules.json`. That file is local to your m
 `vteam cron start` is a foreground process — stop it with Ctrl+C. A scheduler the TUI starts runs in the background and writes its output to `vteam/.cron/scheduler.log`. While a scheduler runs it writes its pid to `vteam/.locks/cron.pid`; a second `vteam cron start` in the same project refuses to start, and `vteam status` uses the file to report whether the scheduler is up. If an agent is still running when its next cron tick fires, the tick is skipped. Cron expressions have 5 fields (minute hour day month weekday) and support ranges, steps, lists, month and weekday names, and `7` for Sunday; `L` and `#` are not supported. When both day-of-month and day-of-week are set, either one matching fires the job. Each scheduled run writes its own log file, the same as a manual `vteam run` (see [Logs](#logs)). The scheduler prints the job table from `vteam status`, then one line per job start, finish, failure, or skipped tick, stamped with the time of day; starts and failures include the path to that run's log file.
 
 ## Commands
+
+Running `vteam` with no arguments opens the [TUI](#vteam-interactive-tui), the main way to drive vteam. `vteam run` and `vteam ensure-merge` are left out of `vteam --help`, but they work as documented below: the scheduler and the TUI run them, and you can call them from scripts or system cron.
 
 ### `vteam init`
 

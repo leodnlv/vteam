@@ -71,7 +71,7 @@ func NextRun(expr string, now time.Time) time.Time {
 
 func padEnd(s string, n int) string { return log.PadEnd(s, n) }
 
-// RenderScheduler renders the Scheduler section shared by vteam status, vteam cron status, and vteam cron start.
+// RenderScheduler renders the Scheduler section shared by vteam status and vteam cron start.
 func RenderScheduler(cwd string, now time.Time) []string {
 	lines := []string{log.FormatSection("Scheduler")}
 	jobs := FindJobs(cwd)

@@ -9,7 +9,7 @@ All vteam terminal output goes through `internal/log` (layout: the `Logger` meth
 
 **Streaming commands** do work and report it as it happens (`vteam run`, `vteam ensure-merge`, `vteam cron start`). They print lines immediately with the `*log.Logger` methods.
 
-**Snapshot commands** show current state (`vteam status`, `vteam cron status`). They build a `[]string` with the `log.Format*` helpers and print it once with `strings.Join(lines, "\n")`. The TUI's Overview tab (`internal/tui`) redraws the same lines, so put the rendering in a `Render*(...) []string` function that other commands can reuse (`schedule.RenderScheduler` is shared by `status`, `cron status`, and `cron start`).
+**Snapshot commands** show current state (`vteam status`). They build a `[]string` with the `log.Format*` helpers and print it once with `strings.Join(lines, "\n")`. The TUI's Overview tab (`internal/tui`) redraws the same lines, so put the rendering in a `Render*(...) []string` function that other commands can reuse (`schedule.RenderScheduler` is shared by `status` and `cron start`).
 
 ## Building blocks
 

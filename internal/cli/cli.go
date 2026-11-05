@@ -110,9 +110,10 @@ func initCmd() *cobra.Command {
 func runCmd() *cobra.Command {
 	var focus string
 	cmd := &cobra.Command{
-		Use:   "run [agent]",
-		Short: "Run a specific agent (omit the agent to list available agents)",
-		Args:  cobra.MaximumNArgs(1),
+		Use:    "run [agent]",
+		Short:  "Run a specific agent (omit the agent to list available agents)",
+		Hidden: true,
+		Args:   cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, err := cwd()
 			if err != nil {
@@ -300,9 +301,10 @@ func cleanCmd() *cobra.Command {
 
 func ensureMergeCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "ensure-merge",
-		Short: "Record merged PRs, cancel tasks with closed PRs, and reopen tasks whose PRs need changes or conflict",
-		Args:  cobra.NoArgs,
+		Use:    "ensure-merge",
+		Short:  "Record merged PRs, cancel tasks with closed PRs, and reopen tasks whose PRs need changes or conflict",
+		Hidden: true,
+		Args:   cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			dir, err := cwd()
 			if err != nil {
@@ -374,15 +376,6 @@ func cronCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: inProject(func(cmd *cobra.Command, dir string, _ []string) error {
 			return schedule.New(dir, log.Std()).Run(cmd.Context())
-		}),
-	}, &cobra.Command{
-		Use:   "status",
-		Short: "Show whether the scheduler is running and the next fire time of each enabled cron",
-		Args:  cobra.NoArgs,
-		RunE: inProject(func(cmd *cobra.Command, dir string, _ []string) error {
-			lines := append([]string{log.FormatBanner("cron status", "")}, schedule.RenderScheduler(dir, time.Now())...)
-			fmt.Fprintln(cmd.OutOrStdout(), strings.Join(lines, "\n")+"\n")
-			return nil
 		}),
 	}, &cobra.Command{
 		Use:   "enable <agent> [cron expression]",
