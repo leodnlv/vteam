@@ -326,6 +326,23 @@ func TestAgentOutputToTaskCreation(t *testing.T) {
 		}
 	})
 
+	t.Run("uses the schema-validated answer when the final text is prose", func(t *testing.T) {
+		h := setup(t, project{agent: obj{"output": "task"}})
+		h.claude.then(func(claude.Options) claude.Result {
+			r := result("Well shoot, I sent it in through the findings tool.", 0)
+			r.StructuredOutput = jsonText(obj{"status": "completed", "summary": "Found issue.", "content": obj{"type": "task", "body": obj{
+				"title": "Stale lock race", "severity": "medium", "description": "Two waiters can both break it.", "files": []string{"src/lock.ts:86"}}}})
+			return r
+		})
+		h.mustRun()
+		if created := h.tasks.Created(); len(created) != 1 || created[0].Body.Title != "Stale lock race" {
+			t.Errorf("created = %+v", created)
+		}
+		if schema := h.claude.Calls()[0].JSONSchema; !strings.Contains(schema, `"task"`) {
+			t.Errorf("agent run should pass the task output schema, got %q", schema)
+		}
+	})
+
 	t.Run("fails the run on invalid output", func(t *testing.T) {
 		h := setup(t, project{})
 		h.claude.thenText("I could not finish.")

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -29,6 +30,8 @@ type Options struct {
 	Timeout         time.Duration
 	AllowedTools    []string
 	DisallowedTools []string
+	// JSONSchema, when set, makes Claude Code validate the final answer against it (--json-schema).
+	JSONSchema string
 }
 
 type Result struct {
@@ -37,8 +40,10 @@ type Result struct {
 	ExitCode int
 	// ResultText is the final result message, "" when Claude produced none.
 	ResultText string
-	CostUSD    *float64
-	Duration   *time.Duration
+	// StructuredOutput is the schema-validated final answer as JSON, "" when the run had no JSONSchema or Claude gave none.
+	StructuredOutput string
+	CostUSD          *float64
+	Duration         *time.Duration
 }
 
 type Runner interface {
@@ -61,10 +66,11 @@ type streamEvent struct {
 	Message *struct {
 		Content json.RawMessage `json:"content"`
 	} `json:"message"`
-	Result       string   `json:"result"`
-	TotalCostUSD *float64 `json:"total_cost_usd"`
-	DurationMS   *int64   `json:"duration_ms"`
-	NumTurns     *int     `json:"num_turns"`
+	Result           string          `json:"result"`
+	StructuredOutput json.RawMessage `json:"structured_output"`
+	TotalCostUSD     *float64        `json:"total_cost_usd"`
+	DurationMS       *int64          `json:"duration_ms"`
+	NumTurns         *int            `json:"num_turns"`
 }
 
 func (e streamEvent) blocks() []ContentBlock {
@@ -84,10 +90,33 @@ func Args(systemPromptFile string, opts Options) []string {
 	if len(opts.AllowedTools) > 0 {
 		args = append(append(args, "--allowedTools"), opts.AllowedTools...)
 	}
+	if tools, ok := BuiltinTools(opts.AllowedTools); ok {
+		args = append(args, "--tools", strings.Join(tools, ","))
+	}
 	if len(opts.DisallowedTools) > 0 {
 		args = append(append(args, "--disallowedTools"), opts.DisallowedTools...)
 	}
+	if opts.JSONSchema != "" {
+		args = append(args, "--json-schema", opts.JSONSchema)
+	}
 	return args
+}
+
+// BuiltinTools turns allowedTools into the --tools list: --allowedTools only pre-approves tools, while --tools is
+// what removes every other built-in tool. Patterns like "Bash(git *)" become "Bash"; MCP tools are not built-in
+// and stay governed by --allowedTools alone. ok is false when allowed is empty, meaning the default set.
+func BuiltinTools(allowed []string) (tools []string, ok bool) {
+	if len(allowed) == 0 {
+		return nil, false
+	}
+	for _, entry := range allowed {
+		name, _, _ := strings.Cut(strings.TrimSpace(entry), "(")
+		if name == "" || strings.HasPrefix(name, "mcp__") || slices.Contains(tools, name) {
+			continue
+		}
+		tools = append(tools, name)
+	}
+	return tools, true
 }
 
 type stream struct {
@@ -103,6 +132,9 @@ func (s *stream) record(e streamEvent) {
 	defer s.mu.Unlock()
 	if e.Result != "" {
 		s.res.ResultText = e.Result
+	}
+	if raw := strings.TrimSpace(string(e.StructuredOutput)); raw != "" && raw != "null" {
+		s.res.StructuredOutput = raw
 	}
 	s.res.CostUSD = e.TotalCostUSD
 	s.turns = e.NumTurns

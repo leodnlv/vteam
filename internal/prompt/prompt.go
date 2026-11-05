@@ -11,11 +11,14 @@ import (
 
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/model"
+	"github.com/leodnlv/vteam/internal/output"
 )
 
 type Parts struct {
 	SystemPrompt string `json:"systemPrompt"`
 	UserPrompt   string `json:"userPrompt"`
+	// OutputSchema is the JSON Schema for the agent's final answer; set only for agent runs, not hooks or curation.
+	OutputSchema string `json:"-"`
 }
 
 type Input struct {
@@ -70,7 +73,10 @@ func Build(in Input) (Parts, error) {
 	}
 	replyable := in.FollowUp != nil && len(in.FollowUp.Threads) > 0
 	sections = append(sections, outputInstruction(in.Agent, replyable))
-	return Parts{SystemPrompt: system, UserPrompt: strings.Join(sections, "\n\n")}, nil
+	schema := output.Schema(output.SchemaOptions{
+		TaskContent: in.Agent.Output == config.OutputTask, Memory: in.Agent.Memory != nil, ThreadReplies: replyable,
+	})
+	return Parts{SystemPrompt: system, UserPrompt: strings.Join(sections, "\n\n"), OutputSchema: schema}, nil
 }
 
 func OnFinish(cfg *config.Subagent, o model.RunOutcome) (Parts, error) {

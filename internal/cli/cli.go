@@ -224,6 +224,8 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 		Project:      loadProject(cmd.Context(), dir),
 		RenderStatus: func(ctx context.Context) ([]string, error) { return renderStatus(ctx, dir) },
 		Agents:       func(now time.Time) []tui.Agent { return tui.LoadAgents(dir, now) },
+		LoadConfig:   func() (*config.Config, error) { return config.Load(dir) },
+		SchedulerPID: func() int { return schedule.ReadPID(dir) },
 		Now:          time.Now,
 	})
 }

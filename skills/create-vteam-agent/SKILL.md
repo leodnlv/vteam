@@ -78,7 +78,7 @@ Map the user's answers to `agent.json` fields (annotated here; the written file 
   "prTriggerLabel": "<label>",             // only if input: "pr"
   "prCreateLabels": ["vteam"],             // only if autoPR: true
   "resolveThreads": true,                  // only with input: "task" + worktree: true — resolve PR threads it replied to on follow-ups
-  "allowedTools": ["..."],                 // always set — principle of least privilege
+  "allowedTools": ["..."],                 // always set — least privilege; also the agent's entire built-in toolset (--tools), so list every built-in tool it needs
   "disallowedTools": ["..."],              // only if needed
   "memory": { "model": "haiku" },          // only if MEMORY.md is created; may also set allowedTools / disallowedTools
   "onFinish": {                            // only if ON_FINISH.md is created

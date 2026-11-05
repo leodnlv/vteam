@@ -22,6 +22,8 @@ Each agent is invoked as a `claude -p` subprocess with:
 - `--append-system-prompt-file` — the agent's `AGENT.md` content (via temp file)
 - `--output-format stream-json` + `--verbose` — real-time streaming of tool calls; the runner accumulates `assistant` text events to extract the final result
 - `--allowedTools` / `--disallowedTools` — per-agent tool permissions from `agent.json` (uses the same syntax as native Claude Code CLI flags)
+- `--tools` — when `allowedTools` is set, the built-in tools it names (`Bash(git *)` → `Bash`; `mcp__*` entries skipped), so the agent has no other built-in tools. `--allowedTools` alone only pre-approves tools; it does not remove the rest (`claude.BuiltinTools`). MCP servers from the user's Claude Code config are not affected by `--tools`.
+- `--json-schema` — agent runs only (not hooks or curation): the JSON Schema of the agent's `AgentOutput` (`output.Schema`), so Claude Code validates the final answer and returns it in the result event's `structured_output`
 - `--no-session-persistence` — no session clutter
 
 The orchestrator assembles a layered prompt: AGENT.md (role) → optional `--focus` context (priority section) → existing task titles (from aven) → task content (plus its aven notes, oldest first, under `## Task Notes`) or PR review comments → output format instructions. The prompt is passed via stdin. Claude returns structured JSON as its final output — the orchestrator parses this to create aven tasks, git commits, and PRs.
@@ -45,7 +47,7 @@ The optional `memoryUpdate` field is included in the output format instructions 
 
 The optional `threadReplies` field (`[{ thread, body }]`) is included only when the run is a follow-up on an existing PR with unresolved review threads. The prompt labels the threads `T1`, `T2`, …; Claude replies by label, and the orchestrator maps labels back to platform thread IDs, so Claude never handles real IDs.
 
-The output format instructions are injected into every agent's user prompt by the prompt builder (`outputInstruction` in `internal/prompt`). The orchestrator validates the output with `output.Parse` (`internal/output`). Unknown keys are ignored, `null` values are rejected. Markdown fences are stripped before parsing as a fallback.
+The output format instructions are injected into every agent's user prompt by the prompt builder (`outputInstruction` in `internal/prompt`). `prompt.Build` also returns the matching JSON Schema (`Parts.OutputSchema`, from `output.Schema`), which offers `memoryUpdate` and `threadReplies` under the same conditions; the runner passes it as `--json-schema`. The orchestrator parses `structured_output` when present and falls back to the result text otherwise. It validates the output with `output.Parse` (`internal/output`). Unknown keys are ignored, `null` values are rejected. Markdown fences are stripped before parsing as a fallback.
 
 ### Memory management
 
@@ -94,7 +96,7 @@ Each agent is a directory `vteam/agents/<name>/`. `AGENT.md` (required — its p
 - `model` — Claude model override passed to `claude --model` (alias or full model ID); omit to use Claude Code's default
 - `prCreateLabels` — labels applied to created PRs
 - `resolveThreads` (default: `false`, requires `input: "task"` and `worktree: true`) — resolve each review thread the agent replied to on a PR follow-up
-- `allowedTools` — Claude Code tools the agent may use (same syntax as the `--allowedTools` CLI flag, e.g. `["Read", "Bash(git *)"]`)
+- `allowedTools` — Claude Code tools the agent may use (same syntax as the `--allowedTools` CLI flag, e.g. `["Read", "Bash(git *)"]`). When set, it is also the agent's whole built-in toolset (passed as `--tools`); an allowlist of only `mcp__*` tools leaves no built-in tools. Omit it for Claude Code's default toolset.
 - `disallowedTools` — Claude Code tools the agent may NOT use (same syntax as `--disallowedTools`)
 - `memory` / `onFinish` — `{ model?, allowedTools?, disallowedTools? }` for the memory curation agent and the on-finish hook. The `MEMORY.md` / `ON_FINISH.md` file enables the feature; the section only configures it, and a section without its markdown file is a load error.
 - `$schema` — ignored by vteam; points editors at the JSON Schema
@@ -224,7 +226,7 @@ internal/
 ├── ensuremerge/                  vteam ensure-merge — record merges, cancel closed PRs, reopen labelled/conflicting PR tasks
 ├── schedule/                     vteam cron — long-lived scheduler process and Scheduler section
 ├── status/                       vteam status — running agents, scheduler, next picks, tasks needing attention
-├── dashboard/                    vteam dashboard — bubbletea program redrawing vteam status every second
+├── tui/                          vteam (no args) — bubbletea/lipgloss TUI: Overview, Agents (log viewer), Info tabs
 ├── clean/                        vteam clean — remove unused worktrees, stale locks, orphaned active tasks
 ├── scaffold/                     vteam init — scaffold vteam/ in any project
 │   └── templates/                Embedded templates: <agent>.agent.json/.agent.md/.memory.md for the four default agents, vteam.config.json
@@ -251,12 +253,12 @@ just clean          # rm -rf dist/
 ### CLI commands
 
 ```
+vteam                                   # interactive TUI (Overview / Agents / Info); prints help outside a terminal or a vteam project
 vteam init                              # scaffold vteam/ directory
 vteam run                               # list available agents
 vteam run <agent>                       # run a specific agent
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
 vteam status                            # show running agents, scheduler state, next picks, tasks needing attention
-vteam dashboard                         # vteam status full-screen, refreshed every second until Ctrl+C or q
 vteam clean                             # remove worktrees no running agent uses, break stale locks, release orphaned active tasks
 vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen labelled or conflicting PR tasks
 vteam cron start                        # start long-lived scheduler for agents with cron patterns
@@ -269,7 +271,13 @@ vteam skill uninstall                   # remove skill symlinks from ~/.claude/s
 
 `vteam status` (`internal/status`) reads only local state plus one `GetIndex` and one `ListReady`: `runstate.FindLive` turns live agent locks in `vteam/.locks/` (except `task-claim`) into running jobs, each with its newest `vteam/.runs/` state started before the lock (`runstate.FindLatest`) for the worktree path; status matches them to `active` tasks by `claimed-pid`/`claimed-host`; `cron.pid` gives the scheduler state; `PickNext` per `input: "task"` agent gives the next pick. It also lists `done` tasks with an unmerged `pr-url`, plus inbox, unroutable, retry-exhausted, orphaned `active` tasks, and worktrees under `worktreeDir` no running job uses (`git.FindOrphaned`, which compares real paths). `vteam clean` removes exactly those worktrees (`git.CleanupOrphaned`), so it is safe to run while agents work.
 
-`vteam dashboard` (`internal/dashboard`) is a bubbletea program that redraws `status.Render` output on the terminal's alternate screen. Each refresh starts at least 1s after the previous one started and never before it finished. A failed refresh keeps the last frame and shows the error in the footer. `ComposeFrame` cuts the frame to the terminal height. It quits on Ctrl+C or `q`. Without a TTY it exits with an error. `status`, `cron status`, and `dashboard` all build their output as lines with the `Format*` helpers in `internal/log`, so they look the same as `vteam run` output.
+`vteam` with no arguments opens the TUI (`internal/tui`, bubbletea v2 + lipgloss v2) on the alternate screen when stdin and stdout are terminals and `vteam/` exists; otherwise it prints help (plus a `vteam init` hint when `vteam/` is missing). It is keyboard only: `1`-`3`/`tab`/`shift+tab` switch tabs, `j`/`k`, `ctrl+d`/`ctrl+u`, `gg`/`G` scroll, `r` refreshes, `?` toggles a help overlay, `q`/`ctrl+c` quit. The header shows the tabs and, top right, the aven project (`tasks.project`, or the directory name when the config fails to load), the task label, and the git branch.
+
+- **Overview** — `status.Render` output without its banner, refreshed every 2s (a refresh starts only after the previous one finished; a failed refresh keeps the last frame and shows the error in the footer).
+- **Agents** — a sidebar of every agent, the merge ensurer, and any other name with a `vteam/.logs/<name>/` directory (`tui.LoadAgents`), showing live runs from agent locks and each agent's details. The log pane shows the selected agent's newest run log, re-read every 500ms when its size or mtime changes, recolored by line glyph and wrapped with a hanging indent (`w` toggles wrap). It follows the end of the log until you scroll up; `G` or scrolling to the bottom resumes. `p`/`n` step to the previous/next run, and the title's `run i/n` turns yellow on an older run. `l`/`enter` focus the log, `h`/`esc` the sidebar.
+- **Info** — the project, `vteam.config.json`, scheduler state, and each agent's `agent.json` settings (model, input/output, cron and next run, flags, `taskFilter`, allowed/denied tools).
+
+`status` and `cron status` build their output as lines with the `Format*` helpers in `internal/log`, and the TUI's Overview shows the same lines, so they look the same as `vteam run` output.
 
 Every `vteam run <agent>` writes a log file for that run at `vteam/.logs/<agent>/<ISO-timestamp>.log` (`internal/runlog`), whether it was started by hand or by the scheduler. Every line the run's `log.Logger` prints is also written to the file, ANSI colors stripped, including the final error. `vteam run` output goes through `internal/log`: sections (`Setup`, `Agent: <name>`, `Result`, `On-finish hook`, `Memory curation`, `Cleanup`), an elapsed-time gutter, and glyphs per line kind (`•` step, `❯` Claude text, `⚙` tool call, `✓`/`!`/`✗`). `internal/claude` renders tool calls (`DescribeTool`), failed tool results, and an exit line with duration, turns, and `total_cost_usd`. In a TTY, `Logger.ToolCall` cuts tool inputs to one line on the terminal and writes the full input to the log file. Logging starts after the agent is resolved, so an unknown agent name creates no file.
 

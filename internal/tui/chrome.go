@@ -17,7 +17,7 @@ func (m Model) renderHeader() []string {
 			parts = append(parts, styleTab.Render(label))
 		}
 	}
-	left := strings.Join(parts, " ")
+	left := " " + strings.Join(parts, " ")
 	return []string{spread(left, m.projectLabel(), m.width), rule(m.width)}
 }
 

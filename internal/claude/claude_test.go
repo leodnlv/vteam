@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -197,6 +198,53 @@ func TestRunGolden(t *testing.T) {
 func TestRunWithoutOptionalFlags(t *testing.T) {
 	if got := Args("/s.md", Options{}); strings.Join(got, " ") != "-p --append-system-prompt-file /s.md --output-format stream-json --verbose --no-session-persistence" {
 		t.Errorf("args = %v", got)
+	}
+}
+
+func TestArgsPassJSONSchema(t *testing.T) {
+	got := Args("/s.md", Options{JSONSchema: `{"type":"object"}`})
+	if i := slices.Index(got, "--json-schema"); i < 0 || got[i+1] != `{"type":"object"}` {
+		t.Errorf("args = %v", got)
+	}
+}
+
+func TestBuiltinTools(t *testing.T) {
+	cases := []struct {
+		allowed []string
+		want    []string
+		ok      bool
+	}{
+		{nil, nil, false},
+		{[]string{"Read", "Glob", "Grep"}, []string{"Read", "Glob", "Grep"}, true},
+		{[]string{"Read", "Bash(npm *)", "Bash(git *)", "Edit"}, []string{"Read", "Bash", "Edit"}, true},
+		{[]string{"mcp__slack__send_message"}, nil, true},
+	}
+	for _, c := range cases {
+		got, ok := BuiltinTools(c.allowed)
+		if ok != c.ok || !slices.Equal(got, c.want) {
+			t.Errorf("BuiltinTools(%v) = %v, %v; want %v, %v", c.allowed, got, ok, c.want, c.ok)
+		}
+	}
+	if args := Args("/s.md", Options{AllowedTools: []string{"mcp__slack__send_message"}}); !slices.Contains(args, "--tools") || args[slices.Index(args, "--tools")+1] != "" {
+		t.Errorf("an MCP-only allowlist should disable every built-in tool: %v", args)
+	}
+}
+
+func TestRunCapturesStructuredOutput(t *testing.T) {
+	cli, _ := fakeCLI(t)
+	fixture := filepath.Join(t.TempDir(), "structured.jsonl")
+	lines := `{"type":"assistant","message":{"content":[{"type":"text","text":"Well shoot, here it is."}]}}` + "\n" +
+		`{"type":"result","result":"{\"status\":\"completed\"}","structured_output":{"status":"completed","summary":"ok"},"num_turns":2}` + "\n"
+	if err := os.WriteFile(fixture, []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FAKE_CLAUDE_FIXTURE", fixture)
+	res, err := cli.Run(context.Background(), Options{Dir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StructuredOutput != `{"status":"completed","summary":"ok"}` {
+		t.Errorf("structured output = %q", res.StructuredOutput)
 	}
 }
 

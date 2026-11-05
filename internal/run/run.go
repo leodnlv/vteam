@@ -380,7 +380,7 @@ func (r *runner) runAgent(dir string) (model.AgentOutput, error) {
 
 	res, err := r.Claude.Run(r.ctx, claude.Options{
 		SystemPrompt: parts.SystemPrompt, UserPrompt: parts.UserPrompt, Dir: dir, Model: r.agent.Model,
-		AllowedTools: r.agent.AllowedTools, DisallowedTools: r.agent.DisallowedTools,
+		AllowedTools: r.agent.AllowedTools, DisallowedTools: r.agent.DisallowedTools, JSONSchema: parts.OutputSchema,
 	})
 	if err != nil {
 		return model.AgentOutput{}, err
@@ -388,14 +388,18 @@ func (r *runner) runAgent(dir string) (model.AgentOutput, error) {
 	if res.ExitCode != 0 {
 		return model.AgentOutput{}, fmt.Errorf("claude exited with code %d", res.ExitCode)
 	}
-	if res.ResultText == "" {
+	answer := res.StructuredOutput
+	if answer == "" {
+		answer = res.ResultText
+	}
+	if answer == "" {
 		return model.AgentOutput{}, errors.New("claude produced no output")
 	}
 
 	r.state.Status = model.RunProcessing
 	r.writeState()
 	r.Log.Section("Result")
-	out, err := output.Parse(res.ResultText)
+	out, err := output.Parse(answer)
 	if err != nil {
 		return out, err
 	}

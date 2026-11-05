@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	xansi "github.com/charmbracelet/x/ansi"
+	"github.com/leodnlv/vteam/internal/config"
 )
 
 var fixedNow = time.Date(2026, 11, 5, 10, 0, 0, 0, time.UTC)
@@ -20,6 +21,8 @@ func newTestModel(t *testing.T, render func(context.Context) ([]string, error)) 
 		Project:      Project{Name: "my-app", FromAven: true, Label: "vteam", Branch: "main"},
 		RenderStatus: render,
 		Agents:       func(time.Time) []Agent { return nil },
+		LoadConfig:   func() (*config.Config, error) { return nil, errors.New("no config") },
+		SchedulerPID: func() int { return 0 },
 		Now:          func() time.Time { return fixedNow },
 	})
 	return update(t, m, tea.WindowSizeMsg{Width: 100, Height: 20})

@@ -67,6 +67,7 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "r":
 		m.agents = m.agents.reload(m.deps.Agents(m.deps.Now()))
+		m.info = m.refreshInfo()
 		return m, m.fetchStatus
 	}
 	if m.tab == TabAgents {
@@ -83,7 +84,7 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 	case TabOverview:
 		m.overview.offset = scrolled(m.overview.offset, delta, len(m.overview.lines), height)
 	case TabInfo:
-		m.infoOff = scrolled(m.infoOff, delta, 0, height)
+		m.info.offset = scrolled(m.info.offset, delta, len(m.infoLines()), height)
 	}
 	return m, nil
 }

@@ -216,9 +216,28 @@ Shows what is happening now and what will happen next. It reads local state and 
 
 For the full task list, use aven (`aven list --label vteam`).
 
-### `vteam dashboard`
+### `vteam` (interactive TUI)
 
-Shows the same view as `vteam status` full-screen and refreshes it every second until you press Ctrl+C or `q`. A refresh starts only after the previous one finishes, so a large aven project (one `aven show` per task) refreshes less often instead of piling up work. If a refresh fails, the last good view stays on screen and the error appears in the footer. Output taller than the terminal is cut off with a line saying how much is hidden. It needs a terminal; use `vteam status` in scripts.
+Running `vteam` with no arguments inside a project opens a full-screen, keyboard-driven view with three tabs. Outside a terminal, or in a directory without `vteam/`, it prints help instead.
+
+- **Overview** — the `vteam status` view, refreshed every 2 seconds. A refresh starts only after the previous one finishes, so a large aven project refreshes less often instead of piling up work. If a refresh fails, the last good view stays and the error appears in the footer.
+- **Agents** — a sidebar of your agents (plus the merge ensurer) with a live/idle marker and details for the selected one, next to its newest run log. The log pane follows the log while the agent runs; scroll up to pause, `G` to follow again. `p` / `n` step to the previous / next run, and the `run i/n` counter in the title turns yellow when you are looking at an older run. `w` toggles line wrap.
+- **Info** — the project, `vteam.config.json`, whether the scheduler is running, and each agent's settings, including the tools it is allowed.
+
+The top-right corner shows the aven project, task label, and git branch.
+
+| Keys | Action |
+|---|---|
+| `1` `2` `3`, `tab` / `shift+tab` | switch tabs |
+| `j` `k` / `↓` `↑` | scroll; in the Agents sidebar, select an agent |
+| `ctrl+d` `ctrl+u` / `pgdown` `pgup` | half page down / up |
+| `gg` / `G` | top / bottom |
+| `l` `enter` `→` / `h` `esc` `←` | Agents tab: focus the log / the sidebar |
+| `p` / `n` | Agents tab: previous (older) / next (newer) run |
+| `f` / `w` | Agents tab: toggle follow / line wrap |
+| `r` | refresh now |
+| `?` | help |
+| `q` `ctrl+c` | quit |
 
 ### `vteam clean`
 
@@ -302,7 +321,7 @@ Validation is strict: unknown keys are rejected everywhere, including inside `me
 | `autoPR`          | `false`    | Create a pull request after pushing                                                                              |
 | `prCreateLabels`  | —          | Labels applied to created PRs (auto-created if they don't exist)                                                 |
 | `resolveThreads`  | `false`    | Requires `input: "task"` and `worktree: true`. On a [PR follow-up](#following-up-on-review-comments), resolve each review thread the agent replied to |
-| `allowedTools`    | —          | Claude Code tools the agent may use (same syntax as `--allowedTools` CLI flag, e.g. `["Read", "Bash(git *)"]`)   |
+| `allowedTools`    | —          | Claude Code tools the agent may use (same syntax as `--allowedTools` CLI flag, e.g. `["Read", "Bash(git *)"]`). When set, the agent gets no other built-in tools; omit it for Claude Code's default set. MCP tools from your Claude Code config stay available. |
 | `disallowedTools` | —          | Claude Code tools the agent may NOT use (same syntax as `--disallowedTools` CLI flag)                            |
 | `memory`          | —          | Curation agent settings: `model`, `allowedTools`, `disallowedTools`. Requires `MEMORY.md`. See [Per-agent memory](#per-agent-memory-memorymd). |
 | `onFinish`        | —          | Hook settings: `model`, `allowedTools`, `disallowedTools`. Requires `ON_FINISH.md`. See [On-finish hooks](#on-finish-hooks-on_finishmd). |
@@ -422,7 +441,7 @@ The coder picks the highest-severity task first.
 
 There is no separate overview file. At prompt-build time, the orchestrator lists every non-deleted task in the aven project carrying the vteam label — all statuses (inbox, backlog, todo, active, done, canceled) — and injects them into the agent's prompt as `- [status] severity | title | files`. Claude uses this list to avoid reporting duplicate findings. Canceling a task in aven therefore marks it as rejected (e.g. a false positive): the reviewer sees it and won't report it again.
 
-Claude returns findings as structured JSON; the orchestrator creates the actual aven tasks.
+Claude returns findings as structured JSON; the orchestrator creates the actual aven tasks. vteam passes the output schema to `claude --json-schema`, so Claude Code itself rejects a final answer that is not valid output.
 
 ### Per-agent memory (MEMORY.md)
 
@@ -565,7 +584,7 @@ This project has its own `vteam/` directory pointing the agents at its own code.
 
 ### Dependencies
 
-vteam keeps external dependencies to a minimum: `cobra` for the CLI, `bubbletea` for the dashboard, and `golang.org/x/term`, `x/sync`, `x/text`. Cron parsing, config validation, and slug generation are internal packages. Tests use the standard library plus `go-cmp` and `testscript`.
+vteam keeps external dependencies to a minimum: `cobra` for the CLI, `bubbletea` and `lipgloss` for the TUI, and `golang.org/x/term`, `x/sync`, `x/text`. Cron parsing, config validation, and slug generation are internal packages. Tests use the standard library plus `go-cmp` and `testscript`.
 
 ### System dependencies
 

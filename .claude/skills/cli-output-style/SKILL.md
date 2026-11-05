@@ -1,6 +1,6 @@
 ---
 name: cli-output-style
-description: The terminal output style shared by every vteam CLI command (run, cron, status, dashboard, ensure-merge). Load before adding a new vteam command or changing what an existing command prints, so its output uses the internal/log helpers and looks like the rest.
+description: The terminal output style shared by every vteam CLI command (run, cron, status, ensure-merge, and the TUI's Overview tab). Load before adding a new vteam command or changing what an existing command prints, so its output uses the internal/log helpers and looks like the rest.
 ---
 
 All vteam terminal output goes through `internal/log` (layout: the `Logger` methods and the `Format*` functions) and `internal/ansi` (`Bold`, `Gray`, …, `Strip`). Never `fmt.Println` hand-built strings or raw ANSI codes in a command. If a helper you need is missing, add it to `internal/log` rather than formatting inline.
@@ -9,7 +9,7 @@ All vteam terminal output goes through `internal/log` (layout: the `Logger` meth
 
 **Streaming commands** do work and report it as it happens (`vteam run`, `vteam ensure-merge`, `vteam cron start`). They print lines immediately with the `*log.Logger` methods.
 
-**Snapshot commands** show current state (`vteam status`, `vteam cron status`, `vteam dashboard`). They build a `[]string` with the `log.Format*` helpers and print it once with `strings.Join(lines, "\n")`. The dashboard redraws the same lines, so put the rendering in a `Render*(...) []string` function that other commands can reuse (`schedule.RenderScheduler` is shared by `status`, `cron status`, and `cron start`).
+**Snapshot commands** show current state (`vteam status`, `vteam cron status`). They build a `[]string` with the `log.Format*` helpers and print it once with `strings.Join(lines, "\n")`. The TUI's Overview tab (`internal/tui`) redraws the same lines, so put the rendering in a `Render*(...) []string` function that other commands can reuse (`schedule.RenderScheduler` is shared by `status`, `cron status`, and `cron start`).
 
 ## Building blocks
 

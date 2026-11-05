@@ -66,6 +66,10 @@ func TestBuildGolden(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if got.OutputSchema == "" {
+				t.Error("agent prompts must carry an output schema")
+			}
+			got.OutputSchema = ""
 			if diff := cmp.Diff(c.Expected, got); diff != "" {
 				t.Errorf("(-want +got):\n%s", diff)
 			}

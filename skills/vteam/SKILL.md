@@ -24,12 +24,12 @@ vteam is a Go CLI that orchestrates AI agents powered by `claude -p` (Claude Cod
 ## CLI commands
 
 ```
+vteam                                   # interactive TUI: Overview (status), Agents (live run logs, p/n through runs), Info (config + agent settings); ? for keys
 vteam init                              # scaffold vteam/ directory in the current project
 vteam run <agent>                       # run a specific agent
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
 vteam run                               # (no agent) list available agents
 vteam status                            # running agents (pid, task, worktree), scheduler state + next fires, each task agent's next pick, PRs awaiting merge, tasks/worktrees needing attention
-vteam dashboard                         # the vteam status view full-screen, refreshed every second (Ctrl+C or q to quit)
 vteam clean                             # remove worktrees no running agent uses, break stale locks, release orphaned active tasks
 vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen done tasks whose PR is labelled or conflicting
 vteam cron start                        # start long-lived scheduler for agents with cron patterns (and the merge ensurer)
@@ -117,7 +117,7 @@ All fields are optional.
   "prTriggerLabel": "vteam:changes-requested", // label to discover PRs needing work
   "prCreateLabels": ["vteam"],               // labels applied to created PRs
   "resolveThreads": true,                    // PR follow-ups: resolve threads the agent replied to (requires input: "task" + worktree)
-  "allowedTools": ["Read", "Grep"],          // Claude Code tools the agent may use
+  "allowedTools": ["Read", "Grep"],          // Claude Code tools the agent may use; when set, also its whole built-in toolset (--tools)
   "disallowedTools": [],                     // Claude Code tools the agent may NOT use
   "memory": { "model": "haiku" },            // curation agent: model, allowedTools, disallowedTools (requires MEMORY.md)
   "onFinish": { "model": "haiku", "allowedTools": ["mcp__slack__send_message"] } // hook: same keys (requires ON_FINISH.md)
@@ -293,6 +293,10 @@ vteam run coder --focus "the issue about XYZ"
 No config changes needed — the orchestrator discovers agents by scanning the `vteam/agents/` directory.
 
 ## Tool permission patterns
+
+`allowedTools` does two things: it pre-approves the listed tools (`--allowedTools`) and, when set, removes every other built-in tool (`--tools`, built from the names: `Bash(npm *)` → `Bash`). MCP tools (`mcp__*`) are not built-in, so they only need listing to be pre-approved; MCP servers from the user's Claude Code config stay available. A hook with `["mcp__slack__send_message"]` gets no built-in tools at all.
+
+Agent runs also get `--json-schema` with the `AgentOutput` schema for that agent, so the final answer is validated by Claude Code and read from `structured_output`.
 
 Common `allowedTools` presets:
 

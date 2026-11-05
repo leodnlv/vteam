@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/leodnlv/vteam/internal/config"
 )
 
 const (
@@ -38,6 +39,9 @@ type Deps struct {
 	Project      Project
 	RenderStatus func(ctx context.Context) ([]string, error)
 	Agents       func(now time.Time) []Agent
+	LoadConfig   func() (*config.Config, error)
+	// SchedulerPID is the pid of a live `vteam cron start`, or 0.
+	SchedulerPID func() int
 	Now          func() time.Time
 }
 
@@ -59,12 +63,13 @@ type Model struct {
 	pendingG bool
 	overview overviewState
 	agents   agentsState
-	infoOff  int
+	info     infoState
 }
 
 func New(ctx context.Context, deps Deps) Model {
 	m := Model{ctx: ctx, deps: deps, width: 80, height: 24, agents: newAgentsState()}
 	m.agents = m.agents.reload(deps.Agents(deps.Now()))
+	m.info = m.refreshInfo()
 	return m
 }
 
@@ -118,6 +123,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.fetchStatus
 	case agentsTickMsg:
 		m.agents = m.agents.reload(m.deps.Agents(m.deps.Now()))
+		m.info = m.refreshInfo()
 		return m, agentsTick()
 	}
 	return m, nil
@@ -145,7 +151,8 @@ func (m Model) renderBody() []string {
 	case TabAgents:
 		return m.renderAgents()
 	case TabInfo:
-		return window([]string{styleGray.Render("  info: coming in stage 3")}, 0, height, m.width)
+		lines := m.infoLines()
+		return window(lines, clampOffset(m.info.offset, len(lines), height), height, m.width)
 	default:
 		lines := m.overview.lines
 		if !m.overview.loaded {
