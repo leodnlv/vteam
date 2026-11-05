@@ -229,7 +229,7 @@ For the full task list, use aven (`aven list --label vteam`).
 
 ### `vteam` (interactive TUI)
 
-Running `vteam` with no arguments inside a project opens a full-screen, keyboard-driven view with three tabs. Outside a terminal, or in a directory without `vteam/`, it prints help instead.
+Running `vteam` with no arguments inside a project opens a full-screen, keyboard-driven view with four tabs. Outside a terminal, or in a directory without `vteam/`, it prints help instead.
 
 - **Overview** — the `vteam status` view, refreshed every 2 seconds. A refresh starts only after the previous one finishes, so a large aven project refreshes less often instead of piling up work. If a refresh fails, the last good view stays and the error appears in the footer.
 - **Agents** — a sidebar of your agents (plus the merge ensurer) with a live/idle marker and details for the selected one, next to its newest run log. The log pane follows the log while the agent runs; scroll up to pause, `G` to follow again. `p` / `n` step to the previous / next run, and the `run i/n` counter in the title turns yellow when you are looking at an older run. `w` toggles line wrap.
@@ -238,12 +238,13 @@ Running `vteam` with no arguments inside a project opens a full-screen, keyboard
     - **Run on cron** opens a dialog prefilled with the enabled pattern, or else the `agent.json` default. As you type it shows the schedule in words, the next three fire times, or the parse error. `tab` toggles saving the pattern as the default in `agent.json` (`vteam.config.json` for the merge ensurer). Confirming enables the cron and, if no scheduler is running, starts one in the background (see [Running on a schedule](#running-on-a-schedule)).
     - **Cron markers** — an agent on cron shows `◷` in the sidebar, its pattern and next run in the details, and a line above its log. All three turn yellow with "paused" when the scheduler is not running.
 - **Info** — the project, `vteam.config.json`, whether the scheduler is running, and each agent's settings, including the tools it is allowed.
+- **About** — what vteam is, its philosophy, the author, and the license.
 
 The top-right corner shows the aven project, task label, and git branch.
 
 | Keys | Action |
 |---|---|
-| `1` `2` `3` | switch tabs |
+| `1` `2` `3` `4` | switch tabs |
 | `j` `k` / `↓` `↑` | scroll; in the Agents sidebar, select an agent |
 | `ctrl+d` `ctrl+u` / `pgdown` `pgup` | half page down / up |
 | `gg` / `G` | top / bottom |

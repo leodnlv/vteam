@@ -59,7 +59,7 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 	switch key {
 	case "q":
 		return m, tea.Quit
-	case "1", "2", "3":
+	case "1", "2", "3", "4":
 		m.tab = Tab(key[0] - '1')
 		return m, nil
 	case "ctrl+r":
@@ -82,6 +82,8 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 		m.overview.offset = scrolled(m.overview.offset, delta, len(m.overview.lines), height)
 	case TabInfo:
 		m.info.offset = scrolled(m.info.offset, delta, len(m.infoLines()), height)
+	case TabAbout:
+		m.about.offset = scrolled(m.about.offset, delta, len(m.aboutLines()), height)
 	}
 	return m, nil
 }

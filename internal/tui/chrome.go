@@ -41,7 +41,7 @@ func (m Model) projectLabel() string {
 
 type hint struct{ keys, label string }
 
-var globalHints = []hint{{"1-3", "tabs"}, {"?", "help"}, {"q", "quit"}}
+var globalHints = []hint{{"1-4", "tabs"}, {"?", "help"}, {"q", "quit"}}
 
 func (m Model) hints() []hint {
 	if m.help {
@@ -118,7 +118,7 @@ var helpGroups = []struct {
 	keys  [][2]string
 }{
 	{"Global", [][2]string{
-		{"1 2 3", "jump to Overview / Agents / Info"},
+		{"1 2 3 4", "jump to Overview / Agents / Info / About"},
 		{"ctrl+r", "refresh now"},
 		{"?", "toggle this help"},
 		{"q  ctrl+c", "quit"},

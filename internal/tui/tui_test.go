@@ -106,7 +106,7 @@ func TestTabSwitching(t *testing.T) {
 	cases := []struct {
 		key  string
 		want Tab
-	}{{"2", TabAgents}, {"3", TabInfo}, {"tab", TabInfo}, {"shift+tab", TabInfo}, {"1", TabOverview}}
+	}{{"2", TabAgents}, {"3", TabInfo}, {"tab", TabInfo}, {"shift+tab", TabInfo}, {"4", TabAbout}, {"1", TabOverview}}
 	for _, c := range cases {
 		m = press(t, m, c.key)
 		if m.tab != c.want {

@@ -22,9 +22,10 @@ const (
 	TabOverview Tab = iota
 	TabAgents
 	TabInfo
+	TabAbout
 )
 
-var tabNames = []string{"Overview", "Agents", "Info"}
+var tabNames = []string{"Overview", "Agents", "Info", "About"}
 
 type Project struct {
 	Name string
@@ -74,6 +75,7 @@ type Model struct {
 	overview overviewState
 	agents   agentsState
 	info     infoState
+	about    struct{ offset int }
 	dialog   dialog
 	toast    toast
 }
@@ -177,6 +179,9 @@ func (m Model) renderBody() []string {
 	case TabInfo:
 		lines := stretchSections(m.infoLines(), m.width-1)
 		return window(lines, clampOffset(m.info.offset, len(lines), height), height, m.width)
+	case TabAbout:
+		lines := stretchSections(m.aboutLines(), m.width-1)
+		return window(lines, clampOffset(m.about.offset, len(lines), height), height, m.width)
 	default:
 		lines := stretchSections(m.overview.lines, m.width-1)
 		if !m.overview.loaded {
