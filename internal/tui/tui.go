@@ -44,8 +44,8 @@ type Deps struct {
 	SchedulerPID func() int
 	Now          func() time.Time
 
-	// RunOnce starts one run of an agent (or the merge ensurer) in the background.
-	RunOnce func(name string) error
+	// RunOnce starts one run of an agent (or the merge ensurer) in the background; focus is "" for none.
+	RunOnce func(name, focus string) error
 	// EnableCron turns on a cron with expr; DisableCron turns it off.
 	EnableCron  func(name, expr string) error
 	DisableCron func(name string) error
@@ -119,7 +119,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case tea.KeyPressMsg:
+		if m.dialog.kind == dialogRun && msg.String() != "ctrl+c" {
+			return m.handleRunKey(msg)
+		}
 		return m.handleKey(msg.String())
+	case tea.PasteMsg:
+		if m.dialog.kind == dialogRun {
+			var cmd tea.Cmd
+			m.dialog.focus, cmd = m.dialog.focus.Update(msg)
+			return m, cmd
+		}
 	case statusMsg:
 		m.overview.loaded = true
 		m.overview.updated = m.deps.Now()

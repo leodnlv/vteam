@@ -63,7 +63,7 @@ func waitForFile(t *testing.T, path, want string) {
 
 func TestSpawnRunStartsADetachedRunWithItsLogPath(t *testing.T) {
 	cwd := t.TempDir()
-	path, err := SpawnRun(cwd, "improver", time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC))
+	path, err := SpawnRun(cwd, "improver", "", time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,6 +71,15 @@ func TestSpawnRunStartsADetachedRunWithItsLogPath(t *testing.T) {
 		t.Errorf("log path = %s", path)
 	}
 	waitForFile(t, path, "run improver sid-leader=true")
+}
+
+func TestSpawnRunPassesTheFocus(t *testing.T) {
+	cwd := t.TempDir()
+	path, err := SpawnRun(cwd, "improver", "look at\nthe parser", time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitForFile(t, path, "run improver --focus look at\nthe parser sid-leader=true")
 }
 
 func TestStartDetachedWritesToTheSchedulerLog(t *testing.T) {

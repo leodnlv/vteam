@@ -28,9 +28,14 @@ func StartDetached(cwd string) (int, error) {
 }
 
 // SpawnRun starts one run of a job in its own session and returns the path of the log it will write.
-func SpawnRun(cwd, name string, now time.Time) (string, error) {
+// A non-empty focus is passed as `--focus`, which only `vteam run` accepts.
+func SpawnRun(cwd, name, focus string, now time.Time) (string, error) {
 	logPath := runlog.Path(cwd, name, now)
-	_, err := startDetached(cwd, JobCommand(name), nil, []string{runlog.Env + "=" + logPath})
+	args := JobCommand(name)
+	if focus != "" {
+		args = append(args, "--focus", focus)
+	}
+	_, err := startDetached(cwd, args, nil, []string{runlog.Env + "=" + logPath})
 	return logPath, err
 }
 

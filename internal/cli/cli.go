@@ -227,8 +227,8 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 		LoadConfig:   func() (*config.Config, error) { return config.Load(dir) },
 		SchedulerPID: func() int { return schedule.ReadPID(dir) },
 		Now:          time.Now,
-		RunOnce: func(name string) error {
-			_, err := schedule.SpawnRun(dir, name, time.Now())
+		RunOnce: func(name, focus string) error {
+			_, err := schedule.SpawnRun(dir, name, focus, time.Now())
 			return err
 		},
 		EnableCron:     func(name, expr string) error { return schedule.Enable(dir, name, expr) },

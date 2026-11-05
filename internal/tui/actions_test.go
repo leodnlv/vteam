@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/lock"
 )
@@ -33,8 +34,12 @@ func actionsModel(t *testing.T, f *fakeActions) Model {
 	m := newTestModel(t, nil)
 	m.deps.Agents = func(time.Time) []Agent { return slices.Clone(f.agents) }
 	m.deps.SchedulerPID = func() int { return f.pid }
-	m.deps.RunOnce = func(name string) error {
-		f.calls = append(f.calls, "run "+name)
+	m.deps.RunOnce = func(name, focus string) error {
+		call := "run " + name
+		if focus != "" {
+			call += " --focus " + focus
+		}
+		f.calls = append(f.calls, call)
 		return f.runErr
 	}
 	m.deps.EnableCron = func(name, expr string) error {
@@ -118,20 +123,59 @@ func TestEnablingACronFromTheActionMenu(t *testing.T) {
 	assertScreen(t, m, "◷ on cron */30 * * * * · every 30 minutes", "◷ 1 on cron")
 }
 
-func TestRunOnceAsksForConfirmation(t *testing.T) {
+var (
+	keyEnter      = tea.KeyPressMsg{Code: tea.KeyEnter}
+	keyShiftEnter = tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModShift}
+	keyCtrlJ      = tea.KeyPressMsg{Code: 'j', Mod: tea.ModCtrl}
+	keyEsc        = tea.KeyPressMsg{Code: tea.KeyEscape}
+)
+
+func typeText(t *testing.T, m Model, text string) Model {
+	t.Helper()
+	for _, r := range text {
+		m = update(t, m, tea.KeyPressMsg{Code: r, Text: string(r)})
+	}
+	return m
+}
+
+func TestRunOnceAsksForAnOptionalFocus(t *testing.T) {
 	f := &fakeActions{agents: testAgents()}
 	m := press(t, actionsModel(t, f), "j", "x")
-	assertScreen(t, m, "Run test-writer once?", "run now", "cancel")
-	m = press(t, m, "esc")
+	assertScreen(t, m, "Run test-writer once", "passed as --focus", "run now", "new line", "cancel")
+	m = typeText(t, m, "xq")
+	m = update(t, m, keyEsc)
 	assertCalls(t, f)
+	if m.dialog.kind != dialogNone {
+		t.Fatal("esc should close the run dialog")
+	}
 
-	m = press(t, m, "x", "enter")
+	m = update(t, press(t, m, "x"), keyEnter)
 	assertCalls(t, f, "run test-writer")
 	assertScreen(t, m, "● started test-writer")
 
+	m = typeText(t, press(t, m, "x"), "  the parser")
+	m = typeText(t, update(t, m, keyShiftEnter), "and q")
+	m = typeText(t, update(t, m, keyCtrlJ), "x")
+	m = update(t, m, tea.PasteMsg{Content: "  pasted\n"})
+	assertScreen(t, m, "the parser", "and q", "x  pasted")
+	m = update(t, m, keyEnter)
+	assertCalls(t, f, "run test-writer", "run test-writer --focus the parser\nand q\nx  pasted")
+	assertScreen(t, m, "● started test-writer with focus")
+
 	f.runErr = errors.New("no binary")
-	m = press(t, m, "x", "enter")
+	m = update(t, press(t, m, "x"), keyEnter)
 	assertScreen(t, m, "✗ test-writer could not start: no binary")
+}
+
+func TestMergeEnsurerRunsWithoutFocus(t *testing.T) {
+	f := &fakeActions{agents: []Agent{{Name: "merge-ensurer", Builtin: true}}}
+	m := press(t, actionsModel(t, f), "x")
+	assertScreen(t, m, "Run merge-ensurer once?")
+	if strings.Contains(screen(m), "--focus") {
+		t.Error("the merge ensurer takes no focus")
+	}
+	press(t, m, "enter")
+	assertCalls(t, f, "run merge-ensurer")
 }
 
 func TestActionsExplainWhyTheyCannotRun(t *testing.T) {

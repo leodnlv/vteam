@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textarea"
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/leodnlv/vteam/internal/cron"
 	"github.com/leodnlv/vteam/internal/log"
@@ -16,6 +19,9 @@ const (
 	toastDuration    = 5 * time.Second
 	fallbackCron     = "0 * * * *"
 	cronDialogWidth  = 52
+	runDialogWidth   = 64
+	focusMinRows     = 3
+	focusMaxRows     = 10
 	menuLabelWidth   = 20
 	nextFiresInPopup = 3
 )
@@ -26,16 +32,19 @@ const (
 	dialogNone dialogKind = iota
 	dialogMenu
 	dialogConfirm
+	dialogRun
 	dialogCron
 )
 
-// dialog is the popup open on the Agents tab: the action menu, the run confirmation, or the cron editor.
+// dialog is the popup open on the Agents tab: the action menu, the run dialog (dialogConfirm for the
+// merge ensurer, which takes no focus), or the cron editor.
 type dialog struct {
 	kind   dialogKind
 	agent  string
 	cursor int
 	input  lineInput
 	save   bool
+	focus  textarea.Model
 }
 
 type toast struct {
@@ -126,7 +135,11 @@ func (m Model) agentAction(key string) Model {
 		case a.Running != nil:
 			return m.withToast(styleYellow.Render("! " + a.Name + " is already running"))
 		}
-		m.dialog = dialog{kind: dialogConfirm, agent: a.Name}
+		if a.Builtin {
+			m.dialog = dialog{kind: dialogConfirm, agent: a.Name}
+		} else {
+			m.dialog = dialog{kind: dialogRun, agent: a.Name, focus: newFocusInput(m.runDialogWidth())}
+		}
 	case "c":
 		if !a.Runnable() {
 			return m.withToast(styleYellow.Render("! " + a.Name + " can't be scheduled"))
@@ -166,7 +179,7 @@ func (m Model) handleDialogKey(key string) Model {
 		case "enter", "y":
 			name := m.dialog.agent
 			m.dialog = dialog{}
-			return m.runOnce(name)
+			return m.runOnce(name, "")
 		case "esc", "n", "q":
 			m.dialog = dialog{}
 		}
@@ -225,12 +238,55 @@ func (m Model) handleCronKey(key string) Model {
 	return m
 }
 
-func (m Model) runOnce(name string) Model {
-	if err := m.deps.RunOnce(name); err != nil {
+func newFocusInput(width int) textarea.Model {
+	in := textarea.New()
+	in.ShowLineNumbers = false
+	in.Prompt = "┃ "
+	in.Placeholder = "What should the agent focus on?"
+	in.DynamicHeight = true
+	in.MinHeight = focusMinRows
+	in.MaxHeight = focusMaxRows
+	in.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter", "alt+enter", "ctrl+j"))
+	styles := textarea.DefaultDarkStyles()
+	styles.Focused.CursorLine = lipgloss.NewStyle()
+	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Cyan)
+	styles.Cursor.Blink = false
+	in.SetStyles(styles)
+	in.SetWidth(width - 4)
+	in.Focus()
+	return in
+}
+
+func (m Model) runDialogWidth() int {
+	return max(24, min(runDialogWidth, m.width-4))
+}
+
+// handleRunKey edits the focus text; enter runs the agent with it, shift+enter (or alt+enter, ctrl+j) adds a line.
+func (m Model) handleRunKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.dialog = dialog{}
+		return m, nil
+	case "enter":
+		name, focus := m.dialog.agent, strings.TrimSpace(m.dialog.focus.Value())
+		m.dialog = dialog{}
+		return m.runOnce(name, focus), nil
+	}
+	var cmd tea.Cmd
+	m.dialog.focus, cmd = m.dialog.focus.Update(msg)
+	return m, cmd
+}
+
+func (m Model) runOnce(name, focus string) Model {
+	if err := m.deps.RunOnce(name, focus); err != nil {
 		return m.withToast(styleRed.Render("✗ " + name + " could not start: " + firstLine(err.Error())))
 	}
 	m.agents.runIndex, m.agents.follow = -1, true
-	return m.refreshAfterAction().withToast(styleGreen.Render("● ") + "started " + styleBold.Render(name))
+	text := styleGreen.Render("● ") + "started " + styleBold.Render(name)
+	if focus != "" {
+		text += styleGray.Render(" with focus")
+	}
+	return m.refreshAfterAction().withToast(text)
 }
 
 func (m Model) enableCron(name, expr string, save bool) Model {
@@ -285,6 +341,8 @@ func (m Model) renderDialog(body []string) []string {
 		return overlayAt(body, box, sidebarWidth-6, y, m.width, height)
 	case dialogConfirm:
 		return overlay(body, m.confirmBox(), m.width, height)
+	case dialogRun:
+		return overlay(body, m.runBox(), m.width, height)
 	case dialogCron:
 		return overlay(body, m.cronBox(), m.width, height)
 	}
@@ -315,6 +373,22 @@ func (m Model) confirmBox() string {
 		styleKey.Render("⏎") + styleGray.Render(" run now   ") + styleKey.Render("esc") + styleGray.Render(" cancel"),
 	}
 	return styleBox.Render(strings.Join(lines, "\n"))
+}
+
+func (m Model) runBox() string {
+	lines := []string{
+		styleBoxHead.Render("Run ") + styleBold.Render(m.dialog.agent) + styleBoxHead.Render(" once"),
+		"",
+		styleGray.Render("focus") + styleGray.Render(" (optional, passed as --focus)"),
+		m.dialog.focus.View(),
+		"",
+		styleGray.Render("Keeps running after you quit the TUI."),
+		"",
+		styleKey.Render("⏎") + styleGray.Render(" run now   ") +
+			styleKey.Render("shift+⏎") + styleGray.Render("/") + styleKey.Render("ctrl+j") + styleGray.Render(" new line   ") +
+			styleKey.Render("esc") + styleGray.Render(" cancel"),
+	}
+	return styleBox.Width(m.runDialogWidth()).Render(strings.Join(lines, "\n"))
 }
 
 func (m Model) cronBox() string {

@@ -53,6 +53,8 @@ func (m Model) hints() []hint {
 			return []hint{{"j/k", "move"}, {"⏎", "choose"}, {"esc", "close"}}
 		case dialogConfirm:
 			return []hint{{"⏎", "run"}, {"esc", "cancel"}}
+		case dialogRun:
+			return []hint{{"⏎", "run"}, {"shift+⏎/ctrl+j", "new line"}, {"esc", "cancel"}}
 		default:
 			return []hint{{"⏎", "confirm"}, {"tab", "save as default"}, {"esc", "cancel"}}
 		}
