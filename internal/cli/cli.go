@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime/debug"
@@ -17,7 +18,6 @@ import (
 	"github.com/leodnlv/vteam/internal/ansi"
 	"github.com/leodnlv/vteam/internal/clean"
 	"github.com/leodnlv/vteam/internal/config"
-	"github.com/leodnlv/vteam/internal/dashboard"
 	"github.com/leodnlv/vteam/internal/ensuremerge"
 	"github.com/leodnlv/vteam/internal/git"
 	"github.com/leodnlv/vteam/internal/lock"
@@ -31,6 +31,7 @@ import (
 	"github.com/leodnlv/vteam/internal/skill"
 	"github.com/leodnlv/vteam/internal/status"
 	"github.com/leodnlv/vteam/internal/tasks"
+	"github.com/leodnlv/vteam/internal/tui"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -65,8 +66,10 @@ func NewRoot() *cobra.Command {
 		Version:       version(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		Args:          cobra.NoArgs,
+		RunE:          runTUI,
 	}
-	root.AddCommand(initCmd(), runCmd(), statusCmd(), dashboardCmd(), cleanCmd(), ensureMergeCmd(), cronCmd(), skillCmd())
+	root.AddCommand(initCmd(), runCmd(), statusCmd(), cleanCmd(), ensureMergeCmd(), cronCmd(), skillCmd())
 	return root
 }
 
@@ -201,6 +204,41 @@ func renderStatus(ctx context.Context, dir string) ([]string, error) {
 	return status.Render(ctx, statusDeps(dir, cfg))
 }
 
+// runTUI opens the TUI in a terminal inside a vteam project, and prints help everywhere else.
+func runTUI(cmd *cobra.Command, _ []string) error {
+	dir, err := cwd()
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(filepath.Join(dir, "vteam")); err != nil {
+		if helpErr := cmd.Help(); helpErr != nil {
+			return helpErr
+		}
+		fmt.Fprintln(cmd.ErrOrStderr(), ansi.Yellow("\nNo vteam/ directory found. Run 'vteam init' to set one up."))
+		return nil
+	}
+	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
+		return cmd.Help()
+	}
+	return tui.Run(cmd.Context(), tui.Deps{
+		Project:      loadProject(cmd.Context(), dir),
+		RenderStatus: func(ctx context.Context) ([]string, error) { return renderStatus(ctx, dir) },
+		Agents:       func(now time.Time) []tui.Agent { return tui.LoadAgents(dir, now) },
+		Now:          time.Now,
+	})
+}
+
+func loadProject(ctx context.Context, dir string) tui.Project {
+	project := tui.Project{Name: filepath.Base(dir), Dir: dir}
+	if cfg, err := config.Load(dir); err == nil {
+		project.Name, project.Label, project.FromAven = cfg.Tasks.Project, cfg.Tasks.Label, true
+	}
+	if out, err := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "--abbrev-ref", "HEAD").Output(); err == nil {
+		project.Branch = strings.TrimSpace(string(out))
+	}
+	return project
+}
+
 func statusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
@@ -220,28 +258,6 @@ func statusCmd() *cobra.Command {
 			}
 			fmt.Fprintln(cmd.OutOrStdout(), strings.Join(lines, "\n")+"\n")
 			return nil
-		},
-	}
-}
-
-func dashboardCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "dashboard",
-		Short: "Show 'vteam status' full-screen, refreshed every second",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			dir, err := cwd()
-			if err != nil {
-				return err
-			}
-			if err := requireVteamDir(dir, cmd.ErrOrStderr()); err != nil {
-				return err
-			}
-			if !term.IsTerminal(int(os.Stdout.Fd())) {
-				fmt.Fprintln(cmd.ErrOrStderr(), ansi.Red("vteam dashboard needs a terminal. Use 'vteam status' for a one-off snapshot."))
-				return log.ErrReported
-			}
-			return dashboard.Run(cmd.Context(), func(ctx context.Context) ([]string, error) { return renderStatus(ctx, dir) })
 		},
 	}
 }

@@ -5,7 +5,8 @@ stderr 'No vteam/ directory found. Run .vteam init. first.'
 ! exec vteam run ghost
 stderr 'error: agent "ghost" not found'
 
-! exec vteam dashboard
+exec vteam
+stdout 'Usage:'
 stderr 'No vteam/ directory found'
 
 mkdir vteam/agents/bad vteam/agents/legacy
