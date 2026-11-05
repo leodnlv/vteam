@@ -81,7 +81,7 @@ func (m Model) enabledCrons() int {
 func (m Model) cronsPaused() bool { return m.enabledCrons() > 0 && !m.schedulerRunning() }
 
 func (m Model) menuItems(a Agent) []menuItem {
-	run := menuItem{"x", "Run once now…", a.Runnable() && a.Running == nil}
+	run := menuItem{"r", "Run once now…", a.Runnable() && a.Running == nil}
 	if a.Running != nil {
 		run.label = "Run once (running)"
 	}
@@ -122,7 +122,7 @@ func (m Model) agentAction(key string) Model {
 		return m
 	}
 	switch key {
-	case "x":
+	case "r":
 		switch {
 		case !a.Runnable():
 			return m.withToast(styleWarn.Render("! " + a.Name + " can't be run"))

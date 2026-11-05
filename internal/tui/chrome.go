@@ -60,13 +60,13 @@ func (m Model) hints() []hint {
 		}
 	}
 	if m.tab == TabAgents {
-		focus := []hint{{"j/k", "select"}, {"space", "actions"}, {"l/⏎", "open log"}}
+		focus := []hint{{"j/k", "select"}, {"space", "actions"}, {"tab/l/⏎", "open log"}}
 		if m.agents.focusLog {
-			focus = []hint{{"j/k", "scroll"}, {"h", "agents"}, {"G", "follow"}}
+			focus = []hint{{"j/k", "scroll"}, {"tab/h", "agents"}, {"G", "follow"}}
 		}
 		return append(append(focus, hint{"p/n", "prev/next run"}, hint{"w", "wrap"}), globalHints...)
 	}
-	return append([]hint{{"j/k", "scroll"}, {"gg/G", "top/bottom"}, {"r", "refresh"}}, globalHints...)
+	return append([]hint{{"j/k", "scroll"}, {"gg/G", "top/bottom"}}, globalHints...)
 }
 
 func (m Model) statusText() string {
@@ -119,8 +119,7 @@ var helpGroups = []struct {
 }{
 	{"Global", [][2]string{
 		{"1 2 3", "jump to Overview / Agents / Info"},
-		{"tab  shift+tab", "next / previous tab"},
-		{"r", "refresh now"},
+		{"ctrl+r", "refresh now"},
 		{"?", "toggle this help"},
 		{"q  ctrl+c", "quit"},
 	}},
@@ -131,11 +130,12 @@ var helpGroups = []struct {
 	}},
 	{"Agents tab", [][2]string{
 		{"j k", "select agent (sidebar) or scroll log"},
+		{"tab  shift+tab", "switch between the sidebar and the log"},
 		{"l  enter  →", "focus the log"},
 		{"h  esc  ←", "back to the sidebar"},
 		{"p  n", "previous (older) / next (newer) run"},
 		{"space  a", "actions menu of the selected agent"},
-		{"x", "run the selected agent once"},
+		{"r", "run the selected agent once"},
 		{"c", "run it on cron / edit its cron"},
 		{"s", "stop its cron"},
 		{"S", "start the scheduler when crons are paused"},

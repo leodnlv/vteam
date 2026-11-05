@@ -140,7 +140,7 @@ func typeText(t *testing.T, m Model, text string) Model {
 
 func TestRunOnceAsksForAnOptionalFocus(t *testing.T) {
 	f := &fakeActions{agents: testAgents()}
-	m := press(t, actionsModel(t, f), "j", "x")
+	m := press(t, actionsModel(t, f), "j", "r")
 	assertScreen(t, m, "Run test-writer once", "passed as --focus", "run now", "new line", "cancel")
 	m = typeText(t, m, "xq")
 	m = update(t, m, keyEsc)
@@ -149,11 +149,11 @@ func TestRunOnceAsksForAnOptionalFocus(t *testing.T) {
 		t.Fatal("esc should close the run dialog")
 	}
 
-	m = update(t, press(t, m, "x"), keyEnter)
+	m = update(t, press(t, m, "r"), keyEnter)
 	assertCalls(t, f, "run test-writer")
 	assertScreen(t, m, "● started test-writer")
 
-	m = typeText(t, press(t, m, "x"), "  the parser")
+	m = typeText(t, press(t, m, "r"), "  the parser")
 	m = typeText(t, update(t, m, keyShiftEnter), "and q")
 	m = typeText(t, update(t, m, keyCtrlJ), "x")
 	m = update(t, m, tea.PasteMsg{Content: "  pasted\n"})
@@ -163,13 +163,13 @@ func TestRunOnceAsksForAnOptionalFocus(t *testing.T) {
 	assertScreen(t, m, "● started test-writer with focus")
 
 	f.runErr = errors.New("no binary")
-	m = update(t, press(t, m, "x"), keyEnter)
+	m = update(t, press(t, m, "r"), keyEnter)
 	assertScreen(t, m, "✗ test-writer could not start: no binary")
 }
 
 func TestMergeEnsurerRunsWithoutFocus(t *testing.T) {
 	f := &fakeActions{agents: []Agent{{Name: "merge-ensurer", Builtin: true}}}
-	m := press(t, actionsModel(t, f), "x")
+	m := press(t, actionsModel(t, f), "r")
 	assertScreen(t, m, "Run merge-ensurer once?")
 	if strings.Contains(screen(m), "--focus") {
 		t.Error("the merge ensurer takes no focus")
@@ -180,7 +180,7 @@ func TestMergeEnsurerRunsWithoutFocus(t *testing.T) {
 
 func TestActionsExplainWhyTheyCannotRun(t *testing.T) {
 	f := &fakeActions{agents: append(testAgents(), Agent{Name: "retired"})}
-	m := press(t, actionsModel(t, f), "j", "j", "x")
+	m := press(t, actionsModel(t, f), "j", "j", "r")
 	if m.dialog.kind != dialogNone {
 		t.Fatal("a running agent should not open the run confirmation")
 	}

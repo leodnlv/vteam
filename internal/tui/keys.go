@@ -62,13 +62,7 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 	case "1", "2", "3":
 		m.tab = Tab(key[0] - '1')
 		return m, nil
-	case "tab":
-		m.tab = (m.tab + 1) % Tab(len(tabNames))
-		return m, nil
-	case "shift+tab":
-		m.tab = (m.tab + Tab(len(tabNames)) - 1) % Tab(len(tabNames))
-		return m, nil
-	case "r":
+	case "ctrl+r":
 		m.agents = m.agents.reload(m.deps.Agents(m.deps.Now()))
 		m.info = m.refreshInfo()
 		return m, m.fetchStatus
@@ -102,13 +96,15 @@ func (m Model) handleAgentsKey(key string, pendingG bool) Model {
 		if !s.follow {
 			s.offset = m.logOffset(len(m.logRows()))
 		}
+	case "tab", "shift+tab":
+		s.focusLog = !s.focusLog
 	case "p":
 		s = s.stepRun(-1)
 	case "n":
 		s = s.stepRun(1)
 	case "ctrl+d", "ctrl+u", "pgdown", "pgup":
 		return m.scrollLog(key, pendingG)
-	case "x", "c", "s", "S", "a":
+	case "r", "c", "s", "S", "a":
 		return m.agentAction(key)
 	default:
 		if !s.focusLog {

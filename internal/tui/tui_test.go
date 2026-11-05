@@ -106,11 +106,25 @@ func TestTabSwitching(t *testing.T) {
 	cases := []struct {
 		key  string
 		want Tab
-	}{{"2", TabAgents}, {"3", TabInfo}, {"tab", TabOverview}, {"shift+tab", TabInfo}, {"1", TabOverview}}
+	}{{"2", TabAgents}, {"3", TabInfo}, {"tab", TabInfo}, {"shift+tab", TabInfo}, {"1", TabOverview}}
 	for _, c := range cases {
 		m = press(t, m, c.key)
 		if m.tab != c.want {
 			t.Fatalf("after %q tab = %v, want %v", c.key, m.tab, c.want)
+		}
+	}
+}
+
+func TestTabTogglesAgentsFocus(t *testing.T) {
+	m := press(t, newTestModel(t, nil), "2")
+	for i, want := range []bool{true, false, true} {
+		key := "tab"
+		if i == 1 {
+			key = "shift+tab"
+		}
+		m = press(t, m, key)
+		if m.tab != TabAgents || m.agents.focusLog != want {
+			t.Fatalf("after %q: tab = %v, focusLog = %v, want focusLog %v", key, m.tab, m.agents.focusLog, want)
 		}
 	}
 }
