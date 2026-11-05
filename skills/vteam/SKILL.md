@@ -257,7 +257,7 @@ Agents with `worktree: true` get an isolated git worktree, branched from a fresh
 
 ## Locking
 
-Advisory file locking via atomic `mkdir`. Each lock contains PID + timestamp. Stale locks (dead process or >30 minutes) are auto-detected. Same-agent runs are serialized; different agents can run concurrently. Task picking is serialized across all agents by the `task-claim` lock. `vteam clean` breaks only stale locks.
+Advisory file locking via atomic `mkdir`. Each lock contains PID + timestamp. A lock is stale only when its holding process is dead (or it has no info file and is older than 30 minutes); a live run keeps its lock however long it takes. Same-agent runs are serialized; different agents can run concurrently. Task picking is serialized across all agents by the `task-claim` lock. `vteam clean` breaks only stale locks.
 
 ## Scheduling
 
@@ -311,7 +311,7 @@ Common `allowedTools` presets:
 
 ## Troubleshooting
 
-- **Stuck lock**: Run `vteam clean` or wait 30 minutes for stale detection.
+- **Stuck lock**: If the holding process is dead, the next run or `vteam clean` breaks it. If it is alive, the run is still going — kill it first.
 - **Orphaned worktree**: `vteam status` lists worktrees no running agent uses. Run `vteam clean` to remove them; it keeps worktrees a running agent is using.
 - **Agent produced no changes**: Check the task's `retry-count` metadata (`aven show <ref>`). After `maxRetries` failures, the task is skipped.
 - **PR creation failed**: Verify `gh` or `glab` is installed and authenticated. The branch is still pushed — create the PR manually.

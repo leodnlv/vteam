@@ -47,6 +47,22 @@ func TestBreakStale(t *testing.T) {
 			t.Error("live lock was broken")
 		}
 	})
+	t.Run("leaves a lock older than 30 minutes held by a live process", func(t *testing.T) {
+		resource := filepath.Join(t.TempDir(), "my-agent")
+		writeLock(t, resource, Info{PID: os.Getpid(), Timestamp: time.Now().Add(-31 * time.Minute).UnixMilli(), Agent: "old"})
+		if BreakStale(resource) || !exists(Dir(resource)) {
+			t.Error("old live lock was broken")
+		}
+	})
+	t.Run("leaves nothing but the lock directory behind", func(t *testing.T) {
+		dir := t.TempDir()
+		resource := filepath.Join(dir, "my-agent")
+		writeLock(t, resource, Info{PID: deadPID, Timestamp: time.Now().UnixMilli(), Agent: "dead"})
+		BreakStale(resource)
+		if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+			t.Errorf("left behind %v", entries)
+		}
+	})
 	t.Run("breaks a lock held by a dead process", func(t *testing.T) {
 		resource := filepath.Join(t.TempDir(), "my-agent")
 		writeLock(t, resource, Info{PID: deadPID, Timestamp: time.Now().UnixMilli(), Agent: "dead"})
@@ -89,6 +105,16 @@ func TestAcquire(t *testing.T) {
 			t.Error("lock directory left behind")
 		}
 	})
+	t.Run("release leaves a lock now owned by another process", func(t *testing.T) {
+		resource := filepath.Join(t.TempDir(), "my-agent")
+		l := acquire(t, resource, "first", time.Second)
+		_ = os.RemoveAll(Dir(resource))
+		writeLock(t, resource, Info{PID: os.Getppid(), Timestamp: time.Now().UnixMilli(), Agent: "second"})
+		l.Release()
+		if !exists(Dir(resource)) {
+			t.Error("release removed another process's lock")
+		}
+	})
 	t.Run("writes lock info with PID and agent name", func(t *testing.T) {
 		resource := filepath.Join(t.TempDir(), "my-agent")
 		before := time.Now().UnixMilli()
@@ -127,12 +153,14 @@ func TestAcquire(t *testing.T) {
 			t.Errorf("info = %+v", info)
 		}
 	})
-	t.Run("breaks stale lock older than 30 minutes", func(t *testing.T) {
+	t.Run("waits on a lock older than 30 minutes while its holder is alive", func(t *testing.T) {
 		resource := filepath.Join(t.TempDir(), "my-agent")
 		writeLock(t, resource, Info{PID: os.Getpid(), Timestamp: time.Now().Add(-31 * time.Minute).UnixMilli(), Agent: "old"})
-		l := acquire(t, resource, "new-agent", 5*time.Second)
-		defer l.Release()
-		if info, _ := ReadLive(Dir(resource)); info.Agent != "new-agent" {
+		_, err := Acquire(context.Background(), resource, "waiter", time.Second)
+		if err == nil || !strings.Contains(err.Error(), "timeout") {
+			t.Errorf("err = %v", err)
+		}
+		if info, _ := ReadLive(Dir(resource)); info.Agent != "old" {
 			t.Errorf("info = %+v", info)
 		}
 	})

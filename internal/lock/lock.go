@@ -27,8 +27,12 @@ type Lock struct {
 	Path string
 }
 
+// Release removes the lock only while this process still owns it, so a lock broken and re-acquired by someone else survives.
 func (l *Lock) Release() {
-	if l != nil {
+	if l == nil {
+		return
+	}
+	if info, err := readInfo(l.Path); err == nil && info.PID == os.Getpid() {
 		_ = os.RemoveAll(l.Path)
 	}
 }
@@ -68,10 +72,21 @@ func isStale(lockDir string) bool {
 		stat, statErr := os.Stat(lockDir)
 		return statErr != nil || time.Since(stat.ModTime()) > StaleAfter
 	}
-	if err != nil || !IsProcessAlive(info.PID) {
-		return true
+	return err != nil || !IsProcessAlive(info.PID)
+}
+
+// removeStale moves the lock aside before checking it again, so two waiters cannot both delete one lock and a lock re-created in between is never deleted.
+func removeStale(lockDir string) bool {
+	graveyard := fmt.Sprintf("%s.stale-%d-%d-%d", lockDir, os.Getpid(), time.Now().UnixNano(), rand.Int64())
+	if err := os.Rename(lockDir, graveyard); err != nil {
+		return false
 	}
-	return time.Since(info.Time()) > StaleAfter
+	if !isStale(graveyard) {
+		_ = os.Rename(graveyard, lockDir)
+		return false
+	}
+	_ = os.RemoveAll(graveyard)
+	return true
 }
 
 func Acquire(ctx context.Context, resource, agent string, timeout time.Duration) (*Lock, error) {
@@ -90,8 +105,7 @@ func Acquire(ctx context.Context, resource, agent string, timeout time.Duration)
 		if !errors.Is(err, os.ErrExist) {
 			return nil, err
 		}
-		if isStale(dir) {
-			_ = os.RemoveAll(dir)
+		if isStale(dir) && removeStale(dir) {
 			continue
 		}
 		wait := 500*time.Millisecond + rand.N(500*time.Millisecond)
@@ -104,14 +118,13 @@ func Acquire(ctx context.Context, resource, agent string, timeout time.Duration)
 	return nil, fmt.Errorf("timeout acquiring lock on %s", resource)
 }
 
-// BreakStale removes the lock when its holder is dead or it is older than StaleAfter.
+// BreakStale removes the lock when its holder is dead, or when it has no info and is older than StaleAfter.
 func BreakStale(resource string) bool {
 	dir := Dir(resource)
 	if _, err := os.Stat(dir); err != nil || !isStale(dir) {
 		return false
 	}
-	_ = os.RemoveAll(dir)
-	return true
+	return removeStale(dir)
 }
 
 func Break(resource string) bool {

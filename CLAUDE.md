@@ -296,7 +296,7 @@ All three must pass before any commit or PR:
 - Self-documenting code, no comments unless the why is non-obvious.
 - Terminal output of every CLI command uses the helpers in `internal/log` (banner, sections, gutter, glyphs, fields). The conventions are in the project skill `.claude/skills/cli-output-style/SKILL.md`; load it before adding a command or changing what one prints.
 - Task refs (e.g. `APP-7KQ9`) are local to the user's aven database. Never put them in branch names, commit messages, or PR bodies.
-- Locking uses atomic `mkdir` with stale detection (30 min timeout).
+- Locking uses atomic `mkdir`. A lock is stale only when its holder pid is dead (or it has no `info.json` and is older than 30 min); age alone never breaks a live lock. Release only removes a lock the current process owns.
 - Tasks live in the user's aven database, not the repo. The real shared artifacts are PRs.
 - All agents return a unified `AgentOutput` JSON. The orchestrator handles all state mutations based on the output fields: creates aven tasks from `content.type: "task"`, commits from `commitMessage` + `filesChanged`, and passes `content` through to ON_FINISH hooks.
 - No module mocking: code that talks to the outside world takes an interface (`execx.Runner`, `tasks.Manager`, `run.Worktrees`, `platform.Platform`, the claude runner) and tests pass fakes. `run.Deps` bundles them for the orchestrator.

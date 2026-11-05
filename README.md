@@ -222,7 +222,7 @@ Shows the same view as `vteam status` full-screen and refreshes it every second 
 
 ### `vteam clean`
 
-Removes the git worktrees under `worktreeDir` that no running agent is using; a worktree belongs to a running agent when that agent's lock is held by a live process and its current run state in `vteam/.runs/` points at it. It also breaks stale locks (held by a dead process or older than 30 minutes) and returns orphaned tasks to `todo`: tasks that are `active` with a claim from this machine whose process is no longer running. Tasks claimed on another machine and `active` tasks without a vteam claim are listed but left alone. Run this after a crash or if a lock is stuck.
+Removes the git worktrees under `worktreeDir` that no running agent is using; a worktree belongs to a running agent when that agent's lock is held by a live process and its current run state in `vteam/.runs/` points at it. It also breaks stale locks (held by a dead process, or missing their info file and older than 30 minutes) and returns orphaned tasks to `todo`: tasks that are `active` with a claim from this machine whose process is no longer running. Tasks claimed on another machine and `active` tasks without a vteam claim are listed but left alone. Run this after a crash or if a lock is stuck.
 
 ### `vteam skill install`
 
@@ -499,9 +499,9 @@ All agents return a unified JSON output (`AgentOutput`). The orchestrator valida
 
 vteam uses advisory file locking via atomic `mkdir` (POSIX guarantees this is atomic). Each lock directory contains an `info.json` with the holding PID and timestamp.
 
-- **Stale detection**: A lock is considered stale if the holding process is dead (checked via `kill -0`) or the lock is older than 30 minutes.
+- **Stale detection**: A lock is considered stale only if the holding process is dead (checked via `kill -0`), so a long run keeps its lock however long it takes. A lock directory without its info file (a crash right after `mkdir`) is stale after 30 minutes. Stale locks are renamed aside and checked again before being deleted, and a process only releases a lock it still owns.
 - **Not distributed**: Locks are local to the filesystem. If you run vteam from multiple machines against the same repo (e.g., via NFS), locks won't protect against concurrent runs.
-- **Crash recovery**: If vteam crashes while holding a lock, the lock may persist. Run `vteam clean` to break stale locks, or wait 30 minutes for automatic stale detection.
+- **Crash recovery**: If vteam crashes while holding a lock, the lock may persist. The next run or `vteam clean` breaks it once the holding process is dead.
 - **Same agent concurrency**: Two runs of the same agent are serialized by the lock. Different agents (improver + coder) can run concurrently.
 - **Task claiming**: Picking a task (list → select → set `active`) runs under `vteam/.locks/task-claim.lock`, shared by all agents, so two agents with overlapping `taskFilter`s never get the same task. The lock is held only while picking, not for the whole run. Like every lock it is local: agents on different machines syncing one aven database can still race.
 
