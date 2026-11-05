@@ -12,17 +12,6 @@ import (
 
 const sidebarWidth = 26
 
-var (
-	styleSelected      = lipgloss.NewStyle().Reverse(true)
-	styleSelectedBlur  = lipgloss.NewStyle().Background(lipgloss.BrightBlack).Foreground(lipgloss.White)
-	styleTitleFocus    = lipgloss.NewStyle().Foreground(lipgloss.Cyan).Bold(true)
-	styleTitleBlur     = lipgloss.NewStyle().Foreground(lipgloss.BrightBlack).Bold(true)
-	styleDividerFocus  = lipgloss.NewStyle().Foreground(lipgloss.Cyan)
-	styleToolName      = lipgloss.NewStyle().Foreground(lipgloss.Yellow).Bold(true)
-	styleFinishedOK    = lipgloss.NewStyle().Foreground(lipgloss.Green).Bold(true)
-	styleFinishedError = lipgloss.NewStyle().Foreground(lipgloss.Red).Bold(true)
-)
-
 type agentsState struct {
 	list     []Agent
 	selected int
@@ -122,7 +111,7 @@ func (m Model) cronBanner() []string {
 		return nil
 	}
 	if !m.schedulerRunning() {
-		return []string{styleYellow.Render("◷ cron "+a.Cron+" paused · scheduler not running") + styleGray.Render(" (S to start it)")}
+		return []string{styleWarn.Render("◷ cron "+a.Cron+" paused · scheduler not running") + styleMuted.Render(" (S to start it)")}
 	}
 	now := m.deps.Now()
 	text := styleCron.Render("◷ on cron ") + styleCron.Bold(true).Render(a.Cron)
@@ -131,7 +120,7 @@ func (m Model) cronBanner() []string {
 	}
 	if !a.NextRun.IsZero() {
 		text += styleCron.Render(" · next "+log.FormatTimeOfDay(a.NextRun.Local(), now.Local())) +
-			styleGray.Render(" (in "+log.FormatAge(a.NextRun.Sub(now))+")")
+			styleMuted.Render(" (in "+log.FormatAge(a.NextRun.Sub(now))+")")
 	}
 	return []string{text}
 }
@@ -141,6 +130,9 @@ func (m Model) logRows() []string {
 	var rows []string
 	for _, raw := range m.agents.log.lines {
 		styled := colorizeLog(raw)
+		if s := logSection.FindStringSubmatch(raw); s != nil {
+			styled = section(s[1], width)
+		}
 		if m.agents.wrap {
 			rows = append(rows, wrapHanging(styled, width, hangingIndent(raw))...)
 		} else {
@@ -163,7 +155,7 @@ func (m Model) renderAgents() []string {
 	height := m.bodyHeight()
 	sidebar := m.renderSidebar(height)
 	pane := m.renderLogPane(height)
-	divider := styleGray.Render("│")
+	divider := styleDivider.Render("│")
 	if m.agents.focusLog {
 		divider = styleDividerFocus.Render("│")
 	}
@@ -183,17 +175,17 @@ func (m Model) renderSidebar(height int) []string {
 	lines := []string{fit(title.Render(" AGENTS"), sidebarWidth), fit(" "+rule(sidebarWidth-2), sidebarWidth)}
 
 	for i, a := range s.list {
-		glyph, age := styleGray.Render("○"), styleGray.Render(lastRunAge(a, m))
+		glyph, age := styleMuted.Render("○"), styleMuted.Render(lastRunAge(a, m))
 		switch {
 		case a.Running != nil:
-			glyph, age = styleGreen.Render("●"), styleGreen.Render(log.FormatAge(m.deps.Now().Sub(a.Running.Time())))
+			glyph, age = styleLive.Render("●"), styleLive.Render(log.FormatAge(m.deps.Now().Sub(a.Running.Time())))
 		case a.LoadError != "":
-			glyph = styleRed.Render("✗")
+			glyph = styleFail.Render("✗")
 		}
 		if a.Cron != "" {
 			clock := styleCron.Render("◷")
 			if !m.schedulerRunning() {
-				clock = styleYellow.Render("◷")
+				clock = styleWarn.Render("◷")
 			}
 			age = clock + " " + age
 		}
@@ -230,11 +222,11 @@ func lastRunAge(a Agent, m Model) string {
 
 func (m Model) agentDetails(a Agent) []string {
 	var lines []string
-	field := func(label, value string) { lines = append(lines, styleGray.Render(log.PadEnd(label, 7))+value) }
+	field := func(label, value string) { lines = append(lines, styleMuted.Render(log.PadEnd(label, 7))+value) }
 	if a.Running != nil {
-		field("status", styleGreen.Render(fmt.Sprintf("running · pid %d", a.Running.PID)))
+		field("status", styleLive.Render(fmt.Sprintf("running · pid %d", a.Running.PID)))
 	} else {
-		field("status", styleGray.Render("idle"))
+		field("status", styleMuted.Render("idle"))
 	}
 	switch {
 	case a.Cron != "" && m.schedulerRunning():
@@ -243,11 +235,11 @@ func (m Model) agentDetails(a Agent) []string {
 			field("next", styleCron.Render(log.FormatTimeOfDay(a.NextRun.Local(), m.deps.Now().Local())))
 		}
 	case a.Cron != "":
-		field("cron", styleYellow.Render(a.Cron+" paused"))
+		field("cron", styleWarn.Render(a.Cron+" paused"))
 	case a.DefaultCron != "":
-		field("cron", styleGray.Render("off ("+a.DefaultCron+")"))
+		field("cron", styleMuted.Render("off ("+a.DefaultCron+")"))
 	case a.Runnable():
-		field("cron", styleGray.Render("off"))
+		field("cron", styleMuted.Render("off"))
 	}
 	if a.Config != nil && a.Config.Model != "" {
 		field("model", a.Config.Model)
@@ -256,7 +248,7 @@ func (m Model) agentDetails(a Agent) []string {
 		field("input", a.Config.Input)
 	}
 	if a.LoadError != "" {
-		lines = append(lines, styleRed.Render(firstLine(a.LoadError)))
+		lines = append(lines, styleFail.Render(firstLine(a.LoadError)))
 	}
 	return lines
 }
@@ -274,7 +266,7 @@ func (m Model) renderLogPane(height int) []string {
 		for _, b := range m.cronBanner() {
 			lines = append(lines, " "+b, "")
 		}
-		return window(append(lines, " "+styleGray.Render(empty)), 0, height, width)
+		return window(append(lines, " "+styleMuted.Render(empty)), 0, height, width)
 	}
 
 	parts := []string{styleBold.Render(a.Name)}
@@ -283,18 +275,18 @@ func (m Model) renderLogPane(height int) []string {
 	}
 	parts = append(parts, m.runCounter(a))
 	if m.agents.follow {
-		parts = append(parts, styleGreen.Render("following"))
+		parts = append(parts, styleOK.Render("following"))
 	} else {
-		parts = append(parts, styleYellow.Render("paused"))
+		parts = append(parts, styleWarn.Render("paused"))
 	}
 	if a.Running != nil && m.agents.onLatestRun() {
-		parts = append(parts, styleGreen.Render("● live"))
+		parts = append(parts, styleLive.Render("● live"))
 	}
 	wrap := "nowrap"
 	if m.agents.wrap {
 		wrap = "wrap"
 	}
-	title := spread(" "+strings.Join(parts, styleGray.Render(" · ")), styleGray.Render(wrap)+" ", width)
+	title := spread(" "+strings.Join(parts, styleMuted.Render(" · ")), styleMuted.Render(wrap)+" ", width)
 
 	rows := m.logRows()
 	body := window(rows, m.logOffset(len(rows)), m.logBodyHeight(), width-1)
@@ -317,61 +309,74 @@ func (m Model) runCounter(a Agent) string {
 	}
 	label := fmt.Sprintf("run %d/%d", index, total)
 	if index < total {
-		return styleYellow.Bold(true).Render(label)
+		return styleWarn.Bold(true).Render(label)
 	}
-	return styleGray.Render(label)
+	return styleMuted.Render(label)
 }
 
 var (
-	logGutter = regexp.MustCompile(`^( \d{1,2}:\d\d(?::\d\d)?  )(\S)(.*)$`)
-	logDetail = regexp.MustCompile(`^(\s+)(\S+)(\s{2,})(.*)$`)
-	logTool   = regexp.MustCompile(`^(\s)(\S+)(.*)$`)
+	logGutter  = regexp.MustCompile(`^ (\d{1,2}:\d\d(?::\d\d)?)( │ |  )(\S)(.*)$`)
+	logBar     = regexp.MustCompile(`^(\s+│)(.*)$`)
+	logDetail  = regexp.MustCompile(`^(\s+)(\S+)(\s{2,})(.*)$`)
+	logTool    = regexp.MustCompile(`^(\s)(\S+)(.*)$`)
+	logSection = regexp.MustCompile(`^▍ (.*?)  (─{3,})$`)
 )
 
 var glyphStyles = map[string]lipgloss.Style{
-	"•": lipgloss.NewStyle().Foreground(lipgloss.Blue),
-	"✓": styleGreen,
-	"✗": styleRed,
-	"!": styleYellow,
-	"⚙": styleYellow,
-	"❯": styleMagenta,
+	"•": styleInfo,
+	"✓": styleOK,
+	"✗": styleFail,
+	"!": styleWarn,
+	"⚙": styleTool,
+	"❯": styleClaude,
 }
 
 // colorizeLog restores the colors that run logs lose when written to disk, keyed on each line's glyph.
+// It also reads logs written before the timeline gutter (" 00:12  • ") and the ▍ sections ("━━ Setup ━━").
 func colorizeLog(line string) string {
 	switch {
 	case strings.HasPrefix(line, "━━"):
 		return styleSection.Render(line)
+	case logSection.MatchString(line):
+		s := logSection.FindStringSubmatch(line)
+		return styleMarker.Render("▍") + " " + styleSection.Render(s[1]) + "  " + styleRule.Render(s[2])
 	case strings.HasPrefix(line, "vteam ▸"):
-		return styleBold.Render(line)
+		return styleBrand.Render("vteam ▸") + styleBold.Render(strings.TrimPrefix(line, "vteam ▸"))
 	case strings.HasPrefix(line, "✓ "):
 		return styleFinishedOK.Render(line)
 	case strings.HasPrefix(line, "✗ "):
 		return styleFinishedError.Render(line)
 	}
 	if g := logGutter.FindStringSubmatch(line); g != nil {
-		clock, glyph, rest := g[1], g[2], g[3]
+		clock, sep, glyph, rest := g[1], g[2], g[3], g[4]
 		switch glyph {
 		case "⚙":
 			if t := logTool.FindStringSubmatch(rest); t != nil {
-				rest = t[1] + styleToolName.Render(t[2]) + t[3]
+				rest = t[1] + styleToolName.Render(t[2]) + styleMuted.Render(t[3])
 			}
 		case "!":
-			rest = styleYellow.Render(rest)
+			rest = styleWarn.Render(rest)
 		case "✗":
-			rest = styleRed.Render(rest)
+			rest = styleFail.Render(rest)
 		}
 		paint, ok := glyphStyles[glyph]
 		if !ok {
 			paint = lipgloss.NewStyle()
 		}
-		return styleGray.Render(clock) + paint.Render(glyph) + rest
+		return " " + styleMuted.Render(clock) + styleRule.Render(sep) + paint.Render(glyph) + rest
 	}
+	if b := logBar.FindStringSubmatch(line); b != nil {
+		return styleRule.Render(b[1]) + colorizeDetail(b[2])
+	}
+	return colorizeDetail(line)
+}
+
+func colorizeDetail(line string) string {
 	if strings.HasPrefix(strings.TrimLeft(line, " "), "✗") {
-		return styleRed.Render(line)
+		return styleFail.Render(line)
 	}
 	if d := logDetail.FindStringSubmatch(line); d != nil {
-		return d[1] + styleGray.Render(d[2]) + d[3] + d[4]
+		return d[1] + styleMuted.Render(d[2]) + d[3] + d[4]
 	}
 	return line
 }
@@ -379,10 +384,13 @@ func colorizeLog(line string) string {
 // hangingIndent lines continuation rows up under the text after a log line's clock and glyph.
 func hangingIndent(raw string) int {
 	if g := logGutter.FindStringSubmatch(raw); g != nil {
-		return lipgloss.Width(g[1]) + lipgloss.Width(g[2]) + 1
+		return 1 + lipgloss.Width(g[1]) + lipgloss.Width(g[2]) + lipgloss.Width(g[3]) + 1
 	}
-	if strings.HasPrefix(raw, "━━") {
+	if strings.HasPrefix(raw, "━━") || logSection.MatchString(raw) {
 		return -1
+	}
+	if b := logBar.FindStringSubmatch(raw); b != nil {
+		return lipgloss.Width(b[1]) + len(b[2]) - len(strings.TrimLeft(b[2], " "))
 	}
 	return len(raw) - len(strings.TrimLeft(raw, " "))
 }

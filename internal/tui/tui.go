@@ -175,12 +175,12 @@ func (m Model) renderBody() []string {
 	case TabAgents:
 		return m.renderAgents()
 	case TabInfo:
-		lines := m.infoLines()
+		lines := stretchSections(m.infoLines(), m.width-1)
 		return window(lines, clampOffset(m.info.offset, len(lines), height), height, m.width)
 	default:
-		lines := m.overview.lines
+		lines := stretchSections(m.overview.lines, m.width-1)
 		if !m.overview.loaded {
-			lines = []string{styleGray.Render("  loading status from aven…")}
+			lines = []string{styleMuted.Render("  loading status from aven…")}
 		}
 		return window(lines, clampOffset(m.overview.offset, len(lines), height), height, m.width)
 	}

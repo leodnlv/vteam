@@ -77,6 +77,8 @@ func TestFormatGolden(t *testing.T) {
 	}
 	t.Setenv("NO_COLOR", "")
 	t.Setenv("FORCE_COLOR", "1")
+	t.Setenv("COLORTERM", "truecolor")
+	t.Setenv("TERM", "xterm-256color")
 	if diff := cmp.Diff(g.Color, renderFormatted()); diff != "" {
 		t.Errorf("color formatting (-want +got):\n%s", diff)
 	}
@@ -156,11 +158,11 @@ func TestLoggerGutterAndGlyphs(t *testing.T) {
 	l.Warn("careful")
 	l.Fail("broken")
 
-	wantOut := " 01:05  • one\n          two\n 01:05  ✓ done\n          branch    vteam/x\n"
+	wantOut := " 01:05 │ • one\n       │   two\n 01:05 │ ✓ done\n       │   branch    vteam/x\n"
 	if diff := cmp.Diff(wantOut, out.String()); diff != "" {
 		t.Errorf("stdout (-want +got):\n%s", diff)
 	}
-	if diff := cmp.Diff(" 01:05  ! careful\n 01:05  ✗ broken\n", errOut.String()); diff != "" {
+	if diff := cmp.Diff(" 01:05 │ ! careful\n 01:05 │ ✗ broken\n", errOut.String()); diff != "" {
 		t.Errorf("stderr (-want +got):\n%s", diff)
 	}
 }
@@ -169,7 +171,7 @@ func TestLoggerWallClock(t *testing.T) {
 	l, out, _, _ := newTestLogger(t)
 	l.UseWallClock()
 	l.Step("tick")
-	if got := out.String(); got != " 10:00:00  • tick\n" {
+	if got := out.String(); got != " 10:00:00 │ • tick\n" {
 		t.Errorf("got %q", got)
 	}
 }
@@ -185,7 +187,7 @@ func TestLoggerCopiesStrippedLinesToTheFile(t *testing.T) {
 	if !strings.Contains(out.String(), "\x1b[") {
 		t.Error("terminal output lost its colors")
 	}
-	if got := file.String(); got != " 00:00  ✓ saved\n 00:00  ! hmm\n" {
+	if got := file.String(); got != " 00:00 │ ✓ saved\n 00:00 │ ! hmm\n" {
 		t.Errorf("file = %q", got)
 	}
 }
@@ -199,10 +201,10 @@ func TestToolCallSplitsTerminalAndFileLines(t *testing.T) {
 
 	TerminalWidth = func() int { return 30 }
 	l.ToolCall("Bash", "echo a very long command line\nsecond line")
-	if got := out.String(); got != " 00:00  ⚙ Bash   echo a very …\n" {
+	if got := out.String(); got != " 00:00 │ ⚙ Bash   echo a very…\n" {
 		t.Errorf("terminal = %q", got)
 	}
-	if got := file.String(); got != " 00:00  ⚙ Bash   echo a very long command line\n                 second line\n" {
+	if got := file.String(); got != " 00:00 │ ⚙ Bash   echo a very long command line\n       │          second line\n" {
 		t.Errorf("file = %q", got)
 	}
 
@@ -210,7 +212,7 @@ func TestToolCallSplitsTerminalAndFileLines(t *testing.T) {
 	file.Reset()
 	TerminalWidth = func() int { return 0 }
 	l.ToolCall("TodoWrite", "")
-	if got := out.String(); got != " 00:00  ⚙ TodoWrite\n" {
+	if got := out.String(); got != " 00:00 │ ⚙ TodoWrite\n" {
 		t.Errorf("no detail = %q", got)
 	}
 }
@@ -218,7 +220,7 @@ func TestToolCallSplitsTerminalAndFileLines(t *testing.T) {
 func TestToolErrorShowsTheFirstLine(t *testing.T) {
 	l, out, _, _ := newTestLogger(t)
 	l.ToolError("\n  Exit code 1\nmore")
-	if got := out.String(); got != "          ✗ Exit code 1\n" {
+	if got := out.String(); got != "       │   ✗ Exit code 1\n" {
 		t.Errorf("got %q", got)
 	}
 }
@@ -232,10 +234,10 @@ func TestAgentExitAndFinished(t *testing.T) {
 	l.Finished("coder", "")
 	l.Finished("coder", "boom")
 
-	if got := out.String(); got != "\n 00:00  ✓ claude exited 0 · 2m05s · 7 turns · $0.46\n\n\n✓ coder completed in 1m30s\n" {
+	if got := out.String(); got != "       │\n 00:00 │ ✓ claude exited 0 · 2m05s · 7 turns · $0.46\n       │\n\n✓ coder completed in 1m30s\n" {
 		t.Errorf("stdout = %q", got)
 	}
-	if got := errOut.String(); got != " 00:00  ✗ claude exited 2\n\n✗ coder failed after 1m30s: boom\n" {
+	if got := errOut.String(); got != " 00:00 │ ✗ claude exited 2\n\n✗ coder failed after 1m30s: boom\n" {
 		t.Errorf("stderr = %q", got)
 	}
 }

@@ -82,7 +82,7 @@ func (in lineInput) view() string {
 	if in.cursor < len(in.text) {
 		after = string(in.text[in.cursor+1:])
 	}
-	return string(in.text[:in.cursor]) + styleSelected.Render(under) + after
+	return string(in.text[:in.cursor]) + styleCursor.Render(under) + after
 }
 
 func (in lineInput) trimmed() string {

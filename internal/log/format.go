@@ -115,12 +115,20 @@ func indentContinuation(text string, indent int) string {
 	return strings.Join(lines, "\n")
 }
 
+// FormatBanner draws "vteam" as a badge in color and as plain "vteam ▸" without it.
 func FormatBanner(title, detail string) string {
+	return formatBanner(title, detail, ansi.Enabled())
+}
+
+func formatBanner(title, detail string, color bool) string {
 	suffix := ""
 	if detail != "" {
-		suffix = "   " + ansi.Gray(detail)
+		suffix = "   " + ansi.Muted(detail)
 	}
-	return ansi.Bold(ansi.Cyan("vteam ▸")) + " " + ansi.Bold(title) + suffix
+	if !color {
+		return ansi.Strip("vteam ▸ " + title + suffix)
+	}
+	return ansi.Badge(" vteam ") + ansi.Brand(" ▸ ") + ansi.Bold(title) + suffix
 }
 
 func FormatSection(title string) string {
@@ -128,8 +136,9 @@ func FormatSection(title string) string {
 	if w := TerminalWidth(); w > 0 {
 		width = min(w, defaultWidth)
 	}
-	head := "━━ " + title + " "
-	return "\n" + ansi.Bold(ansi.Cyan(head+strings.Repeat("━", max(3, width-utf8.RuneCountInString(head)))))
+	head := "▍ " + title + "  "
+	rule := strings.Repeat("─", max(3, width-utf8.RuneCountInString(head)))
+	return "\n" + ansi.Brand("▍") + " " + ansi.Bold(title) + "  " + ansi.Rule(rule)
 }
 
 func FormatListItem(glyph, text string) string {
@@ -137,5 +146,5 @@ func FormatListItem(glyph, text string) string {
 }
 
 func FormatListDetail(label, value string) string {
-	return "    " + ansi.Gray(label) + " " + value
+	return "    " + ansi.Muted(label) + " " + value
 }

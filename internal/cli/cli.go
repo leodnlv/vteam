@@ -47,7 +47,7 @@ func Main() int {
 		return 0
 	}
 	if !errors.Is(err, log.ErrReported) {
-		fmt.Fprintln(os.Stderr, ansi.Red("error: "+err.Error()))
+		fmt.Fprintln(os.Stderr, ansi.Fail("error: "+err.Error()))
 	}
 	return 1
 }
@@ -79,7 +79,7 @@ func cwd() (string, error) {
 
 func requireVteamDir(dir string, errOut io.Writer) error {
 	if _, err := os.Stat(filepath.Join(dir, "vteam")); err != nil {
-		fmt.Fprintln(errOut, ansi.Red("No vteam/ directory found. Run 'vteam init' first."))
+		fmt.Fprintln(errOut, ansi.Fail("No vteam/ directory found. Run 'vteam init' first."))
 		return log.ErrReported
 	}
 	return nil
@@ -214,7 +214,7 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 		if helpErr := cmd.Help(); helpErr != nil {
 			return helpErr
 		}
-		fmt.Fprintln(cmd.ErrOrStderr(), ansi.Yellow("\nNo vteam/ directory found. Run 'vteam init' to set one up."))
+		fmt.Fprintln(cmd.ErrOrStderr(), ansi.Warn("\nNo vteam/ directory found. Run 'vteam init' to set one up."))
 		return nil
 	}
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
@@ -399,7 +399,7 @@ func cronCmd() *cobra.Command {
 			if err := schedule.Disable(dir, args[0]); err != nil {
 				return err
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), log.FormatListItem(ansi.Green("✓"), ansi.Bold(args[0])+" cron disabled"))
+			fmt.Fprintln(cmd.OutOrStdout(), log.FormatListItem(ansi.OK("✓"), ansi.Bold(args[0])+" cron disabled"))
 			return nil
 		}),
 	})
@@ -418,14 +418,14 @@ func cronEnable(out io.Writer, dir string, args []string) error {
 		return err
 	}
 	now := time.Now()
-	lines := []string{log.FormatListItem(ansi.Green("✓"), ansi.Bold(name)+" cron enabled "+ansi.Gray(expr))}
+	lines := []string{log.FormatListItem(ansi.OK("✓"), ansi.Bold(name)+" cron enabled "+ansi.Muted(expr))}
 	if next := schedule.NextRun(expr, now); !next.IsZero() {
-		lines = append(lines, log.FormatListDetail("next", log.FormatTimeOfDay(next, now)+" "+ansi.Gray("(in "+log.FormatAge(next.Sub(now))+")")))
+		lines = append(lines, log.FormatListDetail("next", log.FormatTimeOfDay(next, now)+" "+ansi.Muted("(in "+log.FormatAge(next.Sub(now))+")")))
 	}
 	if pid := schedule.ReadPID(dir); pid != 0 {
 		lines = append(lines, log.FormatListDetail("scheduler", fmt.Sprintf("running (pid %d), picks it up within %s", pid, schedule.PollInterval)))
 	} else {
-		lines = append(lines, log.FormatListDetail("scheduler", ansi.Yellow("not running")+" "+ansi.Gray("(start it with 'vteam cron start')")))
+		lines = append(lines, log.FormatListDetail("scheduler", ansi.Warn("not running")+" "+ansi.Muted("(start it with 'vteam cron start')")))
 	}
 	fmt.Fprintln(out, strings.Join(lines, "\n"))
 	return nil

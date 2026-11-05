@@ -81,12 +81,12 @@ func TestViewFillsTheTerminalExactly(t *testing.T) {
 
 func TestOverviewDropsBannerAndShowsStatus(t *testing.T) {
 	m := newTestModel(t, nil)
-	m = update(t, m, statusMsg{lines: []string{"vteam ▸ status", "\n━━ Running", "  · nothing running"}, started: fixedNow})
+	m = update(t, m, statusMsg{lines: []string{"vteam ▸ status", "\n▍ Running  ───", "  · nothing running"}, started: fixedNow})
 	out := screen(m)
 	if strings.Contains(out, "vteam ▸ status") {
 		t.Error("status banner should be dropped; the header replaces it")
 	}
-	if !strings.Contains(out, "━━ Running") || !strings.Contains(out, "updated 10:00:00") {
+	if !strings.Contains(out, "▍ Running") || !strings.Contains(out, "updated 10:00:00") {
 		t.Errorf("overview is missing status content:\n%s", out)
 	}
 }

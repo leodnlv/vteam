@@ -98,7 +98,7 @@ var (
 	clockCol  = regexp.MustCompile(`(?m)^ \d\d:\d\d(:\d\d)? `)
 )
 
-const stderrLine = " <clock>  ! claude: warning on stderr"
+const stderrLine = " <clock> │ ! claude: warning on stderr"
 
 func TestRunGolden(t *testing.T) {
 	var cases []struct {

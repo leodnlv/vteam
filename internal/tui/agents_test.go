@@ -120,15 +120,16 @@ func TestWrapHangingIndentsContinuationRows(t *testing.T) {
 			t.Errorf("row %q is wider than 30", r)
 		}
 	}
-	section := "━━ Setup " + strings.Repeat("━", 80)
-	if got := wrapHanging(section, 30, hangingIndent(section)); len(got) != 1 {
-		t.Error("section rules should never wrap")
+	for _, section := range []string{"━━ Setup " + strings.Repeat("━", 80), "▍ Setup  " + strings.Repeat("─", 80)} {
+		if got := wrapHanging(section, 30, hangingIndent(section)); len(got) != 1 {
+			t.Errorf("section rule %q should never wrap", section)
+		}
 	}
 }
 
 func TestColorizeLogKeepsTextIntact(t *testing.T) {
 	for _, line := range []string{
-		"━━ Setup ━━━", "vteam ▸ coder", " 00:06  ⚙ Read   src/a.ts", " 00:19  ! no finding",
+		"━━ Setup ━━━", "▍ Setup  ───────", "vteam ▸ coder   log: x", " 00:06 │ ⚙ Read   src/a.ts", " 00:19 │ ! no finding", "       │   branch    vteam/x", "       │   ✗ FAIL x", "       │", " 00:06  ⚙ Read   src/a.ts", " 00:19  ! no finding",
 		"          ✗ FAIL x", "          branch    vteam/x", "✓ coder completed in 1m", "plain",
 	} {
 		if got := xansi.Strip(colorizeLog(line)); got != line {
@@ -243,5 +244,34 @@ func TestAgentWithoutLogs(t *testing.T) {
 	m := agentsModel(t, []Agent{{Name: "fresh"}})
 	if !strings.Contains(screen(m), "no logs yet for fresh") {
 		t.Fatal(screen(m))
+	}
+}
+
+func TestHangingIndentFollowsTheTimelineGutter(t *testing.T) {
+	cases := map[string]int{
+		" 00:06 │ • step":        11,
+		" 14:03:27 │ • step":     14,
+		" 00:06  • old step":     10,
+		"       │   branch  x":   11,
+		"       │            x":  20,
+		"▍ Setup  ─────────────": -1,
+	}
+	for line, want := range cases {
+		if got := hangingIndent(line); got != want {
+			t.Errorf("hangingIndent(%q) = %d, want %d", line, got, want)
+		}
+	}
+}
+
+func TestStretchSectionsFillsTheWidth(t *testing.T) {
+	lines := stretchSections([]string{"▍ Setup  " + strings.Repeat("─", 63), "  • lock acquired"}, 100)
+	if w := xansi.StringWidth(lines[0]); w != 100 {
+		t.Errorf("section is %d cells wide, want 100: %q", w, xansi.Strip(lines[0]))
+	}
+	if !strings.HasPrefix(xansi.Strip(lines[0]), "▍ Setup  ───") {
+		t.Errorf("section lost its title: %q", xansi.Strip(lines[0]))
+	}
+	if lines[1] != "  • lock acquired" {
+		t.Errorf("other lines changed: %q", lines[1])
 	}
 }

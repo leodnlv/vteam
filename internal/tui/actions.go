@@ -52,12 +52,6 @@ type toast struct {
 	until time.Time
 }
 
-var (
-	styleBox     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Cyan).Padding(0, 1)
-	styleBoxHead = lipgloss.NewStyle().Foreground(lipgloss.Cyan).Bold(true)
-	styleCron    = lipgloss.NewStyle().Foreground(lipgloss.Cyan)
-)
-
 type menuItem struct {
 	key, label string
 	enabled    bool
@@ -131,9 +125,9 @@ func (m Model) agentAction(key string) Model {
 	case "x":
 		switch {
 		case !a.Runnable():
-			return m.withToast(styleYellow.Render("! " + a.Name + " can't be run"))
+			return m.withToast(styleWarn.Render("! " + a.Name + " can't be run"))
 		case a.Running != nil:
-			return m.withToast(styleYellow.Render("! " + a.Name + " is already running"))
+			return m.withToast(styleWarn.Render("! " + a.Name + " is already running"))
 		}
 		if a.Builtin {
 			m.dialog = dialog{kind: dialogConfirm, agent: a.Name}
@@ -142,7 +136,7 @@ func (m Model) agentAction(key string) Model {
 		}
 	case "c":
 		if !a.Runnable() {
-			return m.withToast(styleYellow.Render("! " + a.Name + " can't be scheduled"))
+			return m.withToast(styleWarn.Render("! " + a.Name + " can't be scheduled"))
 		}
 		expr := a.Cron
 		if expr == "" {
@@ -154,7 +148,7 @@ func (m Model) agentAction(key string) Model {
 		m.dialog = dialog{kind: dialogCron, agent: a.Name, input: newLineInput(expr)}
 	case "s":
 		if a.Cron == "" {
-			return m.withToast(styleYellow.Render("! " + a.Name + " has no cron enabled"))
+			return m.withToast(styleWarn.Render("! " + a.Name + " has no cron enabled"))
 		}
 		return m.stopCron(a.Name)
 	case "S":
@@ -249,10 +243,10 @@ func newFocusInput(width int) textarea.Model {
 	in.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter", "alt+enter", "ctrl+j"))
 	styles := textarea.DefaultDarkStyles()
 	styles.Focused.CursorLine = lipgloss.NewStyle()
-	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Cyan)
+	styles.Focused.Prompt = styleMuted
 	styles.Cursor.Blink = false
 	in.SetStyles(styles)
-	in.SetWidth(width - 4)
+	in.SetWidth(width - styleBox.GetHorizontalFrameSize())
 	in.Focus()
 	return in
 }
@@ -279,46 +273,46 @@ func (m Model) handleRunKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 
 func (m Model) runOnce(name, focus string) Model {
 	if err := m.deps.RunOnce(name, focus); err != nil {
-		return m.withToast(styleRed.Render("✗ " + name + " could not start: " + firstLine(err.Error())))
+		return m.withToast(styleFail.Render("✗ " + name + " could not start: " + firstLine(err.Error())))
 	}
 	m.agents.runIndex, m.agents.follow = -1, true
-	text := styleGreen.Render("● ") + "started " + styleBold.Render(name)
+	text := styleLive.Render("● ") + "started " + styleBold.Render(name)
 	if focus != "" {
-		text += styleGray.Render(" with focus")
+		text += styleMuted.Render(" with focus")
 	}
 	return m.refreshAfterAction().withToast(text)
 }
 
 func (m Model) enableCron(name, expr string, save bool) Model {
 	if err := m.deps.EnableCron(name, expr); err != nil {
-		return m.withToast(styleRed.Render("✗ " + firstLine(err.Error())))
+		return m.withToast(styleFail.Render("✗ " + firstLine(err.Error())))
 	}
 	parts := []string{styleCron.Render("◷ ") + styleBold.Render(name) + " on cron " + expr}
 	if save {
 		if err := m.deps.SaveCron(name, expr); err != nil {
-			parts = append(parts, styleRed.Render("saving default failed: "+firstLine(err.Error())))
+			parts = append(parts, styleFail.Render("saving default failed: "+firstLine(err.Error())))
 		} else {
 			parts = append(parts, "saved to "+schedule.DefaultCronFile(name))
 		}
 	}
 	if m.deps.SchedulerPID() == 0 {
 		if pid, err := m.deps.StartScheduler(); err != nil {
-			parts = append(parts, styleRed.Render("scheduler failed to start: "+firstLine(err.Error())))
+			parts = append(parts, styleFail.Render("scheduler failed to start: "+firstLine(err.Error())))
 		} else {
 			parts = append(parts, fmt.Sprintf("scheduler started (pid %d)", pid))
 		}
 	}
-	return m.refreshAfterAction().withToast(strings.Join(parts, styleGray.Render(" · ")))
+	return m.refreshAfterAction().withToast(strings.Join(parts, styleMuted.Render(" · ")))
 }
 
 func (m Model) stopCron(name string) Model {
 	if err := m.deps.DisableCron(name); err != nil {
-		return m.withToast(styleRed.Render("✗ " + firstLine(err.Error())))
+		return m.withToast(styleFail.Render("✗ " + firstLine(err.Error())))
 	}
 	m = m.refreshAfterAction()
-	text := styleGray.Render("○ ") + styleBold.Render(name) + " cron stopped"
+	text := styleMuted.Render("○ ") + styleBold.Render(name) + " cron stopped"
 	if m.enabledCrons() == 0 && m.schedulerRunning() {
-		text += styleGray.Render(" · scheduler stops once idle")
+		text += styleMuted.Render(" · scheduler stops once idle")
 	}
 	return m.withToast(text)
 }
@@ -326,9 +320,9 @@ func (m Model) stopCron(name string) Model {
 func (m Model) startScheduler() Model {
 	pid, err := m.deps.StartScheduler()
 	if err != nil {
-		return m.withToast(styleRed.Render("✗ scheduler failed to start: " + firstLine(err.Error())))
+		return m.withToast(styleFail.Render("✗ scheduler failed to start: " + firstLine(err.Error())))
 	}
-	return m.refreshAfterAction().withToast(styleGreen.Render("✓ ") + fmt.Sprintf("scheduler started (pid %d)", pid))
+	return m.refreshAfterAction().withToast(styleOK.Render("✓ ") + fmt.Sprintf("scheduler started (pid %d)", pid))
 }
 
 // renderDialog draws the open dialog over the Agents tab body.
@@ -370,7 +364,7 @@ func (m Model) confirmBox() string {
 	lines := []string{
 		styleBoxHead.Render("Run ") + styleBold.Render(m.dialog.agent) + styleBoxHead.Render(" once?"),
 		"",
-		styleKey.Render("⏎") + styleGray.Render(" run now   ") + styleKey.Render("esc") + styleGray.Render(" cancel"),
+		styleKey.Render("⏎") + styleMuted.Render(" run now   ") + styleKey.Render("esc") + styleMuted.Render(" cancel"),
 	}
 	return styleBox.Render(strings.Join(lines, "\n"))
 }
@@ -379,14 +373,14 @@ func (m Model) runBox() string {
 	lines := []string{
 		styleBoxHead.Render("Run ") + styleBold.Render(m.dialog.agent) + styleBoxHead.Render(" once"),
 		"",
-		styleGray.Render("focus") + styleGray.Render(" (optional, passed as --focus)"),
+		styleMuted.Render("focus") + styleMuted.Render(" (optional, passed as --focus)"),
 		m.dialog.focus.View(),
 		"",
-		styleGray.Render("Keeps running after you quit the TUI."),
+		styleMuted.Render("Keeps running after you quit the TUI."),
 		"",
-		styleKey.Render("⏎") + styleGray.Render(" run now   ") +
-			styleKey.Render("shift+⏎") + styleGray.Render("/") + styleKey.Render("ctrl+j") + styleGray.Render(" new line   ") +
-			styleKey.Render("esc") + styleGray.Render(" cancel"),
+		styleKey.Render("⏎") + styleMuted.Render(" run now   ") +
+			styleKey.Render("shift+⏎") + styleMuted.Render("/") + styleKey.Render("ctrl+j") + styleMuted.Render(" new line   ") +
+			styleKey.Render("esc") + styleMuted.Render(" cancel"),
 	}
 	return styleBox.Width(m.runDialogWidth()).Render(strings.Join(lines, "\n"))
 }
@@ -399,15 +393,15 @@ func (m Model) cronBox() string {
 	if a.Cron != "" {
 		title, verb = "Edit cron of "+d.agent, "update"
 	}
-	label := func(s string) string { return styleGray.Render(log.PadEnd(s, 9)) }
+	label := func(s string) string { return styleMuted.Render(log.PadEnd(s, 9)) }
 	lines := []string{styleBoxHead.Render(title), "", label("cron") + d.input.view()}
 
 	now := m.deps.Now()
 	expr := d.input.trimmed()
 	if s, err := cron.Parse(expr); err != nil {
-		lines = append(lines, label("")+styleRed.Render("✗ "+err.Error()), "")
+		lines = append(lines, label("")+styleFail.Render("✗ "+err.Error()), "")
 	} else {
-		lines = append(lines, label("")+styleGray.Render(orText(describeCron(expr), "custom schedule")))
+		lines = append(lines, label("")+styleMuted.Render(orText(describeCron(expr), "custom schedule")))
 		var fires []string
 		t := now
 		for range nextFiresInPopup {
@@ -421,19 +415,19 @@ func (m Model) cronBox() string {
 
 	file := schedule.DefaultCronFile(d.agent)
 	if a.DefaultCron != "" {
-		lines = append(lines, label("default")+a.DefaultCron+styleGray.Render(" ("+file+")"))
+		lines = append(lines, label("default")+a.DefaultCron+styleMuted.Render(" ("+file+")"))
 	} else {
-		lines = append(lines, label("default")+styleGray.Render("none in "+file))
+		lines = append(lines, label("default")+styleMuted.Render("none in "+file))
 	}
-	box := styleGray.Render("[ ]")
+	box := styleMuted.Render("[ ]")
 	if d.save {
-		box = styleGreen.Render("[x]")
+		box = styleOK.Render("[x]")
 	}
 	lines = append(lines, "",
-		box+" save as default in "+file+styleGray.Render("  tab"),
-		styleGray.Render("Keeps running after you quit the TUI."),
+		box+" save as default in "+file+styleMuted.Render("  tab"),
+		styleMuted.Render("Keeps running after you quit the TUI."),
 		"",
-		styleKey.Render("⏎")+styleGray.Render(" "+verb+"   ")+styleKey.Render("esc")+styleGray.Render(" cancel"),
+		styleKey.Render("⏎")+styleMuted.Render(" "+verb+"   ")+styleKey.Render("esc")+styleMuted.Render(" cancel"),
 	)
 	return styleBox.Width(cronDialogWidth).Render(strings.Join(lines, "\n"))
 }

@@ -20,7 +20,7 @@ func (m Model) renderHeader() []string {
 		}
 	}
 	left := " " + strings.Join(parts, " ")
-	return []string{spread(left, m.projectLabel(), m.width), rule(m.width)}
+	return []string{band(spread(left, m.projectLabel(), m.width), m.width), rule(m.width)}
 }
 
 func (m Model) projectLabel() string {
@@ -29,14 +29,14 @@ func (m Model) projectLabel() string {
 	if p.FromAven {
 		source = " (aven)"
 	}
-	parts := []string{styleBold.Render(p.Name) + styleGray.Render(source)}
+	parts := []string{styleBold.Render(p.Name) + styleMuted.Render(source)}
 	if p.Label != "" {
-		parts = append(parts, styleGray.Render("label "+p.Label))
+		parts = append(parts, styleMuted.Render("label "+p.Label))
 	}
 	if p.Branch != "" {
-		parts = append(parts, styleMagenta.Render("⎇")+" "+p.Branch)
+		parts = append(parts, styleBranch.Render("⎇")+" "+p.Branch)
 	}
-	return strings.Join(parts, styleGray.Render(" · ")) + " "
+	return strings.Join(parts, styleMuted.Render(" · ")) + " "
 }
 
 type hint struct{ keys, label string }
@@ -80,37 +80,37 @@ func (m Model) statusText() string {
 				running++
 			}
 		}
-		parts := []string{styleGray.Render("○ idle")}
+		parts := []string{styleMuted.Render("○ idle")}
 		if running > 0 {
-			parts[0] = styleGreen.Render(fmt.Sprintf("● %d running", running))
+			parts[0] = styleLive.Render(fmt.Sprintf("● %d running", running))
 		}
 		switch crons := m.enabledCrons(); {
 		case crons > 0 && m.schedulerRunning():
 			parts = append(parts, styleCron.Render(fmt.Sprintf("◷ %d on cron", crons)))
 		case crons > 0:
-			parts = append(parts, styleYellow.Render(fmt.Sprintf("◷ %d paused", crons)))
+			parts = append(parts, styleWarn.Render(fmt.Sprintf("◷ %d paused", crons)))
 		}
-		return strings.Join(parts, styleGray.Render(" · "))
+		return strings.Join(parts, styleMuted.Render(" · "))
 	}
 	if m.overview.err != "" {
-		return styleRed.Render("✗ " + m.overview.err)
+		return styleFail.Render("✗ " + m.overview.err)
 	}
 	if m.overview.updated.IsZero() {
 		return ""
 	}
-	return styleGray.Render("updated " + log.FormatWallClock(m.overview.updated))
+	return styleMuted.Render("updated " + log.FormatWallClock(m.overview.updated))
 }
 
 func (m Model) renderFooter() []string {
 	items := make([]string, 0, len(m.hints()))
 	for _, h := range m.hints() {
-		items = append(items, styleKey.Render(h.keys)+" "+styleGray.Render(h.label))
+		items = append(items, styleKey.Render(h.keys)+" "+styleMuted.Render(h.label))
 	}
 	left, right := " "+strings.Join(items, "  "), m.statusText()+" "
 	if room := m.width - lipgloss.Width(right) - 2; lipgloss.Width(left) > room {
 		left = xansi.Truncate(left, max(0, room), "…")
 	}
-	return []string{rule(m.width), spread(left, right, m.width)}
+	return []string{rule(m.width), band(spread(left, right, m.width), m.width)}
 }
 
 var helpGroups = []struct {
@@ -150,11 +150,11 @@ func helpBox() string {
 		if i > 0 {
 			lines = append(lines, "")
 		}
-		lines = append(lines, styleSection.Render("━━ "+g.title+" "+strings.Repeat("━", max(3, 46-len(g.title)))))
+		lines = append(lines, section(g.title, 50))
 		for _, k := range g.keys {
 			lines = append(lines, "  "+styleKey.Render(log.PadEnd(k[0], 17))+k[1])
 		}
 	}
-	lines = append(lines, "", styleGray.Render("press ? or esc to close"))
+	lines = append(lines, "", styleMuted.Render("press ? or esc to close"))
 	return styleHelpBox.Render(strings.Join(lines, "\n"))
 }

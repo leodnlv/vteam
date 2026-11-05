@@ -35,10 +35,10 @@ var testConfig = &config.Config{
 func TestInfoShowsProjectConfigAndScheduler(t *testing.T) {
 	out := infoText(infoModel(t, nil, testConfig, 4242))
 	for _, want := range []string{
-		"━━ Project", "my-app (from aven tasks.project)", "/home/me/my-app", "branch        main",
-		"━━ vteam.config.json", "platform      github", "worktreeDir   .vteam-worktrees", "maxRetries    3",
+		"▍ Project", "my-app (from aven tasks.project)", "/home/me/my-app", "branch        main",
+		"▍ vteam.config.json", "platform      github", "worktreeDir   .vteam-worktrees", "maxRetries    3",
 		"merge cron    */15 * * * *", "merge label   vteam:changes-requested",
-		"━━ Scheduler", "running (pid 4242)",
+		"▍ Scheduler", "running (pid 4242)",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("info is missing %q:\n%s", want, out)

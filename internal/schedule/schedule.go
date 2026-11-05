@@ -77,14 +77,14 @@ func RenderScheduler(cwd string, now time.Time) []string {
 	jobs := FindJobs(cwd)
 	switch pid := ReadPID(cwd); {
 	case pid != 0:
-		lines = append(lines, log.FormatListItem(ansi.Green("✓"), "running "+ansi.Gray(fmt.Sprintf("(pid %d)", pid))))
+		lines = append(lines, log.FormatListItem(ansi.OK("✓"), "running "+ansi.Muted(fmt.Sprintf("(pid %d)", pid))))
 	case len(jobs) > 0:
-		lines = append(lines, log.FormatListItem(ansi.Yellow("!"), ansi.Yellow("not running, crons paused (start it with 'vteam cron start')")))
+		lines = append(lines, log.FormatListItem(ansi.Warn("!"), ansi.Warn("not running, crons paused (start it with 'vteam cron start')")))
 	default:
-		lines = append(lines, log.FormatListItem(ansi.Gray("·"), ansi.Dim("not running")))
+		lines = append(lines, log.FormatListItem(ansi.Muted("·"), ansi.Dim("not running")))
 	}
 	if len(jobs) == 0 {
-		return append(lines, log.FormatListItem(ansi.Gray("·"), ansi.Dim("no crons enabled (enable one in the vteam TUI or with 'vteam cron enable <agent>')")))
+		return append(lines, log.FormatListItem(ansi.Muted("·"), ansi.Dim("no crons enabled (enable one in the vteam TUI or with 'vteam cron enable <agent>')")))
 	}
 	nameWidth, cronWidth := 0, 0
 	for _, j := range jobs {
@@ -94,10 +94,10 @@ func RenderScheduler(cwd string, now time.Time) []string {
 	for _, j := range jobs {
 		when := ansi.Dim("no next run")
 		if next := NextRun(j.Cron, now); !next.IsZero() {
-			when = "next " + log.FormatTimeOfDay(next, now) + " " + ansi.Gray("(in "+log.FormatAge(next.Sub(now))+")")
+			when = "next " + log.FormatTimeOfDay(next, now) + " " + ansi.Muted("(in "+log.FormatAge(next.Sub(now))+")")
 		}
-		lines = append(lines, log.FormatListItem(ansi.Blue("•"),
-			ansi.Bold(padEnd(j.Name, nameWidth))+"  "+ansi.Gray(padEnd(j.Cron, cronWidth))+"  "+when))
+		lines = append(lines, log.FormatListItem(ansi.Info("•"),
+			ansi.Bold(padEnd(j.Name, nameWidth))+"  "+ansi.Muted(padEnd(j.Cron, cronWidth))+"  "+when))
 	}
 	return lines
 }
@@ -201,7 +201,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 
 	s.Log.Println(strings.Join(RenderScheduler(s.Cwd, s.Now()), "\n"))
 	s.Log.Section("Activity")
-	s.Log.Step("waiting for jobs " + ansi.Gray("(Ctrl+C to stop)"))
+	s.Log.Step("waiting for jobs " + ansi.Muted("(Ctrl+C to stop)"))
 
 	running := &runningJobs{cmds: map[string]*exec.Cmd{}}
 	var children sync.WaitGroup
@@ -272,7 +272,7 @@ func (s *Scheduler) syncTimers(timers map[string]*jobTimer, jobs []Job, now time
 		if changed {
 			verb = "cron changed"
 		}
-		s.Log.Step(ansi.Bold(job.Name) + " " + verb + " " + ansi.Gray(job.Cron+" · next "+log.FormatTimeOfDay(t.next, now)))
+		s.Log.Step(ansi.Bold(job.Name) + " " + verb + " " + ansi.Muted(job.Cron+" · next "+log.FormatTimeOfDay(t.next, now)))
 	}
 	for name := range timers {
 		if !seen[name] {

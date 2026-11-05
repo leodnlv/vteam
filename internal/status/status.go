@@ -100,19 +100,19 @@ func relative(base, path string) string {
 func renderRunning(cwd string, running []runningJob, now time.Time) []string {
 	lines := []string{log.FormatSection("Running")}
 	if len(running) == 0 {
-		return append(lines, log.FormatListItem(ansi.Gray("·"), ansi.Dim("nothing running")))
+		return append(lines, log.FormatListItem(ansi.Muted("·"), ansi.Dim("nothing running")))
 	}
 	width := 0
 	for _, r := range running {
 		width = max(width, len(r.Name))
 	}
 	for _, job := range running {
-		meta := ansi.Gray(fmt.Sprintf("pid %d · %s", job.Lock.PID, log.FormatAge(now.Sub(job.Lock.Time()))))
+		meta := ansi.Muted(fmt.Sprintf("pid %d · %s", job.Lock.PID, log.FormatAge(now.Sub(job.Lock.Time()))))
 		task := ""
 		if job.task != nil {
 			task = "  " + formatTask(*job.task)
 		}
-		lines = append(lines, log.FormatListItem(ansi.Green("●"), ansi.Bold(log.PadEnd(job.Name, width))+"  "+meta+task))
+		lines = append(lines, log.FormatListItem(ansi.Live("●"), ansi.Bold(log.PadEnd(job.Name, width))+"  "+meta+task))
 		if job.State != nil && job.State.WorktreePath != "" {
 			lines = append(lines, log.FormatListDetail("worktree", relative(cwd, job.State.WorktreePath)))
 		}
@@ -134,7 +134,7 @@ func renderUpNext(agents []*config.Agent, ready []model.Task, cfg *config.Config
 	}
 	lines := []string{log.FormatSection("Up next")}
 	for _, a := range pickers {
-		lines = append(lines, log.FormatListItem(ansi.Blue("•"), ansi.Bold(log.PadEnd(a.Name, width))+"  "+describeNextPick(a, ready, cfg)))
+		lines = append(lines, log.FormatListItem(ansi.Info("•"), ansi.Bold(log.PadEnd(a.Name, width))+"  "+describeNextPick(a, ready, cfg)))
 	}
 	return lines
 }
@@ -152,7 +152,7 @@ func describeNextPick(a *config.Agent, ready []model.Task, cfg *config.Config) s
 	}
 	followUp := ""
 	if a.Worktree && task.Metadata[model.MetaPRURL] != "" {
-		followUp = ansi.Gray(" (PR follow-up)")
+		followUp = ansi.Muted(" (PR follow-up)")
 	}
 	return formatTask(task) + followUp
 }
@@ -169,15 +169,15 @@ func renderAwaitingMerge(idx tasks.Index) []string {
 	}
 	lines := []string{log.FormatSection(fmt.Sprintf("Awaiting merge (%d)", len(awaiting)))}
 	for _, t := range awaiting {
-		lines = append(lines, log.FormatListItem(ansi.Blue("•"), ansi.Bold(t.Ref)+" "+t.Title+"  "+ansi.Gray(t.Metadata[model.MetaPRURL])))
+		lines = append(lines, log.FormatListItem(ansi.Info("•"), ansi.Bold(t.Ref)+" "+t.Title+"  "+ansi.Muted(t.Metadata[model.MetaPRURL])))
 	}
 	return lines
 }
 
 func renderNeedsAttention(ctx context.Context, d Deps, loaded loadedAgents, idx tasks.Index, running []runningJob) []string {
 	var items []string
-	warning := func(text string) { items = append(items, log.FormatListItem(ansi.Yellow("!"), text)) }
-	failure := func(text string) { items = append(items, log.FormatListItem(ansi.Red("✗"), text)) }
+	warning := func(text string) { items = append(items, log.FormatListItem(ansi.Warn("!"), text)) }
+	failure := func(text string) { items = append(items, log.FormatListItem(ansi.Fail("✗"), text)) }
 
 	for _, e := range loaded.errors {
 		failure(e)
@@ -214,9 +214,9 @@ func renderNeedsAttention(ctx context.Context, d Deps, loaded loadedAgents, idx 
 		pid := tasks.ClaimedPID(t)
 		switch {
 		case pid == 0:
-			warning(ref + " is active without a vteam claim " + ansi.Gray("(reset it by hand if it is stuck)"))
+			warning(ref + " is active without a vteam claim " + ansi.Muted("(reset it by hand if it is stuck)"))
 		case t.Metadata[model.MetaClaimedHost] == d.Host && !d.IsAlive(pid):
-			failure(fmt.Sprintf("%s is active but its process (pid %d) is dead %s", ref, pid, ansi.Gray("(run 'vteam clean')")))
+			failure(fmt.Sprintf("%s is active but its process (pid %d) is dead %s", ref, pid, ansi.Muted("(run 'vteam clean')")))
 		}
 	}
 
@@ -227,9 +227,9 @@ func renderNeedsAttention(ctx context.Context, d Deps, loaded loadedAgents, idx 
 		}
 	}
 	if leftovers, err := d.Orphans(ctx, d.Cwd, d.Config.WorktreeDir, inUse); err == nil && len(leftovers) > 0 {
-		lines := []string{fmt.Sprintf("%d worktree(s) with no running agent %s", len(leftovers), ansi.Gray("(run 'vteam clean')"))}
+		lines := []string{fmt.Sprintf("%d worktree(s) with no running agent %s", len(leftovers), ansi.Muted("(run 'vteam clean')"))}
 		for _, p := range leftovers {
-			lines = append(lines, ansi.Gray(relative(d.Cwd, p)))
+			lines = append(lines, ansi.Muted(relative(d.Cwd, p)))
 		}
 		warning(strings.Join(lines, "\n"))
 	}
@@ -241,16 +241,16 @@ func renderNeedsAttention(ctx context.Context, d Deps, loaded loadedAgents, idx 
 }
 
 var severityColor = map[model.Severity]func(string) string{
-	model.SeverityCritical: func(s string) string { return ansi.Bold(ansi.Red(s)) },
-	model.SeverityHigh:     ansi.Red,
-	model.SeverityMedium:   ansi.Yellow,
-	model.SeverityLow:      ansi.Gray,
+	model.SeverityCritical: func(s string) string { return ansi.Bold(ansi.Fail(s)) },
+	model.SeverityHigh:     ansi.Fail,
+	model.SeverityMedium:   ansi.Warn,
+	model.SeverityLow:      ansi.Muted,
 }
 
 func formatTask(t model.Task) string {
 	paint, ok := severityColor[t.Severity]
 	if !ok {
-		paint = ansi.Gray
+		paint = ansi.Muted
 	}
 	return ansi.Bold(t.Ref) + " " + paint("["+string(t.Severity)+"]") + " " + t.Title
 }

@@ -7,13 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"charm.land/lipgloss/v2"
 	xansi "github.com/charmbracelet/x/ansi"
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/log"
 )
-
-var styleOff = lipgloss.NewStyle().Foreground(lipgloss.BrightBlack).Faint(true)
 
 type infoState struct {
 	config       *config.Config
@@ -43,7 +40,7 @@ func (m Model) infoLines() []string {
 		lines = append(lines, strings.TrimPrefix(log.FormatSection(title), "\n"))
 	}
 	field := func(label, value string) {
-		lines = append(lines, "  "+styleGray.Render(log.PadEnd(label, 14))+value)
+		lines = append(lines, "  "+styleMuted.Render(log.PadEnd(label, 14))+value)
 	}
 
 	p := m.deps.Project
@@ -52,7 +49,7 @@ func (m Model) infoLines() []string {
 	if p.FromAven {
 		source = "aven tasks.project"
 	}
-	field("name", p.Name+" "+styleGray.Render("(from "+source+")"))
+	field("name", p.Name+" "+styleMuted.Render("(from "+source+")"))
 	field("directory", p.Dir)
 	if p.Branch != "" {
 		field("branch", p.Branch)
@@ -72,22 +69,22 @@ func (m Model) infoLines() []string {
 		if cfg.MergeEnsurer.Cron != "" {
 			field("merge cron", cfg.MergeEnsurer.Cron)
 		} else {
-			field("merge cron", styleGray.Render("not scheduled"))
+			field("merge cron", styleMuted.Render("not scheduled"))
 		}
 		field("merge label", cfg.MergeEnsurer.Label)
 	} else {
-		field("error", styleRed.Render(m.info.configErr))
+		field("error", styleFail.Render(m.info.configErr))
 	}
 
 	section("Scheduler")
 	if pid := m.info.schedulerPID; pid > 0 {
-		field("state", styleGreen.Render(fmt.Sprintf("running (pid %d)", pid)))
+		field("state", styleOK.Render(fmt.Sprintf("running (pid %d)", pid)))
 	} else if n := m.enabledCrons(); n > 0 {
-		field("state", styleYellow.Render(fmt.Sprintf("not running · %d crons paused", n))+styleGray.Render(" (S in the Agents tab, or 'vteam cron start')"))
+		field("state", styleWarn.Render(fmt.Sprintf("not running · %d crons paused", n))+styleMuted.Render(" (S in the Agents tab, or 'vteam cron start')"))
 	} else {
-		field("state", styleGray.Render("not running · no crons enabled"))
+		field("state", styleMuted.Render("not running · no crons enabled"))
 	}
-	field("crons", fmt.Sprintf("%d enabled", m.enabledCrons())+styleGray.Render(" (space on an agent in the Agents tab)"))
+	field("crons", fmt.Sprintf("%d enabled", m.enabledCrons())+styleMuted.Render(" (space on an agent in the Agents tab)"))
 
 	section("Agents")
 	for _, a := range m.agents.list {
@@ -97,17 +94,17 @@ func (m Model) infoLines() []string {
 }
 
 func (m Model) agentInfo(a Agent) []string {
-	glyph := styleGray.Render("○")
+	glyph := styleMuted.Render("○")
 	switch {
 	case a.Running != nil:
-		glyph = styleGreen.Render("●")
+		glyph = styleLive.Render("●")
 	case a.LoadError != "":
-		glyph = styleRed.Render("✗")
+		glyph = styleFail.Render("✗")
 	}
 	lines := []string{"  " + glyph + " " + styleBold.Render(a.Name)}
 	const indent = 16
 	detail := func(label, value string) {
-		lines = append(lines, "      "+styleGray.Render(log.PadEnd(label, 10))+value)
+		lines = append(lines, "      "+styleMuted.Render(log.PadEnd(label, 10))+value)
 	}
 	detailList := func(label string, items []string) {
 		rows := packItems(items, max(20, m.width-indent-1))
@@ -119,14 +116,14 @@ func (m Model) agentInfo(a Agent) []string {
 
 	switch {
 	case a.LoadError != "":
-		lines = append(lines, "      "+styleRed.Render(firstLine(a.LoadError)))
+		lines = append(lines, "      "+styleFail.Render(firstLine(a.LoadError)))
 		return lines
 	case a.Builtin:
-		lines = append(lines, "      "+styleGray.Render("built-in sweep (vteam ensure-merge)"))
+		lines = append(lines, "      "+styleMuted.Render("built-in sweep (vteam ensure-merge)"))
 		detail("cron", m.cronInfo(a))
 		return lines
 	case a.Config == nil:
-		lines = append(lines, "      "+styleGray.Render("no agent directory (logs only)"))
+		lines = append(lines, "      "+styleMuted.Render("no agent directory (logs only)"))
 		return lines
 	}
 
@@ -136,7 +133,7 @@ func (m Model) agentInfo(a Agent) []string {
 	if output == "" {
 		output = "generic"
 	}
-	detail("io", styleGray.Render("in ")+orDefault(c.Input, "—")+styleGray.Render("  out ")+output)
+	detail("io", styleMuted.Render("in ")+orDefault(c.Input, "—")+styleMuted.Render("  out ")+output)
 	detail("cron", m.cronInfo(a))
 	detail("flags", strings.Join([]string{
 		flag(c.Worktree, "worktree"), flag(c.ReadOnly, "readOnly"), flag(c.AutoPR, "autoPR"),
@@ -148,7 +145,7 @@ func (m Model) agentInfo(a Agent) []string {
 	if len(c.AllowedTools) > 0 {
 		detailList("tools", c.AllowedTools)
 	} else {
-		detail("tools", styleGray.Render("Claude Code default set"))
+		detail("tools", styleMuted.Render("Claude Code default set"))
 	}
 	if len(c.DisallowedTools) > 0 {
 		detailList("denied", c.DisallowedTools)
@@ -160,17 +157,17 @@ func (m Model) agentInfo(a Agent) []string {
 func (m Model) cronInfo(a Agent) string {
 	if a.Cron == "" {
 		if a.DefaultCron != "" {
-			return styleGray.Render("off  default " + a.DefaultCron)
+			return styleMuted.Render("off  default " + a.DefaultCron)
 		}
-		return styleGray.Render("off")
+		return styleMuted.Render("off")
 	}
 	if !m.schedulerRunning() {
-		return a.Cron + styleYellow.Render("  paused")
+		return a.Cron + styleWarn.Render("  paused")
 	}
 	if a.NextRun.IsZero() {
 		return a.Cron
 	}
-	return a.Cron + styleGray.Render("  next "+log.FormatTimeOfDay(a.NextRun.Local(), m.deps.Now().Local()))
+	return a.Cron + styleMuted.Render("  next "+log.FormatTimeOfDay(a.NextRun.Local(), m.deps.Now().Local()))
 }
 
 // packItems joins items with ", " into rows no wider than width, never splitting an item.
@@ -202,25 +199,25 @@ func formatFilter(filter config.TaskFilter) string {
 		values := make([]string, 0, len(filter[key]))
 		for _, v := range filter[key] {
 			if v == "" {
-				v = styleGray.Render("(unset)")
+				v = styleMuted.Render("(unset)")
 			}
 			values = append(values, v)
 		}
-		parts = append(parts, styleGray.Render(key+": ")+strings.Join(values, styleGray.Render(" | ")))
+		parts = append(parts, styleMuted.Render(key+": ")+strings.Join(values, styleMuted.Render(" | ")))
 	}
-	return strings.Join(parts, styleGray.Render("  ·  "))
+	return strings.Join(parts, styleMuted.Render("  ·  "))
 }
 
 func flag(on bool, label string) string {
 	if on {
-		return styleGreen.Render(label)
+		return styleOK.Render(label)
 	}
 	return styleOff.Render(label)
 }
 
 func orDefault(value, fallback string) string {
 	if value == "" {
-		return styleGray.Render(fallback)
+		return styleMuted.Render(fallback)
 	}
 	return value
 }

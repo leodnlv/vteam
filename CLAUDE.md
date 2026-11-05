@@ -206,7 +206,8 @@ cmd/vteam/
 internal/
 ├── cli/                          Cobra commands; wires real dependencies into the packages below
 ├── model/                        Shared types (tasks, AgentOutput, Content union, PRs, run outcome)
-├── ansi/                         ANSI colors (TTY / NO_COLOR / FORCE_COLOR aware) and Strip
+├── ansi/                         ANSI painters per palette role (TTY / NO_COLOR / FORCE_COLOR aware) and Strip
+├── palette/                      Color roles (brand, muted, ok, warn, …) → ANSI number or hex; the one place to restyle the CLI and TUI
 ├── log/                          Run output formatting: Logger (sections, elapsed-time gutter, glyphs, tool lines) and Format* helpers
 ├── runlog/                       Per-run log file under vteam/.logs/<agent>/ (ANSI-stripped copy of the Logger output)
 ├── runstate/                     Per-run state JSON under vteam/.runs/; live-run discovery from agent locks
@@ -308,7 +309,7 @@ All three must pass before any commit or PR:
 ## Conventions
 
 - Self-documenting code, no comments unless the why is non-obvious.
-- Terminal output of every CLI command uses the helpers in `internal/log` (banner, sections, gutter, glyphs, fields). The conventions are in the project skill `.claude/skills/cli-output-style/SKILL.md`; load it before adding a command or changing what one prints.
+- Terminal output of every CLI command uses the helpers in `internal/log` (banner, sections, gutter, glyphs, fields). The conventions are in the project skill `.claude/skills/cli-output-style/SKILL.md`; load it before adding a command or changing what one prints. Colors are picked by role from `internal/palette`, never by hue.
 - Task refs (e.g. `APP-7KQ9`) are local to the user's aven database. Never put them in branch names, commit messages, or PR bodies.
 - Locking uses atomic `mkdir`. A lock is stale only when its holder pid is dead (or it has no `info.json` and is older than 30 min); age alone never breaks a live lock. Release only removes a lock the current process owns.
 - Tasks live in the user's aven database, not the repo. The real shared artifacts are PRs.

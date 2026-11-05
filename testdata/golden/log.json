@@ -156,17 +156,17 @@
   "plain": {
     "banner": "vteam ▸ status",
     "bannerDetail": "vteam ▸ status   aven: p · label: vteam",
-    "section": "\n━━ Running ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-    "sectionLong": "\n━━ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ━━━",
+    "section": "\n▍ Running  ─────────────────────────────────────────────────────────────",
+    "sectionLong": "\n▍ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  ───",
     "listItem": "  • line one\n    line two\n\n    line four",
     "listDetail": "    worktree .w/x"
   },
   "color": {
-    "banner": "\u001b[1m\u001b[36mvteam ▸\u001b[39m\u001b[22m \u001b[1mstatus\u001b[22m",
-    "bannerDetail": "\u001b[1m\u001b[36mvteam ▸\u001b[39m\u001b[22m \u001b[1mstatus\u001b[22m   \u001b[90maven: p · label: vteam\u001b[39m",
-    "section": "\n\u001b[1m\u001b[36m━━ Running ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[39m\u001b[22m",
-    "sectionLong": "\n\u001b[1m\u001b[36m━━ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ━━━\u001b[39m\u001b[22m",
+    "banner": "\u001b[1m\u001b[48;2;125;211;252m\u001b[38;2;20;21;27m vteam \u001b[39;49;22m\u001b[38;2;125;211;252m ▸ \u001b[39m\u001b[1mstatus\u001b[22m",
+    "bannerDetail": "\u001b[1m\u001b[48;2;125;211;252m\u001b[38;2;20;21;27m vteam \u001b[39;49;22m\u001b[38;2;125;211;252m ▸ \u001b[39m\u001b[1mstatus\u001b[22m   \u001b[38;2;124;129;144maven: p · label: vteam\u001b[39m",
+    "section": "\n\u001b[38;2;125;211;252m▍\u001b[39m \u001b[1mRunning\u001b[22m  \u001b[38;2;52;56;70m─────────────────────────────────────────────────────────────\u001b[39m",
+    "sectionLong": "\n\u001b[38;2;125;211;252m▍\u001b[39m \u001b[1mxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\u001b[22m  \u001b[38;2;52;56;70m───\u001b[39m",
     "listItem": "  • line one\n    line two\n\n    line four",
-    "listDetail": "    \u001b[90mworktree\u001b[39m .w/x"
+    "listDetail": "    \u001b[38;2;124;129;144mworktree\u001b[39m .w/x"
   }
 }

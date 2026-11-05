@@ -3,7 +3,7 @@ name: cli-output-style
 description: The terminal output style shared by every vteam CLI command (run, cron, status, ensure-merge, and the TUI's Overview tab). Load before adding a new vteam command or changing what an existing command prints, so its output uses the internal/log helpers and looks like the rest.
 ---
 
-All vteam terminal output goes through `internal/log` (layout: the `Logger` methods and the `Format*` functions) and `internal/ansi` (`Bold`, `Gray`, …, `Strip`). Never `fmt.Println` hand-built strings or raw ANSI codes in a command. If a helper you need is missing, add it to `internal/log` rather than formatting inline.
+All vteam terminal output goes through `internal/log` (layout: the `Logger` methods and the `Format*` functions) and `internal/ansi` (`Bold`, `Dim`, the role painters `Muted`, `Info`, `OK`, `Warn`, `Fail`, …, and `Strip`). Never `fmt.Println` hand-built strings or raw ANSI codes in a command. If a helper you need is missing, add it to `internal/log` rather than formatting inline.
 
 ## Two kinds of commands
 
@@ -15,13 +15,13 @@ All vteam terminal output goes through `internal/log` (layout: the `Logger` meth
 
 | Helper | Output | Use for |
 | --- | --- | --- |
-| `Banner(title, detail)` / `FormatBanner` | `vteam ▸ <title>   <gray detail>` | First line of every command. `title` is the command or agent name. `detail` is the log path (`log: vteam/.logs/...`), pid, or scope (`aven: <project> · label: <label>`). |
-| `Section(title)` / `FormatSection` | blank line + `━━ Title ━━━━` (cyan, bold, up to 72 cols) | Phases of a streaming command (`Setup`, `Agent: <name>`, `Result`, `Cleanup`) or groups in a snapshot (`Running`, `Up next`, `Needs attention`). Title Case. A count goes in parentheses: `Awaiting merge (3)`. |
-| `Step(text)` | ` 00:12  • text` | A neutral progress step or a decision ("lock acquired", "picked task …", "nothing to do"). |
-| `OK(text)` | ` 00:12  ✓ text` | Something succeeded or changed state as intended. |
-| `Warn(text)` | ` 00:12  ! text` (yellow, stderr) | Not fatal but worth noticing: a fallback, a skipped item, a non-fatal failure. |
-| `Fail(text)` | ` 00:12  ✗ text` (red, stderr) | Something failed. |
-| `Field(label, value)` | gray label padded to 10 cols, aligned under the text of the line above | Details of the preceding step/ok/warn/fail line: `path`, `branch`, `PR`, `log`, `reason`, `error`. Short, lowercase labels. |
+| `Banner(title, detail)` / `FormatBanner` | `vteam ▸ <title>   <muted detail>` (in color, `vteam` is a Brand badge) | First line of every command. `title` is the command or agent name. `detail` is the log path (`log: vteam/.logs/...`), pid, or scope (`aven: <project> · label: <label>`). |
+| `Section(title)` / `FormatSection` | blank line + `▍ Title  ────` (Brand marker, bold title, Rule-colored rule, up to 72 cols; the TUI redraws it to the full pane width) | Phases of a streaming command (`Setup`, `Agent: <name>`, `Result`, `Cleanup`) or groups in a snapshot (`Running`, `Up next`, `Needs attention`). Title Case. A count goes in parentheses: `Awaiting merge (3)`. |
+| `Step(text)` | ` 00:12 │ • text` | A neutral progress step or a decision ("lock acquired", "picked task …", "nothing to do"). |
+| `OK(text)` | ` 00:12 │ ✓ text` | Something succeeded or changed state as intended. |
+| `Warn(text)` | ` 00:12 │ ! text` (whole line in the warn color, stderr) | Not fatal but worth noticing: a fallback, a skipped item, a non-fatal failure. |
+| `Fail(text)` | ` 00:12 │ ✗ text` (whole line in the fail color, stderr) | Something failed. |
+| `Field(label, value)` | `       │   ` then a muted label padded to 10 cols, aligned under the text of the line above | Details of the preceding step/ok/warn/fail line: `path`, `branch`, `PR`, `log`, `reason`, `error`. Short, lowercase labels. |
 | `Finished(name, failure)` | blank line + `✓ <name> completed in 12s` or `✗ <name> failed after 12s: <msg>` | Last line of a streaming command that has a clear end. |
 | `FormatListItem(glyph, text)` | `  <glyph> text` | One entry in a snapshot section. |
 | `FormatListDetail(label, value)` | `    <gray label> value` | A detail line under a list item. |
@@ -31,17 +31,18 @@ Formatting helpers: `FormatDuration` (`12s`, `3m05s`, `1h02m`) for how long some
 
 ## Gutter (streaming commands)
 
-Every `Step`/`OK`/`Warn`/`Fail` line starts with a gray time gutter.
+Every `Step`/`OK`/`Warn`/`Fail` line starts with a muted time gutter and a `│` bar in the Rule color. Fields, tool errors, continuation lines, and the blank line before the claude exit line keep the bar without the clock, so a run reads as one unbroken timeline. The run log gets the same lines with colors stripped; the TUI's log viewer (`colorizeLog` in `internal/tui/agents.go`) parses that format, so change both together.
 
 - Default: elapsed time since `StartClock()` (`00:12`). Call `logger.StartClock()` right before the banner.
 - Long-lived processes (`cron start`) call `logger.UseWallClock()` instead, so the gutter shows `14:03:27`.
 
 ## Glyphs and colors
 
-- `•` blue: neutral item or step. `✓` green: good. `!` yellow: attention. `✗` red: failure. `●` green: something live (a running job). `·` gray with `ansi.Dim` text: empty placeholder ("nothing running"). Snapshot sections use the same glyph meanings as streaming lines.
+- `•` `ansi.Info`: neutral item or step. `✓` `ansi.OK`: good. `!` `ansi.Warn`: attention. `✗` `ansi.Fail`: failure. `●` `ansi.Live`: something live (a running job). `·` `ansi.Muted` with `ansi.Dim` text: empty placeholder ("nothing running"). Snapshot sections use the same glyph meanings as streaming lines.
 - `ansi.Bold` for the identifier the line is about: task ref, agent or job name, the item name in a list. Do not bold whole sentences.
-- `ansi.Gray` for secondary metadata: pids, durations, URLs in lists, hints such as `(run 'vteam clean')`.
-- Severity: use the `severityColor` map in `internal/status` (critical bold red, high red, medium yellow, low gray) when showing a task severity.
+- `ansi.Muted` for secondary metadata: pids, durations, URLs in lists, hints such as `(run 'vteam clean')`.
+- Severity: use the `severityColor` map in `internal/status` (critical bold fail, high fail, medium warn, low muted) when showing a task severity.
+- Color by role, never by hue. The roles and the colors they map to live in `internal/palette` (`palette.Brand`, `Muted`, `Rule`, `Info`, `OK`, `Warn`, `Fail`, `Claude`, `Tool`, `Live`, `Cron`, `Branch`, `Key`, `Focus`, `Surface`). A role holds `""` (terminal default), an ANSI number, or a `#rrggbb` hex. The current values are truecolor hex tuned for dark terminals; `internal/ansi` downgrades them to 256 or 16 colors when the terminal (checked once with `colorprofile.Detect`) can't show them, and bubbletea does the same in the TUI. `internal/ansi` paints with them for commands, and `internal/tui/styles.go` builds every TUI style from them, so restyling vteam is a change to that one file. Need a new kind of color? Add a role there instead of picking a hue at the call site.
 - Never hard-code escape codes. `internal/ansi` already respects TTY, `NO_COLOR`, and `FORCE_COLOR`.
 
 ## Text style
@@ -109,14 +110,14 @@ func foo(dir string) error {
 func RenderFoo(dir string) []string {
 	lines := []string{log.FormatSection("Things")}
 	if len(things) == 0 {
-		return append(lines, log.FormatListItem(ansi.Gray("·"), ansi.Dim("no things")))
+		return append(lines, log.FormatListItem(ansi.Muted("·"), ansi.Dim("no things")))
 	}
 	width := 0
 	for _, t := range things {
 		width = max(width, len(t.Name))
 	}
 	for _, t := range things {
-		lines = append(lines, log.FormatListItem(ansi.Blue("•"), ansi.Bold(log.PadEnd(t.Name, width))+"  "+ansi.Gray(t.Detail)))
+		lines = append(lines, log.FormatListItem(ansi.Info("•"), ansi.Bold(log.PadEnd(t.Name, width))+"  "+ansi.Muted(t.Detail)))
 	}
 	return lines
 }

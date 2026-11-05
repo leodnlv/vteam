@@ -7,21 +7,6 @@ import (
 	xansi "github.com/charmbracelet/x/ansi"
 )
 
-var (
-	styleBrand     = lipgloss.NewStyle().Foreground(lipgloss.Cyan).Bold(true)
-	styleTabActive = lipgloss.NewStyle().Background(lipgloss.Cyan).Foreground(lipgloss.Black).Bold(true)
-	styleTab       = lipgloss.NewStyle().Foreground(lipgloss.BrightBlack)
-	styleGray      = lipgloss.NewStyle().Foreground(lipgloss.BrightBlack)
-	styleBold      = lipgloss.NewStyle().Bold(true)
-	styleKey       = lipgloss.NewStyle().Foreground(lipgloss.Cyan).Bold(true)
-	styleMagenta   = lipgloss.NewStyle().Foreground(lipgloss.Magenta)
-	styleRed       = lipgloss.NewStyle().Foreground(lipgloss.Red)
-	styleGreen     = lipgloss.NewStyle().Foreground(lipgloss.Green)
-	styleYellow    = lipgloss.NewStyle().Foreground(lipgloss.Yellow)
-	styleSection   = lipgloss.NewStyle().Foreground(lipgloss.Cyan).Bold(true)
-	styleHelpBox   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Cyan).Padding(0, 2)
-)
-
 // fit cuts or pads a styled line to exactly width cells.
 func fit(line string, width int) string {
 	if width <= 0 {
@@ -35,7 +20,7 @@ func fit(line string, width int) string {
 }
 
 func rule(width int) string {
-	return styleGray.Render(strings.Repeat("─", max(0, width)))
+	return styleRule.Render(strings.Repeat("─", max(0, width)))
 }
 
 // spread puts left and right on one line of width cells, dropping right when both do not fit.
@@ -83,7 +68,7 @@ func dropLeadingBlank(lines []string) []string {
 func overlay(base []string, box string, width, height int) []string {
 	dimmed := make([]string, len(base))
 	for i, line := range base {
-		dimmed[i] = styleGray.Faint(true).Render(xansi.Strip(line))
+		dimmed[i] = styleMuted.Faint(true).Render(xansi.Strip(line))
 	}
 	x := max(0, (width-lipgloss.Width(box))/2)
 	y := max(0, (height-lipgloss.Height(box))/2)

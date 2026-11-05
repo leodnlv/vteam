@@ -359,7 +359,7 @@ func TestSchedulerRunsJobsAndReportsTheirEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := h.out.String()
-	for _, want := range []string{"vteam ▸ cron start   pid", "━━ Scheduler", "━━ Activity", "• coder started", "log       vteam/.logs/coder/", "scheduler stopped"} {
+	for _, want := range []string{"vteam ▸ cron start   pid", "▍ Scheduler", "▍ Activity", "• coder started", "log       vteam/.logs/coder/", "scheduler stopped"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)
 		}

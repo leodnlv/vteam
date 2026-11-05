@@ -22,18 +22,18 @@
     ],
     "stdin": "USER",
     "output": [
-      "          system    <tmp>/system-prompt.md",
-      "          prompt    <tmp>/user-prompt.md",
+      "       │   system    <tmp>/system-prompt.md",
+      "       │   prompt    <tmp>/user-prompt.md",
       "",
-      " <clock>  ! claude: warning on stderr",
-      " <clock>  ❯ Let me look around.\n          Two lines.",
-      " <clock>  ⚙ Read   src/a.ts",
-      " <clock>  ⚙ Bash   npm test\n                   --watch",
-      "          ✗ Exit code 1",
-      " <clock>  • this line is not json",
-      " <clock>  ⚙ TodoWrite",
-      "",
-      " <clock>  ✓ claude exited 0 · 2m05s · 7 turns · $0.46"
+      " <clock> │ ! claude: warning on stderr",
+      " <clock> │ ❯ Let me look around.\n       │   Two lines.",
+      " <clock> │ ⚙ Read   src/a.ts",
+      " <clock> │ ⚙ Bash   npm test\n       │            --watch",
+      "       │   ✗ Exit code 1",
+      " <clock> │ • this line is not json",
+      " <clock> │ ⚙ TodoWrite",
+      "       │",
+      " <clock> │ ✓ claude exited 0 · 2m05s · 7 turns · $0.46"
     ],
     "result": {
       "exitCode": 0,
@@ -66,13 +66,13 @@
     ],
     "stdin": "USER",
     "output": [
-      "          system    <tmp>/system-prompt.md",
-      "          prompt    <tmp>/user-prompt.md",
+      "       │   system    <tmp>/system-prompt.md",
+      "       │   prompt    <tmp>/user-prompt.md",
       "",
-      " <clock>  ! claude: warning on stderr",
-      " <clock>  ❯ Giving up.",
-      "",
-      " <clock>  ✗ claude exited 3 · 3s · 50 turns · $1.50"
+      " <clock> │ ! claude: warning on stderr",
+      " <clock> │ ❯ Giving up.",
+      "       │",
+      " <clock> │ ✗ claude exited 3 · 3s · 50 turns · $1.50"
     ],
     "result": {
       "exitCode": 3,
