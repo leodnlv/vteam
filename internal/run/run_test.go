@@ -46,6 +46,7 @@ type harness struct {
 	git      *fakeWorktrees
 	platform *fakePlatform
 	workmux  *fakeWorkmux
+	notifier *fakeNotifier
 	out      syncBuffer
 	logger   *log.Logger
 }
@@ -108,6 +109,7 @@ func setup(t *testing.T, p project) *harness {
 	h := &harness{t: t, cwd: cwd, tasks: taskstest.New(), claude: &fakeClaude{}, git: newFakeWorktrees(t, cwd)}
 	h.platform = &fakePlatform{order: &h.git.order}
 	h.workmux = &fakeWorkmux{git: h.git}
+	h.notifier = &fakeNotifier{}
 	h.logger = log.New(&h.out, &h.out)
 	return h
 }
@@ -118,7 +120,7 @@ func (h *harness) deps() Deps {
 		h.t.Fatal(err)
 	}
 	return Deps{Cwd: h.cwd, Config: cfg, Log: h.logger, Tasks: h.tasks, Claude: h.claude, Git: h.git, Platform: h.platform,
-		Workmux: h.workmux, Bin: "vteam", Now: time.Now, PID: 4242, Host: "test-host", LockTimeout: 10 * time.Second}
+		Workmux: h.workmux, Notifier: h.notifier, Bin: "vteam", Now: time.Now, PID: 4242, Host: "test-host", LockTimeout: 10 * time.Second}
 }
 
 func (h *harness) run(agentName, focus string) error {
@@ -1182,5 +1184,81 @@ func TestStop(t *testing.T) {
 		if len(h.git.removed) != 1 {
 			t.Errorf("removed = %v", h.git.removed)
 		}
+	})
+}
+
+func TestNotifications(t *testing.T) {
+	finding := func(title string) obj {
+		return obj{"title": title, "severity": "medium", "description": "d", "files": []string{"a.go"}}
+	}
+
+	t.Run("announces a task created from a finding", func(t *testing.T) {
+		h := setup(t, project{agent: obj{"output": "task"}})
+		h.claude.thenText(jsonText(obj{"status": "completed", "summary": "Found.", "content": obj{"type": "task", "body": finding("Missing error handling")}}))
+		h.mustRun()
+		want := []notification{{"vteam test-agent: new task", "VTM-1 Missing error handling"}}
+		if diff := cmp.Diff(want, h.notifier.Sent()); diff != "" {
+			t.Error(diff)
+		}
+	})
+
+	t.Run("stays quiet when the agent found nothing", func(t *testing.T) {
+		h := setup(t, project{})
+		h.claude.thenText(jsonText(obj{"status": "completed", "summary": "Done.", "content": obj{"type": "generic", "body": "All good."}}))
+		h.mustRun()
+		if sent := h.notifier.Sent(); len(sent) != 0 {
+			t.Errorf("sent = %v", sent)
+		}
+	})
+
+	t.Run("announces a PR opened for a task", func(t *testing.T) {
+		h := setup(t, project{agent: obj{"input": "task", "worktree": true, "autoPR": true}})
+		h.tasks.Add(model.Task{Ref: "VTM-NEW1", Title: "Fix the thing", Status: "todo", Severity: "high", Description: "It is broken.", CreatedAt: "2026-10-01T00:00:00Z"})
+		agentEditing(h, nil, true)
+		h.mustRun()
+		want := []notification{{"vteam test-agent: PR created", "VTM-NEW1 Fix the thing"}}
+		if diff := cmp.Diff(want, h.notifier.Sent()); diff != "" {
+			t.Error(diff)
+		}
+	})
+
+	t.Run("announces a PR opened without a task", func(t *testing.T) {
+		h := setup(t, project{agent: obj{"worktree": true, "autoPR": true}})
+		agentEditing(h, nil, true)
+		h.mustRun()
+		sent := h.notifier.Sent()
+		if diff := cmp.Diff([]notification{{"vteam test-agent: PR created", "VTM-1 guard null email"}}, sent); diff != "" {
+			t.Error(diff)
+		}
+	})
+
+	t.Run("announces a task moved to done on an existing PR", func(t *testing.T) {
+		h := setup(t, project{agent: obj{"input": "task", "worktree": true, "autoPR": true}})
+		seedDoneTaskReopened(h)
+		mockPR(h, "open", "mergeable")
+		agentEditing(h, nil, true)
+		h.mustRun()
+		sent := h.notifier.Sent()
+		if len(sent) != 1 || sent[0].Title != "vteam test-agent: task done" || !strings.HasPrefix(sent[0].Message, "VTM-") {
+			t.Errorf("sent = %v", sent)
+		}
+	})
+
+	t.Run("stays quiet when nothing was pushed", func(t *testing.T) {
+		h := setup(t, project{agent: obj{"input": "task", "worktree": true, "autoPR": true}})
+		h.tasks.Add(model.Task{Ref: "VTM-NEW1", Title: "Fix the thing", Status: "todo", Severity: "high", Description: "It is broken.", CreatedAt: "2026-10-01T00:00:00Z"})
+		agentEditing(h, nil, false)
+		h.mustRun()
+		if sent := h.notifier.Sent(); len(sent) != 0 {
+			t.Errorf("sent = %v", sent)
+		}
+	})
+
+	t.Run("a failing notifier only warns", func(t *testing.T) {
+		h := setup(t, project{agent: obj{"output": "task"}})
+		h.notifier.err = errors.New("no display")
+		h.claude.thenText(jsonText(obj{"status": "completed", "summary": "Found.", "content": obj{"type": "task", "body": finding("Stale lock")}}))
+		h.mustRun()
+		requireContains(t, h.out.String(), "failed to send notification: no display")
 	})
 }
