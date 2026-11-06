@@ -4,6 +4,14 @@ A virtual development team framework that orchestrates AI agents powered by [Cla
 
 You define agent prompts, triage findings, and review pull requests. vteam handles everything else: scheduling agent runs, managing task lifecycle, isolating work in git worktrees, and creating branches and pull requests.
 
+![The vteam TUI on the Agents tab, showing a merge-ensurer run log](docs/images/tui-agents.png)
+
+## Philosophy
+
+1. **The codebase improves even when you are not looking.** Agents run on cron, find issues, and fix them without anyone at the keyboard.
+2. **Agents keep learning.** Memory, task notes, and review threads carry what earlier runs learned into the next one.
+3. **Humans have points of intervention.** You triage findings from inbox to todo and review every pull request before it merges.
+
 ## How it works
 
 vteam runs Claude in headless mode (`claude -p`) as a subprocess. Each agent invocation is stateless — all memory is external (tasks in [aven](#task-lifecycle), per-agent memory files) and injected into the prompt.
