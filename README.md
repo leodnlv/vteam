@@ -229,15 +229,15 @@ For the full task list, use aven (`aven list --label vteam`).
 
 ### `vteam` (interactive TUI)
 
-Running `vteam` with no arguments inside a project opens a full-screen, keyboard-driven view with four tabs. Outside a terminal, or in a directory without `vteam/`, it prints help instead.
+Running `vteam` with no arguments inside a project opens a full-screen, keyboard-driven view with four tabs, starting on Agents. Outside a terminal, or in a directory without `vteam/`, it prints help instead.
 
-- **Overview** — the `vteam status` view, refreshed every 2 seconds. A refresh starts only after the previous one finishes, so a large aven project refreshes less often instead of piling up work. If a refresh fails, the last good view stays and the error appears in the footer.
 - **Agents** — a sidebar of your agents (plus the merge ensurer) with a live/idle marker and details for the selected one, next to its newest run log. The log pane follows the log while the agent runs; scroll up to pause, `G` to follow again. `p` / `n` step to the previous / next run, and the `run i/n` counter in the title turns yellow when you are looking at an older run. `w` toggles line wrap.
   - **Running agents from the TUI** — `space` (or `a`) opens an action menu for the selected agent: run once, stop its run, run on cron or edit its cron, stop its cron, start the scheduler, open the log. Each action also has its own key (`r`, `x`, `c`, `s`, `S`).
     - **Run once** opens a dialog with an optional, multiline focus field, then starts `vteam run <agent>` in the background, passing the text as `--focus`. `⏎` runs, `shift+⏎` (or `alt+⏎`, `ctrl+j`) adds a line, `esc` cancels. Leave it empty for a normal run. The run keeps going after you quit the TUI.
     - **Stop run** asks before stopping the selected agent's run (see [Stopping a run](#stopping-a-run)). For an agent with a worktree, choose with `j` / `k` between removing the worktree and keeping it for inspection.
     - **Run on cron** opens a dialog prefilled with the enabled pattern, or else the `agent.json` default. As you type it shows the schedule in words, the next three fire times, or the parse error. `tab` toggles saving the pattern as the default in `agent.json` (`vteam.config.json` for the merge ensurer). Confirming enables the cron and, if no scheduler is running, starts one in the background (see [Running on a schedule](#running-on-a-schedule)).
     - **Cron markers** — an agent on cron shows `◷` in the sidebar, its pattern and next run in the details, and a line above its log. All three turn yellow with "paused" when the scheduler is not running.
+- **Overview** — the `vteam status` view, refreshed every 2 seconds. A refresh starts only after the previous one finishes, so a large aven project refreshes less often instead of piling up work. If a refresh fails, the last good view stays and the error appears in the footer.
 - **Info** — the project, `vteam.config.json`, whether the scheduler is running, and each agent's settings, including the tools it is allowed.
 - **About** — what vteam is, its philosophy, the author, and the license.
 

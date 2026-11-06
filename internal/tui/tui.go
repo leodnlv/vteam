@@ -20,13 +20,13 @@ const (
 type Tab int
 
 const (
-	TabOverview Tab = iota
-	TabAgents
+	TabAgents Tab = iota
+	TabOverview
 	TabInfo
 	TabAbout
 )
 
-var tabNames = []string{"Overview", "Agents", "Info", "About"}
+var tabNames = []string{"Agents", "Overview", "Info", "About"}
 
 type Project struct {
 	Name string

@@ -62,7 +62,7 @@ func actionsModel(t *testing.T, f *fakeActions) Model {
 		return f.startPID, nil
 	}
 	m = m.refreshAfterAction()
-	return press(t, m, "2")
+	return press(t, m, "1")
 }
 
 func testAgents() []Agent {

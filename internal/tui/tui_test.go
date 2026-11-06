@@ -28,6 +28,11 @@ func newTestModel(t *testing.T, render func(context.Context) ([]string, error)) 
 	return update(t, m, tea.WindowSizeMsg{Width: 100, Height: 20})
 }
 
+func overviewModel(t *testing.T, render func(context.Context) ([]string, error)) Model {
+	t.Helper()
+	return press(t, newTestModel(t, render), "2")
+}
+
 func update(t *testing.T, m Model, msg tea.Msg) Model {
 	t.Helper()
 	next, _ := m.Update(msg)
@@ -81,7 +86,7 @@ func statusLines(n int) []string {
 func TestHeaderShowsTabsAndProject(t *testing.T) {
 	m := newTestModel(t, nil)
 	first := strings.Split(screen(m), "\n")[0]
-	for _, want := range []string{"vteam ▸", "1 Overview", "2 Agents", "3 Info", "my-app (aven)", "label vteam", "⎇ main"} {
+	for _, want := range []string{"vteam ▸", "1 Agents", "2 Overview", "3 Info", "my-app (aven)", "label vteam", "⎇ main"} {
 		if !strings.Contains(first, want) {
 			t.Errorf("header %q is missing %q", first, want)
 		}
@@ -103,7 +108,7 @@ func TestViewFillsTheTerminalExactly(t *testing.T) {
 }
 
 func TestOverviewDropsBannerAndShowsStatus(t *testing.T) {
-	m := newTestModel(t, nil)
+	m := overviewModel(t, nil)
 	m = update(t, m, statusMsg{lines: []string{"vteam ▸ status", "\n▍ Running  ───", "  · nothing running"}, started: fixedNow})
 	out := screen(m)
 	if strings.Contains(out, "vteam ▸ status") {
@@ -115,7 +120,7 @@ func TestOverviewDropsBannerAndShowsStatus(t *testing.T) {
 }
 
 func TestRefreshErrorKeepsLastFrame(t *testing.T) {
-	m := newTestModel(t, nil)
+	m := overviewModel(t, nil)
 	m = update(t, m, statusMsg{lines: statusLines(3), started: fixedNow})
 	m = update(t, m, statusMsg{err: errors.New("aven exploded\nstack"), started: fixedNow})
 	out := screen(m)
@@ -126,10 +131,13 @@ func TestRefreshErrorKeepsLastFrame(t *testing.T) {
 
 func TestTabSwitching(t *testing.T) {
 	m := newTestModel(t, nil)
+	if m.tab != TabAgents {
+		t.Fatalf("start tab = %v, want Agents", m.tab)
+	}
 	cases := []struct {
 		key  string
 		want Tab
-	}{{"2", TabAgents}, {"3", TabInfo}, {"tab", TabInfo}, {"shift+tab", TabInfo}, {"4", TabAbout}, {"1", TabOverview}}
+	}{{"2", TabOverview}, {"3", TabInfo}, {"tab", TabInfo}, {"shift+tab", TabInfo}, {"4", TabAbout}, {"1", TabAgents}}
 	for _, c := range cases {
 		m = press(t, m, c.key)
 		if m.tab != c.want {
@@ -139,7 +147,7 @@ func TestTabSwitching(t *testing.T) {
 }
 
 func TestTabTogglesAgentsFocus(t *testing.T) {
-	m := press(t, newTestModel(t, nil), "2")
+	m := newTestModel(t, nil)
 	for i, want := range []bool{true, false, true} {
 		key := "tab"
 		if i == 1 {
@@ -153,7 +161,7 @@ func TestTabTogglesAgentsFocus(t *testing.T) {
 }
 
 func TestOverviewScrollingClampsAndSupportsVimKeys(t *testing.T) {
-	m := newTestModel(t, nil)
+	m := overviewModel(t, nil)
 	m = update(t, m, statusMsg{lines: statusLines(50), started: fixedNow})
 	maxOffset := 50 - m.bodyHeight()
 
@@ -186,7 +194,7 @@ func TestHelpOverlayTogglesAndSwallowsKeys(t *testing.T) {
 		t.Fatal("? should open help")
 	}
 	m = press(t, m, "2")
-	if m.tab != TabOverview {
+	if m.tab != TabAgents {
 		t.Fatal("keys behind the help overlay should be ignored")
 	}
 	m = press(t, m, "esc")
@@ -241,7 +249,7 @@ func TestViewEnablesMouseWheel(t *testing.T) {
 }
 
 func TestMouseWheelScrollsTheActiveTab(t *testing.T) {
-	m := newTestModel(t, nil)
+	m := overviewModel(t, nil)
 	m = update(t, m, statusMsg{lines: statusLines(50), started: fixedNow})
 	m = wheel(t, m, tea.MouseWheelDown, 2)
 	if m.overview.view.YOffset() != 6 {
@@ -254,7 +262,7 @@ func TestMouseWheelScrollsTheActiveTab(t *testing.T) {
 }
 
 func TestMouseWheelScrollsTheHelpOverlayNotTheTab(t *testing.T) {
-	m := newTestModel(t, nil)
+	m := overviewModel(t, nil)
 	m = update(t, m, statusMsg{lines: statusLines(50), started: fixedNow})
 	m = wheel(t, press(t, m, "?"), tea.MouseWheelDown, 1)
 	if m.helpView.YOffset() != 3 || m.overview.view.YOffset() != 0 {

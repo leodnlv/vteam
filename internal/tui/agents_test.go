@@ -145,7 +145,7 @@ func agentsModel(t *testing.T, agents []Agent) Model {
 	m := newTestModel(t, nil)
 	m.deps.Agents = func(time.Time) []Agent { return agents }
 	m.agents = newAgentsState().reload(agents)
-	return press(t, m, "2")
+	return press(t, m, "1")
 }
 
 func logDir(t *testing.T, lines int) (string, []string) {

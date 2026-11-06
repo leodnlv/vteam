@@ -23,7 +23,7 @@ func binding(keys []string, help, desc string) key.Binding {
 }
 
 var keys = keyMap{
-	Tabs:      binding([]string{"1", "2", "3", "4"}, "1 2 3 4", "jump to Overview / Agents / Info / About"),
+	Tabs:      binding([]string{"1", "2", "3", "4"}, "1 2 3 4", "jump to Agents / Overview / Info / About"),
 	Refresh:   binding([]string{"ctrl+r"}, "ctrl+r", "refresh now"),
 	Help:      binding([]string{"?"}, "?", "toggle this help"),
 	Quit:      binding([]string{"q"}, "q  ctrl+c", "quit"),
