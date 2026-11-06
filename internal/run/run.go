@@ -19,6 +19,7 @@ import (
 	"github.com/leodnlv/vteam/internal/lock"
 	"github.com/leodnlv/vteam/internal/log"
 	"github.com/leodnlv/vteam/internal/model"
+	"github.com/leodnlv/vteam/internal/notify"
 	"github.com/leodnlv/vteam/internal/output"
 	"github.com/leodnlv/vteam/internal/platform"
 	"github.com/leodnlv/vteam/internal/prompt"
@@ -52,6 +53,8 @@ type Deps struct {
 	Git      Worktrees
 	Platform platform.Platform
 	Workmux  workmux.Client
+	// Notifier is optional; nil means no notifications.
+	Notifier notify.Notifier
 	// Bin is the vteam executable an interactive session runs to submit.
 	Bin string
 	// InTmux means vteam runs inside tmux, so an interactive window opens in the user's session and gets focus.
@@ -64,6 +67,10 @@ type Deps struct {
 }
 
 func NewDeps(cwd string, cfg *config.Config, logger *log.Logger) Deps {
+	var notifier notify.Notifier
+	if cfg.NotificationsEnabled() {
+		notifier = notify.New(execx.OS{})
+	}
 	return Deps{
 		Cwd:         cwd,
 		Config:      cfg,
@@ -73,6 +80,7 @@ func NewDeps(cwd string, cfg *config.Config, logger *log.Logger) Deps {
 		Git:         git.New(logger),
 		Platform:    platform.New(cfg.Platform, cwd),
 		Workmux:     workmux.New(),
+		Notifier:    notifier,
 		Bin:         executable(),
 		InTmux:      os.Getenv("TMUX") != "",
 		Now:         time.Now,
@@ -553,14 +561,17 @@ func (r *runner) mergedBaseCleanly() bool {
 
 func (r *runner) applyOutput(out model.AgentOutput) error {
 	if out.Content != nil {
+		var lines []string
 		for _, body := range out.Content.Findings() {
 			ref, err := r.Tasks.Create(r.ctx, body, r.agent.Name, tasks.LabelsOnCreate(r.Config.Tasks, r.agent.Name))
 			if err != nil {
 				return err
 			}
 			r.state.TasksCreated = append(r.state.TasksCreated, ref)
+			lines = append(lines, taskLine(ref, body.Title))
 			r.Log.OK(fmt.Sprintf("created task %s: %s (%s)", ref, body.Title, body.Severity))
 		}
+		r.notifyTasksCreated(lines)
 	}
 
 	var unresolved []string
@@ -668,12 +679,48 @@ func (r *runner) publish(out model.AgentOutput, commitMessage *model.CommitMessa
 		}
 		r.settled = true
 		r.Log.OK(fmt.Sprintf("task %s done", r.task.Ref))
+		r.notifyPublished(taskLine(r.task.Ref, r.task.Title))
 	} else if r.prURL != "" {
-		if ref := r.recordPRTask(out); ref != "" {
+		ref := r.recordPRTask(out)
+		if ref != "" {
 			r.state.TasksCreated = append(r.state.TasksCreated, ref)
 		}
+		r.notifyPublished(taskLine(ref, prTaskTitle(out)))
 	}
 	return nil
+}
+
+func (r *runner) notify(title, message string) {
+	if r.Notifier == nil {
+		return
+	}
+	if err := r.Notifier.Notify(r.ctx, title, message); err != nil {
+		r.Log.Warn("failed to send notification: " + err.Error())
+	}
+}
+
+func taskLine(ref, title string) string {
+	return strings.TrimSpace(ref + " " + title)
+}
+
+func (r *runner) notifyTasksCreated(lines []string) {
+	switch len(lines) {
+	case 0:
+	case 1:
+		r.notify("vteam "+r.agent.Name+": new task", lines[0])
+	default:
+		r.notify(fmt.Sprintf("vteam %s: %d new tasks", r.agent.Name, len(lines)), strings.Join(lines, "\n"))
+	}
+}
+
+// notifyPublished reports a pushed run: a new PR, or a task that moved to done on an existing branch.
+func (r *runner) notifyPublished(line string) {
+	switch {
+	case r.prURL != "" && r.followUp == nil:
+		r.notify("vteam "+r.agent.Name+": PR created", line)
+	case r.task != nil:
+		r.notify("vteam "+r.agent.Name+": task done", line)
+	}
 }
 
 var vteamPrefix = regexp.MustCompile(`(?i)^vteam:\s*`)
@@ -784,13 +831,19 @@ func (r *runner) postThreadReplies(replies []model.ThreadReply, sha string) int 
 	return posted
 }
 
-// recordPRTask creates a done task for a PR opened without one, because the merge ensurer only tracks PRs through tasks.
-func (r *runner) recordPRTask(out model.AgentOutput) string {
-	title, description := out.Summary, out.Summary
+func prTaskTitle(out model.AgentOutput) string {
 	if out.CommitMessage != nil {
 		if subject := vteamPrefix.ReplaceAllString(out.CommitMessage.Subject, ""); subject != "" {
-			title = subject
+			return subject
 		}
+	}
+	return out.Summary
+}
+
+// recordPRTask creates a done task for a PR opened without one, because the merge ensurer only tracks PRs through tasks.
+func (r *runner) recordPRTask(out model.AgentOutput) string {
+	title, description := prTaskTitle(out), out.Summary
+	if out.CommitMessage != nil {
 		if out.CommitMessage.Body != "" {
 			description = out.CommitMessage.Body
 		}

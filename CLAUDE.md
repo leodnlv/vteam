@@ -132,6 +132,7 @@ All task operations go through the `tasks.Manager` interface (`internal/tasks/ta
 Agent labels are hardcoded conventions, all defined in `internal/tasks/labels.go`: a created task gets `<tasks.label>-<creating agent>` (e.g. `vteam-improver`), and a task set to `done` gets `<tasks.label>-<finishing agent>` (e.g. `vteam-coder`). They are never removed, so they stay when a task is reopened. `ToAvenLabel` mirrors aven's label normalization (lowercase, runs of non-`[a-z0-9]` → `-`, trimmed) so the label vteam writes is the one aven stores. Each label is created (`aven label create`) before use, because `aven edit --label` rejects unknown labels.
 - `tasks.workspace` (optional) — passed as `--workspace` to every aven call.
 - `mergeEnsurer.cron` (optional) — default cron pattern for `vteam ensure-merge` (job name `merge-ensurer`), used when its cron is enabled.
+- `notifications` (default `true`) — set `false` to disable desktop notifications.
 - `mergeEnsurer.label` (default `"vteam:changes-requested"`) — PR label a human adds to approve the review feedback; see Merge ensurer.
 
 Routing (`MatchesFilter` in `tasks.go`): `ListReady` returns every ready labelled task with its metadata; `run` keeps the tasks matching the running agent's `taskFilter` (no filter = all). There is no fallback agent — a task no filter matches is never picked. Overlaps are allowed — picking runs under a global claim lock (see Lifecycle), so exactly one run gets each task. vteam only writes `found-by`; humans set other keys such as `actor` via `aven edit <ref> --metadata actor=<agent>`. `Candidates` (also in `tasks.go`) applies the filter and the severity/age ordering, and `PickNext` takes the first candidate under the retry limit; `run` and `vteam status` both use `PickNext`, and the TUI's task picker lists `Candidates`.
@@ -170,6 +171,10 @@ Whenever the agent returned output (every ending except an error or crash), the 
 An agent can optionally have an `ON_FINISH.md` file at `vteam/agents/<name>/ON_FINISH.md`. When present, the orchestrator spawns a second `claude -p` call after the agent run completes (both success and failure, but not after a stop). The hook receives a structured summary of the run outcome (status, branch, PR URL, task info, content, error) as its user prompt. When the agent returned `content` in its output, the hook receives it in a `## Content` section — generic content as a string, task content as JSON. This allows hooks to act on the agent's primary deliverable (e.g. post a PR review as a comment).
 
 The ON_FINISH.md content is the hook's system prompt. Its `model`, `allowedTools`, and `disallowedTools` go in the `onFinish` section of `agent.json`. The hook runs in the main project directory (not the worktree) and its failure does not affect the agent run's exit status.
+
+### Notifications
+
+On macOS, `run.Deps.Notifier` (`internal/notify`, `osascript` with the text passed as script arguments; a no-op elsewhere) shows a desktop notification when a run produced something to look at: tasks created from findings (`vteam <agent>: new task` / `N new tasks`, in `applyOutput`), a PR opened (`vteam <agent>: PR created`), or a task moved to `done` on an existing PR branch (`vteam <agent>: task done`) — both in `publish` via `notifyPublished`. The message is just `<task ref> <task title>` (one line per task); the PR URL is left out. A run that opens a PR for a task sends one notification, and a PR without a task uses its receipt task. Interactive submits use the same `applyOutput`, so they notify too. `notifications: false` in `vteam.config.json` (default on, `Config.NotificationsEnabled`) leaves `NewDeps` with a nil notifier; there is no per-agent switch. A nil notifier sends nothing, and a failed notification is logged as a warning and never fails the run.
 
 ### Per-agent memory
 
@@ -243,6 +248,7 @@ internal/
 ├── platform/                     Platform interface; GitHub (gh) and GitLab (glab) PRs, threads, labels
 ├── run/                          vteam run <agent> — main orchestration flow on injected Deps; interactive hand-off, Submit, Finalize
 ├── session/                      Interactive session state under vteam/.sessions/<runId>/; find by id or worktree dir
+├── notify/                       Desktop notifications (osascript on macOS, no-op elsewhere)
 ├── workmux/                      workmux CLI client (add --headless, open, list, remove) for interactive runs
 ├── ensuremerge/                  vteam ensure-merge — record merges, cancel closed PRs, reopen labelled/conflicting PR tasks
 ├── schedule/                     vteam cron — enabled-cron state, long-lived scheduler, detached scheduler/run spawning, Scheduler section

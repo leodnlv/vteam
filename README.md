@@ -339,6 +339,7 @@ Global settings live in `vteam/vteam.config.json`:
 | `tasks.label`      | Default `"vteam"`. vteam only sees and picks up tasks carrying this label. Created automatically. |
 | `tasks.workspace`  | Optional. aven workspace, passed to every `aven` call as `--workspace`.                 |
 | `mergeEnsurer.cron` | Optional. Default cron pattern for [`vteam ensure-merge`](#vteam-ensure-merge), used when you enable its cron (see [Running on a schedule](#running-on-a-schedule)). |
+| `notifications` | Default `true`. Set to `false` to turn off the macOS [desktop notifications](#desktop-notifications) for every agent. |
 | `mergeEnsurer.label` | Default `"vteam:changes-requested"`. The PR label you add to approve the review feedback on a coder PR. Create it in GitHub/GitLab once. |
 
 ### Agent configuration (agent.json)
@@ -378,6 +379,10 @@ Validation is strict: unknown keys are rejected everywhere, including inside `me
 | `disallowedTools` | —          | Claude Code tools the agent may NOT use (same syntax as `--disallowedTools` CLI flag)                            |
 | `memory`          | —          | Curation agent settings: `model`, `allowedTools`, `disallowedTools`. Requires `MEMORY.md`. See [Per-agent memory](#per-agent-memory-memorymd). |
 | `onFinish`        | —          | Hook settings: `model`, `allowedTools`, `disallowedTools`. Requires `ON_FINISH.md`. See [On-finish hooks](#on-finish-hooks-on_finishmd). |
+
+### Desktop notifications
+
+On macOS, vteam shows a notification when an agent creates tasks from its findings, opens a PR, or finishes a task on an existing PR. They're on by default; set `"notifications": false` in `vteam.config.json` to turn them off. Other platforms skip it. For other channels such as Slack, use an [on-finish hook](#on-finish-hooks-on_finishmd).
 
 ### On-finish hooks (ON_FINISH.md)
 

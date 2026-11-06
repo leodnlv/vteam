@@ -164,6 +164,18 @@ func TestVteamConfigSchema(t *testing.T) {
 			t.Errorf("got %+v", cfg)
 		}
 	})
+	t.Run("notifications are on unless switched off", func(t *testing.T) {
+		cfg, _ := ParseConfig(base())
+		if !cfg.NotificationsEnabled() {
+			t.Error("default should be on")
+		}
+		doc := base()
+		doc["notifications"] = false
+		cfg, issues := ParseConfig(doc)
+		if len(issues) > 0 || cfg.NotificationsEnabled() {
+			t.Errorf("cfg %+v issues %v", cfg, issues)
+		}
+	})
 	t.Run("accepts optional workspace", func(t *testing.T) {
 		doc := base()
 		doc["tasks"].(obj)["workspace"] = "work"
@@ -179,6 +191,7 @@ func TestVteamConfigSchema(t *testing.T) {
 		"rejects fractional maxRetries":         func(d obj) { d["tasks"].(obj)["maxRetries"] = 1.5 },
 		"rejects missing project":               func(d obj) { delete(d["tasks"].(obj), "project") },
 		"rejects empty project":                 func(d obj) { d["tasks"].(obj)["project"] = "" },
+		"rejects a non-boolean notifications":   func(d obj) { d["notifications"] = "off" },
 		"rejects an invalid merge ensurer cron": func(d obj) { d["mergeEnsurer"] = obj{"cron": "every minute"} },
 	} {
 		t.Run(name, func(t *testing.T) {

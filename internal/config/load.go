@@ -24,11 +24,17 @@ type MergeEnsurer struct {
 }
 
 type Config struct {
-	BaseBranch   string         `json:"baseBranch"`
-	Platform     model.Platform `json:"platform"`
-	WorktreeDir  string         `json:"worktreeDir"`
-	Tasks        Tasks          `json:"tasks"`
-	MergeEnsurer MergeEnsurer   `json:"mergeEnsurer"`
+	BaseBranch    string         `json:"baseBranch"`
+	Platform      model.Platform `json:"platform"`
+	WorktreeDir   string         `json:"worktreeDir"`
+	Tasks         Tasks          `json:"tasks"`
+	MergeEnsurer  MergeEnsurer   `json:"mergeEnsurer"`
+	Notifications *bool          `json:"notifications,omitempty"`
+}
+
+// NotificationsEnabled is true unless vteam.config.json sets notifications to false.
+func (c *Config) NotificationsEnabled() bool {
+	return c.Notifications == nil || *c.Notifications
 }
 
 func str(minLen int) func(*checker, []string, any) {
@@ -53,6 +59,7 @@ var configRules = []rule{
 	{key: "worktreeDir", requiredType: "string", check: str(0)},
 	{key: "tasks", requiredType: "object", check: func(c *checker, p []string, v any) { c.object(p, v, false, tasksRules) }},
 	{key: "mergeEnsurer", check: func(c *checker, p []string, v any) { c.object(p, v, false, mergeEnsurerRules) }},
+	{key: "notifications", check: func(c *checker, p []string, v any) { c.boolean(p, v) }},
 }
 
 // ParseConfig validates a decoded vteam.config.json and applies defaults. Unknown keys are ignored.

@@ -285,3 +285,24 @@ func (f *fakePlatform) CreatePR(_ context.Context, req platform.PRRequest) (stri
 func gitOutput(t *testing.T, dir string, args ...string) string {
 	return gittest.Run(t, dir, args...)
 }
+
+type notification struct{ Title, Message string }
+
+type fakeNotifier struct {
+	mu   sync.Mutex
+	sent []notification
+	err  error
+}
+
+func (f *fakeNotifier) Notify(_ context.Context, title, message string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sent = append(f.sent, notification{title, message})
+	return f.err
+}
+
+func (f *fakeNotifier) Sent() []notification {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]notification(nil), f.sent...)
+}
