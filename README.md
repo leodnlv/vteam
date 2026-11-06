@@ -248,7 +248,7 @@ Shows what is happening now and what will happen next. It reads local state and 
 - **Scheduler** — whether the scheduler is running, and each enabled cron with its next fire time.
 - **Up next** — for each `input: "task"` agent, the task it would pick if it ran now (same routing, retry limit, and ordering as `vteam run`), marked `(PR follow-up)` when it would continue an existing PR. `input: "pr"` agents show the PR label they watch.
 - **Awaiting merge** — `done` tasks whose PR has not been recorded as merged.
-- **Needs attention** — tasks in `inbox` awaiting triage, `todo` tasks no agent's `taskFilter` matches, `todo` tasks at `maxRetries`, `active` tasks whose claiming process on this machine is dead or that have no vteam claim, and worktrees no running agent is using.
+- **Needs attention** — tasks in `inbox` awaiting triage (listed with ref, severity, and title), `todo` tasks no agent's `taskFilter` matches, `todo` tasks at `maxRetries`, `active` tasks whose claiming process on this machine is dead or that have no vteam claim, and worktrees no running agent is using.
 
 For the full task list, use aven (`aven list --label vteam`).
 

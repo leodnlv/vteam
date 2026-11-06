@@ -29,6 +29,7 @@ stdout '✓ improver completed in'
 
 exec vteam status
 stdout '! 1 task\(s\) in inbox awaiting triage'
+stdout '\[high\] Missing null check'
 stdout 'coder  nothing ready'
 
 # A human moves it to todo; the coder would pick it next.
