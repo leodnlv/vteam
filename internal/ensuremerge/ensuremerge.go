@@ -58,7 +58,12 @@ func Sweep(ctx context.Context, d Deps) (Result, error) {
 	d.Log.Section("Pull requests")
 
 	for _, t := range pending {
-		o, err := ensure(ctx, d, t)
+		if ctx.Err() != nil {
+			d.Log.Warn("stopped before checking the remaining PRs")
+			break
+		}
+		// One PR is handled in full even when a stop arrives, so a removed label always reopens its task.
+		o, err := ensure(context.WithoutCancel(ctx), d, t)
 		if err != nil {
 			d.Log.Fail(fmt.Sprintf("%s %s", t.Ref, t.Title))
 			d.Log.Field("PR", t.Metadata[model.MetaPRURL])

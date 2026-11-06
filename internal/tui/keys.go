@@ -12,8 +12,8 @@ type keyMap struct {
 
 	Down, Up, HalfPageDown, HalfPageUp, Top, GG, Bottom key.Binding
 
-	SwitchPane, FocusLog, FocusSidebar, PrevRun, NextRun       key.Binding
-	Actions, Run, Cron, StopCron, StartScheduler, Follow, Wrap key.Binding
+	SwitchPane, FocusLog, FocusSidebar, PrevRun, NextRun                key.Binding
+	Actions, Run, StopRun, Cron, StopCron, StartScheduler, Follow, Wrap key.Binding
 
 	Confirm, Cancel, SaveDefault, NewLine key.Binding
 }
@@ -44,6 +44,7 @@ var keys = keyMap{
 	NextRun:        binding([]string{"n"}, "n", "next (newer) run"),
 	Actions:        binding([]string{"space", "a"}, "space  a", "actions menu of the selected agent"),
 	Run:            binding([]string{"r"}, "r", "run the selected agent once"),
+	StopRun:        binding([]string{"x"}, "x", "stop its run"),
 	Cron:           binding([]string{"c"}, "c", "run it on cron / edit its cron"),
 	StopCron:       binding([]string{"s"}, "s", "stop its cron"),
 	StartScheduler: binding([]string{"S"}, "S", "start the scheduler when crons are paused"),
@@ -180,7 +181,7 @@ func (m Model) handleAgentsKey(msg tea.KeyPressMsg, pendingG bool) Model {
 		s = s.stepRun(-1)
 	case key.Matches(msg, keys.NextRun):
 		s = s.stepRun(1)
-	case key.Matches(msg, keys.Run, keys.Cron, keys.StopCron, keys.StartScheduler, keys.Actions):
+	case key.Matches(msg, keys.Run, keys.StopRun, keys.Cron, keys.StopCron, keys.StartScheduler, keys.Actions):
 		return m.agentAction(msg.String())
 	case key.Matches(msg, keys.HalfPageDown, keys.HalfPageUp):
 		return m.scrollLog(msg, pendingG)

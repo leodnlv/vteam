@@ -227,5 +227,15 @@ func (l *Logger) Finished(agent, failure string) {
 	l.Println("\n" + ansi.Bold(ansi.OK("✓ "+agent+" completed in "+elapsed)))
 }
 
+func (l *Logger) Stopped(agent string) {
+	l.Eprintln("\n" + ansi.Bold(ansi.Warn("! "+agent+" stopped after "+FormatDuration(l.Elapsed()))))
+}
+
 // ErrReported marks an error that the command already printed; main exits non-zero without printing it again.
 var ErrReported = errors.New("failure already reported")
+
+// ErrStopped means a stop signal ended the command early; it was reported, and main exits with ExitStopped.
+var ErrStopped = fmt.Errorf("stopped: %w", ErrReported)
+
+// ExitStopped is the exit code of a command that ErrStopped ended, 128 + SIGTERM like a process killed by it.
+const ExitStopped = 143

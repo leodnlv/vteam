@@ -95,7 +95,11 @@ func TestEnablingACronFromTheActionMenu(t *testing.T) {
 	m := actionsModel(t, f)
 
 	m = press(t, m, "space")
-	assertScreen(t, m, "Run once now…", "Run on cron…", "Stop cron", "Open log")
+	assertScreen(t, m, "Run once now…", "Stop run…", "Run on cron…", "Stop cron", "Open log")
+	m = press(t, m, "j", "enter")
+	if m.dialog.kind != dialogMenu {
+		t.Fatal("Stop run is disabled while the agent is idle")
+	}
 	m = press(t, m, "j", "enter")
 	if m.dialog.kind != dialogCron || m.dialog.input.Value() != "0 * * * *" {
 		t.Fatalf("cron dialog should open prefilled with the agent.json default: %+v", m.dialog)
@@ -186,7 +190,7 @@ func TestActionsExplainWhyTheyCannotRun(t *testing.T) {
 	}
 	assertScreen(t, m, "! coder is already running")
 	m = press(t, m, "space")
-	assertScreen(t, m, "Run once (running)")
+	assertScreen(t, m, "Run once (running)", "Stop run…")
 	m = press(t, m, "enter")
 	if m.dialog.kind != dialogMenu {
 		t.Error("choosing a disabled item should keep the menu open")
@@ -195,7 +199,74 @@ func TestActionsExplainWhyTheyCannotRun(t *testing.T) {
 	assertScreen(t, m, "! retired can't be scheduled")
 	m = press(t, m, "s")
 	assertScreen(t, m, "! retired has no cron enabled")
+	m = press(t, m, "x")
+	assertScreen(t, m, "! retired is not running")
 	assertCalls(t, f)
+}
+
+func stopModel(t *testing.T, agents []Agent) (Model, *fakeActions) {
+	t.Helper()
+	f := &fakeActions{agents: agents}
+	m := actionsModel(t, f)
+	m.deps.StopRun = func(name string, keep bool) error {
+		call := "stop " + name
+		if keep {
+			call += " --keep-worktree"
+		}
+		f.calls = append(f.calls, call)
+		return f.runErr
+	}
+	return m, f
+}
+
+func TestStoppingARun(t *testing.T) {
+	running := &lock.Info{PID: 7, Timestamp: fixedNow.UnixMilli()}
+	worktreeCoder := []Agent{{Name: "coder", Config: &config.Agent{Worktree: true, Input: config.InputTask}, Running: running}}
+
+	t.Run("removes the worktree by default", func(t *testing.T) {
+		m, f := stopModel(t, worktreeCoder)
+		m = press(t, m, "space", "j", "enter")
+		assertScreen(t, m, "Stop coder?", "Its task goes back to", "› Stop and remove worktree", "Stop and keep worktree")
+		m = press(t, m, "enter")
+		assertCalls(t, f, "stop coder")
+		assertScreen(t, m, "■ stopping coder")
+	})
+
+	t.Run("keeps the worktree when chosen", func(t *testing.T) {
+		m, f := stopModel(t, worktreeCoder)
+		m = press(t, m, "x", "j")
+		assertScreen(t, m, "› Stop and keep worktree")
+		m = press(t, m, "enter")
+		assertCalls(t, f, "stop coder --keep-worktree")
+		assertScreen(t, m, "■ stopping coder · keeping its worktree")
+	})
+
+	t.Run("esc cancels", func(t *testing.T) {
+		m, f := stopModel(t, worktreeCoder)
+		m = press(t, m, "x", "esc")
+		if m.dialog.kind != dialogNone {
+			t.Error("dialog still open")
+		}
+		assertCalls(t, f)
+	})
+
+	t.Run("offers a plain stop without a worktree", func(t *testing.T) {
+		m, f := stopModel(t, []Agent{{Name: "merge-ensurer", Builtin: true, Running: running}})
+		m = press(t, m, "x")
+		assertScreen(t, m, "Stop merge-ensurer?", "It finishes the PR it is on, then stops.")
+		if strings.Contains(screen(m), "keep worktree") {
+			t.Error("offered to keep a worktree the merge ensurer does not have")
+		}
+		press(t, m, "enter")
+		assertCalls(t, f, "stop merge-ensurer")
+	})
+
+	t.Run("shows why the stop failed", func(t *testing.T) {
+		m, f := stopModel(t, worktreeCoder)
+		f.runErr = errors.New("coder is not running")
+		m = press(t, m, "x", "enter")
+		assertScreen(t, m, "✗ coder is not running")
+	})
 }
 
 func TestStoppingACron(t *testing.T) {

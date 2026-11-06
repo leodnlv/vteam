@@ -110,7 +110,11 @@ func (f *Fake) Create(_ context.Context, body model.TaskContentBody, foundBy str
 	return ref, nil
 }
 
-func (f *Fake) Update(_ context.Context, ref string, u tasks.Update) error {
+// Update and AddNote fail on a cancelled context, like the aven subprocess they stand in for.
+func (f *Fake) Update(ctx context.Context, ref string, u tasks.Update) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if f.FailUpdate != nil {
 		if err := f.FailUpdate(ref, u); err != nil {
 			return err
@@ -139,7 +143,10 @@ func (f *Fake) Update(_ context.Context, ref string, u tasks.Update) error {
 	return nil
 }
 
-func (f *Fake) AddNote(_ context.Context, ref, text string) error {
+func (f *Fake) AddNote(ctx context.Context, ref, text string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.FailNotes {

@@ -244,6 +244,29 @@ func TestSweep(t *testing.T) {
 	})
 }
 
+func TestSweepStop(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	labelled := pr(func(p *model.PullRequestInfo) { p.Labels = []string{"vteam:changes-requested"} })
+	h := newHarness(func(url string) (model.PullRequestInfo, error) {
+		cancel()
+		return labelled(url)
+	}, doneTask("A", map[string]string{"pr-url": prURL}), doneTask("B", map[string]string{"pr-url": prURL}))
+	res, err := Sweep(ctx, Deps{Config: cfg, Log: log.New(&h.out, &h.out), Tasks: h.tasks, Platform: h.platform})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff([]string{"A"}, refs(res.Reopened)); diff != "" {
+		t.Errorf("finishes the PR it was handling when stopped: %s", diff)
+	}
+	if len(h.platform.lookups) != 1 {
+		t.Errorf("lookups = %v, want B left unchecked", h.platform.lookups)
+	}
+	if !strings.Contains(h.out.String(), "stopped before checking the remaining PRs") {
+		t.Errorf("output:\n%s", h.out.String())
+	}
+}
+
 func TestLogSummary(t *testing.T) {
 	var out bytes.Buffer
 	l := log.New(&out, &out)

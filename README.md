@@ -101,7 +101,7 @@ vteam cron disable improver
 
 Enabled crons live in `vteam/.cron/schedules.json`. That file is local to your machine, and its directory has its own `.gitignore`. The scheduler rereads it every 2 seconds, so enabling, changing, or disabling a cron takes effect without a restart. When no crons are left enabled and no scheduled run is still going, the scheduler stops on its own. Enabled crons survive a scheduler stop or a reboot: they show as paused until the scheduler starts again (`vteam cron start`, or `S` in the TUI).
 
-`vteam cron start` is a foreground process — stop it with Ctrl+C. A scheduler the TUI starts runs in the background and writes its output to `vteam/.cron/scheduler.log`. While a scheduler runs it writes its pid to `vteam/.locks/cron.pid`; a second `vteam cron start` in the same project refuses to start, and `vteam status` uses the file to report whether the scheduler is up. If an agent is still running when its next cron tick fires, the tick is skipped. Cron expressions have 5 fields (minute hour day month weekday) and support ranges, steps, lists, month and weekday names, and `7` for Sunday; `L` and `#` are not supported. When both day-of-month and day-of-week are set, either one matching fires the job. Each scheduled run writes its own log file, the same as a manual `vteam run` (see [Logs](#logs)). The scheduler prints the job table from `vteam status`, then one line per job start, finish, failure, or skipped tick, stamped with the time of day; starts and failures include the path to that run's log file.
+`vteam cron start` is a foreground process — stop it with Ctrl+C. A scheduler the TUI starts runs in the background and writes its output to `vteam/.cron/scheduler.log`. While a scheduler runs it writes its pid to `vteam/.locks/cron.pid`; a second `vteam cron start` in the same project refuses to start, and `vteam status` uses the file to report whether the scheduler is up. If an agent is still running when its next cron tick fires, the tick is skipped. Cron expressions have 5 fields (minute hour day month weekday) and support ranges, steps, lists, month and weekday names, and `7` for Sunday; `L` and `#` are not supported. When both day-of-month and day-of-week are set, either one matching fires the job. Each scheduled run writes its own log file, the same as a manual `vteam run` (see [Logs](#logs)). The scheduler prints the job table from `vteam status`, then one line per job start, finish, failure, stop, or skipped tick, stamped with the time of day; starts and failures include the path to that run's log file.
 
 ## Commands
 
@@ -233,8 +233,9 @@ Running `vteam` with no arguments inside a project opens a full-screen, keyboard
 
 - **Overview** — the `vteam status` view, refreshed every 2 seconds. A refresh starts only after the previous one finishes, so a large aven project refreshes less often instead of piling up work. If a refresh fails, the last good view stays and the error appears in the footer.
 - **Agents** — a sidebar of your agents (plus the merge ensurer) with a live/idle marker and details for the selected one, next to its newest run log. The log pane follows the log while the agent runs; scroll up to pause, `G` to follow again. `p` / `n` step to the previous / next run, and the `run i/n` counter in the title turns yellow when you are looking at an older run. `w` toggles line wrap.
-  - **Running agents from the TUI** — `space` (or `a`) opens an action menu for the selected agent: run once, run on cron or edit its cron, stop its cron, start the scheduler, open the log. Each action also has its own key (`r`, `c`, `s`, `S`).
+  - **Running agents from the TUI** — `space` (or `a`) opens an action menu for the selected agent: run once, stop its run, run on cron or edit its cron, stop its cron, start the scheduler, open the log. Each action also has its own key (`r`, `x`, `c`, `s`, `S`).
     - **Run once** opens a dialog with an optional, multiline focus field, then starts `vteam run <agent>` in the background, passing the text as `--focus`. `⏎` runs, `shift+⏎` (or `alt+⏎`, `ctrl+j`) adds a line, `esc` cancels. Leave it empty for a normal run. The run keeps going after you quit the TUI.
+    - **Stop run** asks before stopping the selected agent's run (see [Stopping a run](#stopping-a-run)). For an agent with a worktree, choose with `j` / `k` between removing the worktree and keeping it for inspection.
     - **Run on cron** opens a dialog prefilled with the enabled pattern, or else the `agent.json` default. As you type it shows the schedule in words, the next three fire times, or the parse error. `tab` toggles saving the pattern as the default in `agent.json` (`vteam.config.json` for the merge ensurer). Confirming enables the cron and, if no scheduler is running, starts one in the background (see [Running on a schedule](#running-on-a-schedule)).
     - **Cron markers** — an agent on cron shows `◷` in the sidebar, its pattern and next run in the details, and a line above its log. All three turn yellow with "paused" when the scheduler is not running.
 - **Info** — the project, `vteam.config.json`, whether the scheduler is running, and each agent's settings, including the tools it is allowed.
@@ -253,7 +254,7 @@ The top-right corner shows the aven project, task label, and git branch.
 | `p` / `n` | Agents tab: previous (older) / next (newer) run |
 | `f` / `w` | Agents tab: toggle follow / line wrap |
 | `space` `a` | Agents tab: action menu for the selected agent |
-| `r` / `c` / `s` / `S` | Agents tab: run once / run on cron or edit its cron / stop its cron / start the scheduler |
+| `r` / `x` / `c` / `s` / `S` | Agents tab: run once / stop its run / run on cron or edit its cron / stop its cron / start the scheduler |
 | `ctrl+r` | refresh now |
 | `?` | help |
 | `q` `ctrl+c` | quit |
@@ -401,7 +402,11 @@ improver finds issue
           crash or error (no increment)
 ```
 
-Any ending other than a pushed commit or "no changes" — a crash, an error, or a `readOnly` / non-worktree agent with `input: "task"` — returns the task to `todo` without incrementing `retry-count`.
+Any ending other than a pushed commit or "no changes" — a crash, an error, a stop, or a `readOnly` / non-worktree agent with `input: "task"` — returns the task to `todo` without incrementing `retry-count`.
+
+### Stopping a run
+
+Stop a running agent from the TUI (`x` on the Agents tab), or send its process a signal: `SIGTERM` or `Ctrl+C` stops it and removes its worktree, `SIGUSR1` stops it and keeps the worktree so you can look at what the agent did (`vteam clean` removes it later). Claude is stopped, the task goes back to `todo` with a note, and the on-finish hook and memory curation are skipped. If Claude has already answered, vteam finishes committing, pushing, and opening the PR first, so a stop never leaves a pushed branch without its PR. A stopped run exits with code 143 and its log ends with `! <agent> stopped after …`; the scheduler logs it as stopped, not failed. The merge ensurer stops between PRs.
 
 ### Routing tasks to agents
 

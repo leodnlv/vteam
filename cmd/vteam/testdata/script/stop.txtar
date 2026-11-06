@@ -1,0 +1,78 @@
+# A signalled run stops: SIGUSR1 keeps the worktree, SIGTERM removes it, and either way the task goes back to todo.
+[!aven] skip 'aven is not installed'
+mkdir $FAKE_DIR/claude
+
+exec git init -q --bare origin.git
+mkdir app
+cd app
+exec git init -q -b main
+cp ../files/README.md README.md
+exec git add -A
+exec git commit -q -m init
+exec git remote add origin $WORK/origin.git
+exec git push -q origin main
+
+mkdir vteam/agents/improver vteam/agents/coder
+cp ../files/vteam.config.json vteam/vteam.config.json
+cp ../files/improver.json vteam/agents/improver/agent.json
+cp ../files/prompt.md vteam/agents/improver/AGENT.md
+cp ../files/coder.json vteam/agents/coder/agent.json
+cp ../files/prompt.md vteam/agents/coder/AGENT.md
+
+cp ../files/finding.json $FAKE_DIR/claude/1.json
+exec vteam run improver
+triage e2e
+
+# Stopped with SIGUSR1 while Claude works: the worktree stays, the task returns to todo.
+cp ../files/stop-keep.sh $FAKE_DIR/claude/2.sh
+cp ../files/fix.json $FAKE_DIR/claude/2.json
+! exec vteam run coder
+stdout 'worktree kept, `vteam clean` removes it'
+stderr '! coder stopped after'
+! stderr 'failed'
+exec git worktree list
+stdout '\.vteam-worktrees'
+exec vteam status
+stdout 'coder  \S+ \[high\] Missing null check'
+
+exec vteam clean
+exec git worktree list
+! stdout '\.vteam-worktrees'
+
+# Stopped with SIGTERM: the worktree is removed.
+cp ../files/stop.sh $FAKE_DIR/claude/3.sh
+cp ../files/fix.json $FAKE_DIR/claude/3.json
+! exec vteam run coder
+stdout 'worktree removed'
+stderr '! coder stopped after'
+exec git worktree list
+! stdout '\.vteam-worktrees'
+exec vteam status
+stdout 'coder  \S+ \[high\] Missing null check'
+
+-- files/README.md --
+# app
+-- files/prompt.md --
+You are an agent.
+-- files/vteam.config.json --
+{
+  "baseBranch": "main",
+  "platform": "github",
+  "worktreeDir": ".vteam-worktrees",
+  "tasks": { "maxRetries": 3, "project": "e2e" }
+}
+-- files/improver.json --
+{ "output": "task" }
+-- files/coder.json --
+{ "worktree": true, "input": "task", "autoPR": true }
+-- files/finding.json --
+{"status":"completed","summary":"Found one.","content":{"type":"task","body":{"title":"Missing null check","severity":"high","description":"Crashes on null.","files":["README.md:1"]}}}
+-- files/stop-keep.sh --
+echo "half done" >> README.md
+kill -USR1 $(sed -n 's/.*"pid": *\([0-9]*\).*/\1/p' $WORK/app/vteam/.locks/coder.lock/info.json)
+exec sleep 10 >/dev/null 2>&1
+-- files/stop.sh --
+kill -TERM $(sed -n 's/.*"pid": *\([0-9]*\).*/\1/p' $WORK/app/vteam/.locks/coder.lock/info.json)
+exec sleep 10 >/dev/null 2>&1
+-- files/fix.json --
+{"status":"completed","summary":"Added the check.","filesChanged":["README.md"],"commitMessage":{"subject":"vteam: add null check","body":"Guards the null case."}}

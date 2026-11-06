@@ -48,6 +48,8 @@ type Deps struct {
 
 	// RunOnce starts one run of an agent (or the merge ensurer) in the background; focus is "" for none.
 	RunOnce func(name, focus string) error
+	// StopRun asks the live run of an agent (or the merge ensurer) to stop; keepWorktree leaves its worktree in place.
+	StopRun func(name string, keepWorktree bool) error
 	// EnableCron turns on a cron with expr; DisableCron turns it off.
 	EnableCron  func(name, expr string) error
 	DisableCron func(name string) error

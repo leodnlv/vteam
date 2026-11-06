@@ -11,6 +11,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/cron"
 	"github.com/leodnlv/vteam/internal/log"
 	"github.com/leodnlv/vteam/internal/schedule"
@@ -20,6 +21,7 @@ const (
 	toastDuration    = 5 * time.Second
 	fallbackCron     = "0 * * * *"
 	cronDialogWidth  = 52
+	stopDialogWidth  = 56
 	runDialogWidth   = 64
 	focusMinRows     = 3
 	focusMaxRows     = 10
@@ -36,10 +38,11 @@ const (
 	dialogConfirm
 	dialogRun
 	dialogCron
+	dialogStop
 )
 
 // dialog is the popup open on the Agents tab: the action menu, the run dialog (dialogConfirm for the
-// merge ensurer, which takes no focus), or the cron editor.
+// merge ensurer, which takes no focus), the cron editor, or the stop dialog.
 type dialog struct {
 	kind   dialogKind
 	agent  string
@@ -52,6 +55,19 @@ type dialog struct {
 type toast struct {
 	text  string
 	until time.Time
+}
+
+type stopOption struct {
+	label        string
+	keepWorktree bool
+}
+
+// stopOptions are the ways to stop a's run; an agent without a worktree has only one.
+func stopOptions(a Agent) []stopOption {
+	if a.Config == nil || !a.Config.Worktree {
+		return []stopOption{{label: "Stop"}}
+	}
+	return []stopOption{{label: "Stop and remove worktree"}, {label: "Stop and keep worktree", keepWorktree: true}}
 }
 
 type menuItem struct {
@@ -87,11 +103,12 @@ func (m Model) menuItems(a Agent) []menuItem {
 	if a.Running != nil {
 		run.label = "Run once (running)"
 	}
+	stop := menuItem{"x", "Stop run…", a.Running != nil}
 	cronItem := menuItem{"c", "Run on cron…", a.Runnable()}
 	if a.Cron != "" {
 		cronItem.label = "Edit cron…"
 	}
-	items := []menuItem{run, cronItem, {"s", "Stop cron", a.Cron != ""}}
+	items := []menuItem{run, stop, cronItem, {"s", "Stop cron", a.Cron != ""}}
 	if m.cronsPaused() {
 		items = append(items, menuItem{"S", "Start scheduler", true})
 	}
@@ -148,6 +165,11 @@ func (m Model) agentAction(key string) Model {
 			expr = fallbackCron
 		}
 		m.dialog = dialog{kind: dialogCron, agent: a.Name, input: newCronInput(expr)}
+	case "x":
+		if a.Running == nil {
+			return m.withToast(styleWarn.Render("! " + a.Name + " is not running"))
+		}
+		m.dialog = dialog{kind: dialogStop, agent: a.Name}
 	case "s":
 		if a.Cron == "" {
 			return m.withToast(styleWarn.Render("! " + a.Name + " has no cron enabled"))
@@ -183,8 +205,32 @@ func (m Model) handleDialogKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.handleRunKey(msg)
 	case dialogCron:
 		return m.handleCronKey(msg)
+	case dialogStop:
+		return m.handleStopKey(msg), nil
 	}
 	return m, nil
+}
+
+func (m Model) handleStopKey(msg tea.KeyPressMsg) Model {
+	a, ok := m.agentByName(m.dialog.agent)
+	if !ok {
+		m.dialog = dialog{}
+		return m
+	}
+	options := stopOptions(a)
+	switch {
+	case key.Matches(msg, keys.Cancel, keys.Quit):
+		m.dialog = dialog{}
+	case key.Matches(msg, keys.Down):
+		m.dialog.cursor = min(len(options)-1, m.dialog.cursor+1)
+	case key.Matches(msg, keys.Up):
+		m.dialog.cursor = max(0, m.dialog.cursor-1)
+	case key.Matches(msg, keys.Confirm):
+		keep := options[min(m.dialog.cursor, len(options)-1)].keepWorktree
+		m.dialog = dialog{}
+		return m.stopRun(a.Name, keep)
+	}
+	return m
 }
 
 func (m Model) handleMenuKey(msg tea.KeyPressMsg) Model {
@@ -308,6 +354,17 @@ func (m Model) runOnce(name, focus string) Model {
 	return m.refreshAfterAction().withToast(text)
 }
 
+func (m Model) stopRun(name string, keepWorktree bool) Model {
+	if err := m.deps.StopRun(name, keepWorktree); err != nil {
+		return m.withToast(styleFail.Render("✗ " + firstLine(err.Error())))
+	}
+	text := styleWarn.Render("■ ") + "stopping " + styleBold.Render(name)
+	if keepWorktree {
+		text += styleMuted.Render(" · keeping its worktree")
+	}
+	return m.refreshAfterAction().withToast(text)
+}
+
 func (m Model) enableCron(name, expr string, save bool) Model {
 	if err := m.deps.EnableCron(name, expr); err != nil {
 		return m.withToast(styleFail.Render("✗ " + firstLine(err.Error())))
@@ -364,6 +421,8 @@ func (m Model) renderDialog(body []string) []string {
 		return overlay(body, m.runBox(), m.width, height)
 	case dialogCron:
 		return overlay(body, m.cronBox(), m.width, height)
+	case dialogStop:
+		return overlay(body, m.stopBox(), m.width, height)
 	}
 	return body
 }
@@ -392,6 +451,39 @@ func (m Model) confirmBox() string {
 		styleKey.Render("⏎") + styleMuted.Render(" run now   ") + styleKey.Render("esc") + styleMuted.Render(" cancel"),
 	}
 	return styleBox.Render(strings.Join(lines, "\n"))
+}
+
+func (m Model) stopBox() string {
+	a, _ := m.agentByName(m.dialog.agent)
+	lines := []string{styleBoxHead.Render("Stop ") + styleBold.Render(a.Name) + styleBoxHead.Render("?"), ""}
+	switch {
+	case a.Builtin:
+		lines = append(lines, styleMuted.Render("It finishes the PR it is on, then stops."))
+	case a.Config != nil:
+		text := "Claude is stopped, and the on-finish hook and memory curation are skipped. Output Claude already returned is still pushed."
+		if a.Config.Input == config.InputTask {
+			text += " Its task goes back to todo."
+		}
+		lines = append(lines, styleMuted.Render(text))
+	}
+	options := stopOptions(a)
+	if len(options) > 1 {
+		lines = append(lines, "")
+		for i, o := range options {
+			if i == m.dialog.cursor {
+				lines = append(lines, styleSelected.Render("› "+o.label))
+			} else {
+				lines = append(lines, "  "+o.label)
+			}
+		}
+		lines = append(lines, styleMuted.Render("  a kept worktree stays until `vteam clean`"))
+	}
+	hints := styleKey.Render("⏎") + styleMuted.Render(" stop   ")
+	if len(options) > 1 {
+		hints += styleKey.Render("j/k") + styleMuted.Render(" choose   ")
+	}
+	lines = append(lines, "", hints+styleKey.Render("esc")+styleMuted.Render(" cancel"))
+	return styleBox.Width(stopDialogWidth).Render(strings.Join(lines, "\n"))
 }
 
 func (m Model) runBox() string {

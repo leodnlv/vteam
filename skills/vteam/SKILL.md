@@ -24,7 +24,7 @@ vteam is a Go CLI that orchestrates AI agents powered by `claude -p` (Claude Cod
 ## CLI commands
 
 ```
-vteam                                   # interactive TUI: Overview (status), Agents (live run logs, p/n through runs; space for actions: run once with an optional multiline --focus, run on cron, stop cron), Info (config + agent settings); ? for keys
+vteam                                   # interactive TUI: Overview (status), Agents (live run logs, p/n through runs; space for actions: run once with an optional multiline --focus, stop a running agent (x), run on cron, stop cron), Info (config + agent settings); ? for keys
 vteam init                              # scaffold vteam/ directory in the current project
 vteam run <agent>                       # run a specific agent (hidden from --help, still works)
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
@@ -201,7 +201,7 @@ The orchestrator then:
 improver finds issue → aven task in inbox
 human triages → todo
 coder picks task → active → implements fix → branch + PR → done
-no changes / crash / error → active → back to todo
+no changes / crash / error / stop → active → back to todo
 review comments to apply → human adds the vteam:changes-requested PR label → vteam ensure-merge moves the task to todo → coder pushes to the same PR → done
 PR conflicts with base → vteam ensure-merge moves the task to todo → coder merges base, resolves conflicts → done
 PR merged → vteam ensure-merge sets merged=true; PR closed → task canceled
@@ -216,6 +216,7 @@ Tasks live in aven, scoped to `tasks.project` + `tasks.label`. Refs look like `A
 - **Human triage**: users can manage tasks in aven (`aven tui` or CLI) — move findings to backlog/canceled, reprioritize, add dependencies, or add the `vteam` label to their own tasks to queue them for the coder. Canceled tasks still appear in the dedup list, so canceling marks a finding as rejected/false positive.
 - **Merge ensurer** (`vteam ensure-merge`, no Claude): for each `done` task with `pr-url` and without `merged=true`, looks the PR up. Merged → metadata `merged=true`. Closed → `canceled` + note. Open with `mergeEnsurer.label` → removes the label first (if that fails the task stays done), then `todo`, clears `retry-count`, adds a note. Open and conflicting → `todo` + note. Otherwise nothing; comments alone never reopen a task. Unknown mergeability is skipped. Holds `vteam/.locks/merge-ensurer`, logs to `vteam/.logs/merge-ensurer/`.
 - **PR follow-ups**: add the `mergeEnsurer.label` to the PR, or reopen by hand with `aven edit <ref> --status todo` plus `aven note <ref> "<which comments to apply>"`. The task's `pr-url` makes the run check out the PR branch and see its unresolved review threads. A merged or closed PR parks the task in `backlog`; remove `pr-url` (`aven edit <ref> --remove-metadata pr-url`) to start over on a new branch.
+- **Stopping**: TUI `x`, or a signal to the `vteam run` process. SIGTERM/SIGINT stops it and removes the worktree; SIGUSR1 keeps the worktree (`vteam clean` removes it later). Claude is killed, the task returns to `todo` with a `<agent>: stopped` note, retries unchanged, and the on-finish hook and memory curation are skipped. Once Claude has answered, the commit/push/PR/`done` steps finish even if a stop arrives. A stopped run exits 143; the scheduler logs it as stopped. The merge ensurer stops between PRs.
 - **Hard kill**: if the vteam process is killed, the task may remain `active`. `vteam clean` returns it to `todo` when `claimed-host` is this machine and `claimed-pid` is dead; otherwise reset it with `aven edit <ref> --status todo`.
 
 ## Optional agent files

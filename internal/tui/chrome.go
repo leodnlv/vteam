@@ -56,6 +56,8 @@ func (m Model) hints() []key.Binding {
 			return []key.Binding{relabel(keys.Confirm, "⏎", "run"), keys.Cancel}
 		case dialogRun:
 			return []key.Binding{relabel(keys.Confirm, "⏎", "run"), keys.NewLine, keys.Cancel}
+		case dialogStop:
+			return []key.Binding{relabel(keys.Confirm, "⏎", "stop"), relabel(keys.Down, "j/k", "choose"), keys.Cancel}
 		default:
 			return []key.Binding{keys.Confirm, keys.SaveDefault, keys.Cancel}
 		}
@@ -139,7 +141,7 @@ var helpGroups = []struct {
 		relabel(keys.Down, "j k", "select agent (sidebar) or scroll log"),
 		keys.SwitchPane, keys.FocusLog, keys.FocusSidebar,
 		relabel(keys.PrevRun, "p  n", "previous (older) / next (newer) run"),
-		keys.Actions, keys.Run, keys.Cron, keys.StopCron, keys.StartScheduler, keys.Follow, keys.Wrap,
+		keys.Actions, keys.Run, keys.StopRun, keys.Cron, keys.StopCron, keys.StartScheduler, keys.Follow, keys.Wrap,
 	}},
 }
 

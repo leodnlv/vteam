@@ -278,6 +278,7 @@ const (
 	RunProcessing    RunStatus = "processing"
 	RunCompleted     RunStatus = "completed"
 	RunFailed        RunStatus = "failed"
+	RunStopped       RunStatus = "stopped"
 )
 
 type RunState struct {

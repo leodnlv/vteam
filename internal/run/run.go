@@ -70,6 +70,9 @@ func NewDeps(cwd string, cfg *config.Config, logger *log.Logger) Deps {
 // ErrFailed means the run failed and the failure was already reported in the run output.
 var ErrFailed = fmt.Errorf("agent run failed: %w", log.ErrReported)
 
+// ErrStopKeepWorktree is the cancel cause of a run context that stops the run but keeps its worktree.
+var ErrStopKeepWorktree = errors.New("stopped, keeping the worktree")
+
 type Options struct {
 	Focus string
 }
@@ -86,9 +89,12 @@ func MemoryPath(cwd, agent string) string {
 
 type runner struct {
 	Deps
-	ctx   context.Context
-	agent *config.Agent
-	focus string
+	// ctx is the context of every external call; it stops being cancellable once Claude has answered.
+	ctx context.Context
+	// stopCtx is the context Run was given; it is cancelled when the run is asked to stop.
+	stopCtx context.Context
+	agent   *config.Agent
+	focus   string
 
 	runID      string
 	startedAt  string
@@ -106,7 +112,7 @@ type runner struct {
 
 // Run runs agent once. It returns ErrFailed when the run failed; the failure is already in the output.
 func Run(ctx context.Context, d Deps, agent *config.Agent, opts Options) error {
-	r := &runner{Deps: d, ctx: ctx, agent: agent, focus: opts.Focus}
+	r := &runner{Deps: d, ctx: ctx, stopCtx: ctx, agent: agent, focus: opts.Focus}
 	r.runID = RunID(agent.Name, d.Now())
 	r.startedAt = model.ISOTime(d.Now())
 	if err := os.MkdirAll(LocksDir(d.Cwd), 0o755); err != nil {
@@ -114,11 +120,18 @@ func Run(ctx context.Context, d Deps, agent *config.Agent, opts Options) error {
 	}
 
 	agentLock, err := r.execute()
-	if err != nil {
+	stopped := err != nil && ctx.Err() != nil
+	switch {
+	case stopped:
+		r.stop()
+	case err != nil:
 		r.fail(err)
 	}
-	r.finish()
+	r.finish(stopped)
 	agentLock.Release()
+	if stopped {
+		return log.ErrStopped
+	}
 	if r.outcome != nil && r.outcome.Status == "failed" {
 		return ErrFailed
 	}
@@ -151,6 +164,15 @@ func (r *runner) branch() string {
 		return ""
 	}
 	return r.worktree.Branch
+}
+
+func (r *runner) stop() {
+	r.state = model.RunState{RunID: r.runID, Agent: r.agent.Name, Status: model.RunStopped, StartedAt: r.startedAt, Error: "stopped"}
+	r.writeState()
+}
+
+func (r *runner) keepWorktree() bool {
+	return errors.Is(context.Cause(r.stopCtx), ErrStopKeepWorktree)
 }
 
 func (r *runner) fail(err error) {
@@ -194,6 +216,8 @@ func (r *runner) execute() (*lock.Lock, error) {
 	if err != nil {
 		return agentLock, err
 	}
+	// A stop from here on would cut a push off from its PR and task update, so the output is applied in full.
+	r.ctx = context.WithoutCancel(r.stopCtx)
 	return agentLock, r.applyOutput(out)
 }
 
@@ -705,20 +729,34 @@ func (r *runner) addNote(ref, text string) {
 }
 
 // finish releases an unsettled task, runs the hooks, and removes the worktree, whatever happened before.
-func (r *runner) finish() {
+// It still cleans up after a stop; the hooks are skipped once a stop was asked for.
+func (r *runner) finish(stopped bool) {
+	r.ctx = context.WithoutCancel(r.stopCtx)
 	if r.task != nil && !r.settled {
 		if err := r.Tasks.Update(r.ctx, r.task.Ref, tasks.Update{Status: model.StatusTodo, RemoveMetadata: tasks.ClaimKeys}); err != nil {
 			r.Log.Warn(fmt.Sprintf("failed to return task %s to todo: %s", r.task.Ref, err))
 		}
+		if stopped {
+			r.addNote(r.task.Ref, r.agent.Name+": stopped\n\nThe run was stopped before it finished.")
+		}
 	}
-	if r.outcome != nil {
+	if r.outcome != nil && r.stopCtx.Err() == nil {
 		r.runOnFinishHook()
 		r.runMemoryCuration()
 	}
 	if r.worktree != nil {
 		r.Log.Section("Cleanup")
-		r.Git.RemoveWorktree(r.ctx, r.Cwd, r.worktree.Path)
-		r.Log.Step("worktree removed")
+		if r.keepWorktree() {
+			r.Log.Step("worktree kept, `vteam clean` removes it")
+			r.Log.Field("path", r.worktree.Path)
+		} else {
+			r.Git.RemoveWorktree(r.ctx, r.Cwd, r.worktree.Path)
+			r.Log.Step("worktree removed")
+		}
+	}
+	if stopped {
+		r.Log.Stopped(r.agent.Name)
+		return
 	}
 	if r.outcome != nil {
 		failure := ""
@@ -744,7 +782,7 @@ func (r *runner) runOnFinishHook() {
 	r.Log.Section(sectionTitle("On-finish hook", hook.Model))
 	parts, err := prompt.OnFinish(hook, *r.outcome)
 	if err == nil {
-		_, err = r.Claude.Run(r.ctx, claude.Options{SystemPrompt: parts.SystemPrompt, UserPrompt: parts.UserPrompt, Dir: r.Cwd,
+		_, err = r.Claude.Run(r.stopCtx, claude.Options{SystemPrompt: parts.SystemPrompt, UserPrompt: parts.UserPrompt, Dir: r.Cwd,
 			Model: hook.Model, AllowedTools: hook.AllowedTools, DisallowedTools: hook.DisallowedTools})
 	}
 	if err != nil {
@@ -765,7 +803,7 @@ func (r *runner) runMemoryCuration() {
 		r.Log.Warn("memory curation failed: " + err.Error())
 		return
 	}
-	res, err := r.Claude.Run(r.ctx, claude.Options{SystemPrompt: parts.SystemPrompt, UserPrompt: parts.UserPrompt, Dir: r.Cwd,
+	res, err := r.Claude.Run(r.stopCtx, claude.Options{SystemPrompt: parts.SystemPrompt, UserPrompt: parts.UserPrompt, Dir: r.Cwd,
 		Model: mem.Model, AllowedTools: mem.AllowedTools, DisallowedTools: mem.DisallowedTools})
 	if err != nil {
 		r.Log.Warn("memory curation failed: " + err.Error())

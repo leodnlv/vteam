@@ -312,6 +312,10 @@ func (s *Scheduler) tick(job Job, running *runningJobs, children *sync.WaitGroup
 			s.Log.OK(fmt.Sprintf("%s finished in %s", ansi.Bold(job.Name), elapsed))
 			return
 		}
+		if cmd.ProcessState.ExitCode() == log.ExitStopped {
+			s.Log.Warn(fmt.Sprintf("%s stopped after %s", ansi.Bold(job.Name), elapsed))
+			return
+		}
 		how := fmt.Sprintf("exited %d", cmd.ProcessState.ExitCode())
 		if status, ok := cmd.ProcessState.Sys().(syscall.WaitStatus); ok && status.Signaled() {
 			how = "killed by " + unixSignalName(status.Signal())

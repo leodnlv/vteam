@@ -37,7 +37,8 @@ func (f *fakeClaude) thenText(text string) *fakeClaude {
 	return f.then(func(claude.Options) claude.Result { return result(text, 0) })
 }
 
-func (f *fakeClaude) Run(_ context.Context, opts claude.Options) (claude.Result, error) {
+// Run calls the next response; a response may cancel the run to stop it, and then Run fails like a killed claude.
+func (f *fakeClaude) Run(ctx context.Context, opts claude.Options) (claude.Result, error) {
 	f.mu.Lock()
 	f.calls = append(f.calls, opts)
 	var fn func(claude.Options) claude.Result
@@ -50,7 +51,11 @@ func (f *fakeClaude) Run(_ context.Context, opts claude.Options) (claude.Result,
 	if fn == nil {
 		return claude.Result{}, errors.New("unexpected claude call")
 	}
-	return fn(opts), nil
+	res := fn(opts)
+	if err := ctx.Err(); err != nil {
+		return claude.Result{ExitCode: -1}, err
+	}
+	return res, nil
 }
 
 func (f *fakeClaude) Calls() []claude.Options {
@@ -75,6 +80,7 @@ type fakeWorktrees struct {
 	removed  []string
 	conflict []string
 	newSHA   string
+	onPush   func()
 }
 
 func newFakeWorktrees(t *testing.T, root string) *fakeWorktrees {
@@ -110,7 +116,10 @@ func (f *fakeWorktrees) CheckoutWorktree(_ context.Context, root, branch, dir st
 	return git.Session{Path: f.scratchRepo(branch), Branch: branch, RemoteSHA: "pr-head-sha"}, nil
 }
 
-func (f *fakeWorktrees) RemoveWorktree(_ context.Context, _, path string) {
+func (f *fakeWorktrees) RemoveWorktree(ctx context.Context, _, path string) {
+	if ctx.Err() != nil {
+		return
+	}
 	f.removed = append(f.removed, path)
 }
 
@@ -119,7 +128,13 @@ func (f *fakeWorktrees) MergeBaseBranch(_ context.Context, wt, base string) ([]s
 	return f.conflict, nil
 }
 
-func (f *fakeWorktrees) Push(_ context.Context, path, branch, remoteSHA string) error {
+func (f *fakeWorktrees) Push(ctx context.Context, path, branch, remoteSHA string) error {
+	if f.onPush != nil {
+		f.onPush()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	f.record("push")
 	f.pushes = append(f.pushes, pushCall{path, branch, remoteSHA})
 	return nil

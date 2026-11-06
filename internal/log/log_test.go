@@ -233,11 +233,12 @@ func TestAgentExitAndFinished(t *testing.T) {
 	clock.t = clock.t.Add(90 * time.Second)
 	l.Finished("coder", "")
 	l.Finished("coder", "boom")
+	l.Stopped("coder")
 
 	if got := out.String(); got != "       │\n 00:00 │ ✓ claude exited 0 · 2m05s · 7 turns · $0.46\n       │\n\n✓ coder completed in 1m30s\n" {
 		t.Errorf("stdout = %q", got)
 	}
-	if got := errOut.String(); got != " 00:00 │ ✗ claude exited 2\n\n✗ coder failed after 1m30s: boom\n" {
+	if got := errOut.String(); got != " 00:00 │ ✗ claude exited 2\n\n✗ coder failed after 1m30s: boom\n\n! coder stopped after 1m30s\n" {
 		t.Errorf("stderr = %q", got)
 	}
 }

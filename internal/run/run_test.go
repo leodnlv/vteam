@@ -1041,3 +1041,96 @@ func TestRunFailsWhenTheAgentLockIsHeld(t *testing.T) {
 	}
 	requireContains(t, h.out.String(), "timeout acquiring lock")
 }
+
+func TestStop(t *testing.T) {
+	worktreeTask := obj{"input": "task", "worktree": true, "autoPR": true}
+
+	stopDuringClaude := func(h *harness, cause error) error {
+		ctx, cancel := context.WithCancelCause(context.Background())
+		t.Cleanup(func() { cancel(nil) })
+		h.claude.then(func(claude.Options) claude.Result {
+			cancel(cause)
+			return claude.Result{}
+		})
+		agent, _ := config.ResolveAgent("test-agent", h.cwd)
+		return Run(ctx, h.deps(), agent, Options{})
+	}
+
+	t.Run("returns the task to todo, notes the stop, removes the worktree, and skips the hooks", func(t *testing.T) {
+		h := setup(t, project{agent: worktreeTask, onFinish: true})
+		seedTask(h, model.Task{})
+		err := stopDuringClaude(h, context.Canceled)
+		if !errors.Is(err, log.ErrStopped) {
+			t.Fatalf("err = %v", err)
+		}
+		if diff := cmp.Diff([]model.TaskStatus{"active", "todo"}, h.statuses()); diff != "" {
+			t.Error(diff)
+		}
+		if notes := h.tasks.Notes(); len(notes) != 1 || notes[0].Text != "test-agent: stopped\n\nThe run was stopped before it finished." {
+			t.Errorf("notes = %+v", notes)
+		}
+		if len(h.git.removed) != 1 {
+			t.Errorf("removed = %v", h.git.removed)
+		}
+		if len(h.claude.Calls()) != 1 {
+			t.Errorf("claude calls = %d, want only the agent", len(h.claude.Calls()))
+		}
+		requireContains(t, h.out.String(), "worktree removed", "! test-agent stopped after")
+		requireNotContains(t, h.out.String(), "failed")
+	})
+
+	t.Run("keeps the worktree when stopped with ErrStopKeepWorktree", func(t *testing.T) {
+		h := setup(t, project{agent: worktreeTask})
+		seedTask(h, model.Task{})
+		if err := stopDuringClaude(h, ErrStopKeepWorktree); !errors.Is(err, log.ErrStopped) {
+			t.Fatalf("err = %v", err)
+		}
+		if len(h.git.removed) != 0 {
+			t.Errorf("removed = %v", h.git.removed)
+		}
+		requireContains(t, h.out.String(), "worktree kept, `vteam clean` removes it", ".worktrees")
+		if diff := cmp.Diff([]model.TaskStatus{"active", "todo"}, h.statuses()); diff != "" {
+			t.Error(diff)
+		}
+	})
+
+	t.Run("writes a stopped run state", func(t *testing.T) {
+		h := setup(t, project{})
+		_ = stopDuringClaude(h, context.Canceled)
+		entries, _ := os.ReadDir(filepath.Join(h.cwd, "vteam", ".runs"))
+		if len(entries) != 1 {
+			t.Fatalf("run states = %v", entries)
+		}
+		data, _ := os.ReadFile(filepath.Join(h.cwd, "vteam", ".runs", entries[0].Name()))
+		var state model.RunState
+		_ = json.Unmarshal(data, &state)
+		if state.Status != model.RunStopped {
+			t.Errorf("state = %+v", state)
+		}
+	})
+
+	t.Run("finishes publishing when the stop arrives after Claude answered", func(t *testing.T) {
+		h := setup(t, project{agent: worktreeTask, onFinish: true})
+		seedTask(h, model.Task{})
+		agentEditing(h, nil, true)
+		ctx, cancel := context.WithCancelCause(context.Background())
+		t.Cleanup(func() { cancel(nil) })
+		h.git.onPush = func() { cancel(context.Canceled) }
+		agent, _ := config.ResolveAgent("test-agent", h.cwd)
+		if err := Run(ctx, h.deps(), agent, Options{}); err != nil {
+			t.Fatalf("err = %v\n%s", err, h.out.String())
+		}
+		if len(h.git.pushes) != 1 || len(h.platform.created) != 1 {
+			t.Errorf("pushes = %v, PRs = %v", h.git.pushes, h.platform.created)
+		}
+		if h.lastUpdate().Status != "done" {
+			t.Errorf("last update = %+v", h.lastUpdate())
+		}
+		if len(h.claude.Calls()) != 1 {
+			t.Errorf("claude calls = %d, the on-finish hook should be skipped", len(h.claude.Calls()))
+		}
+		if len(h.git.removed) != 1 {
+			t.Errorf("removed = %v", h.git.removed)
+		}
+	})
+}

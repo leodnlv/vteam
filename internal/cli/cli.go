@@ -46,6 +46,9 @@ func Main() int {
 	if err == nil {
 		return 0
 	}
+	if errors.Is(err, log.ErrStopped) {
+		return log.ExitStopped
+	}
 	if !errors.Is(err, log.ErrReported) {
 		fmt.Fprintln(os.Stderr, ansi.Fail("error: "+err.Error()))
 	}
@@ -173,6 +176,8 @@ func runAgent(ctx context.Context, dir, name, focus string) error {
 	if err != nil {
 		return err
 	}
+	ctx, stop := stopKeepingWorktreeOnSignal(ctx)
+	defer stop()
 	logger := log.Std()
 	runLog, err := runlog.Start(dir, agent.Name, time.Now(), logger)
 	if err != nil {
@@ -188,6 +193,24 @@ func runAgent(ctx context.Context, dir, name, focus string) error {
 		return err
 	}
 	return run.Run(ctx, run.NewDeps(dir, cfg, logger), agent, run.Options{Focus: focus})
+}
+
+// stopKeepingWorktreeOnSignal cancels ctx with run.ErrStopKeepWorktree on runstate.StopKeepWorktreeSignal.
+func stopKeepingWorktreeOnSignal(ctx context.Context) (context.Context, func()) {
+	ctx, cancel := context.WithCancelCause(ctx)
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, runstate.StopKeepWorktreeSignal)
+	go func() {
+		select {
+		case <-sigs:
+			cancel(run.ErrStopKeepWorktree)
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, func() {
+		signal.Stop(sigs)
+		cancel(nil)
+	}
 }
 
 func statusDeps(dir string, cfg *config.Config) status.Deps {
@@ -230,6 +253,10 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 		Now:          time.Now,
 		RunOnce: func(name, focus string) error {
 			_, err := schedule.SpawnRun(dir, name, focus, time.Now())
+			return err
+		},
+		StopRun: func(name string, keepWorktree bool) error {
+			_, err := runstate.Stop(dir, name, keepWorktree)
 			return err
 		},
 		EnableCron:     func(name, expr string) error { return schedule.Enable(dir, name, expr) },
@@ -347,6 +374,10 @@ func ensureMerge(ctx context.Context, dir string) error {
 		ensuremerge.LogSummary(logger, res)
 		return nil
 	}()
+	if ctx.Err() != nil {
+		logger.Stopped(ensuremerge.Name)
+		return log.ErrStopped
+	}
 	if err != nil {
 		logger.WriteFile(err.Error() + "\n")
 		logger.Finished(ensuremerge.Name, err.Error())

@@ -400,6 +400,14 @@ func TestSchedulerReportsFailedJobs(t *testing.T) {
 	_ = stop()
 }
 
+func TestSchedulerReportsStoppedJobs(t *testing.T) {
+	h := newHarness(t, map[string]string{"coder": "exit 143"})
+	stop, _ := h.start(t)
+	h.ticks <- "tick"
+	h.waitFor(t, "! coder stopped after")
+	_ = stop()
+}
+
 func TestSchedulerRefusesToRunTwice(t *testing.T) {
 	h := newHarness(t, map[string]string{"coder": "exit 0"})
 	_ = os.MkdirAll(filepath.Dir(PIDPath(h.cwd)), 0o755)
