@@ -174,8 +174,8 @@ func TestContentUnmarshalErrors(t *testing.T) {
 		raw     string
 		wantErr string
 	}{
-		{"unknown type", `{"type":"review","body":"x"}`, `content.type: expected "task" or "generic", got "review"`},
-		{"missing type", `{"body":"x"}`, `content.type: expected "task" or "generic", got ""`},
+		{"unknown type", `{"type":"review","body":"x"}`, `content.type: expected "task", "tasks" or "generic", got "review"`},
+		{"missing type", `{"body":"x"}`, `content.type: expected "task", "tasks" or "generic", got ""`},
 		{"generic body is not a string", `{"type":"generic","body":{"a":1}}`, "content.body:"},
 		{"task body is not an object", `{"type":"task","body":"just text"}`, "content.body:"},
 		{"task body missing", `{"type":"task"}`, "content.body:"},
