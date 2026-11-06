@@ -8,6 +8,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textarea"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/leodnlv/vteam/internal/cron"
@@ -42,7 +43,7 @@ type dialog struct {
 	kind   dialogKind
 	agent  string
 	cursor int
-	input  lineInput
+	input  textinput.Model
 	save   bool
 	focus  textarea.Model
 }
@@ -145,7 +146,7 @@ func (m Model) agentAction(key string) Model {
 		if expr == "" {
 			expr = fallbackCron
 		}
-		m.dialog = dialog{kind: dialogCron, agent: a.Name, input: newLineInput(expr)}
+		m.dialog = dialog{kind: dialogCron, agent: a.Name, input: newCronInput(expr)}
 	case "s":
 		if a.Cron == "" {
 			return m.withToast(styleWarn.Render("! " + a.Name + " has no cron enabled"))
@@ -177,8 +178,6 @@ func (m Model) handleDialogKey(key string) Model {
 		case "esc", "n", "q":
 			m.dialog = dialog{}
 		}
-	case dialogCron:
-		return m.handleCronKey(key)
 	}
 	return m
 }
@@ -212,24 +211,42 @@ func (m Model) handleMenuKey(key string) Model {
 	return m
 }
 
-func (m Model) handleCronKey(key string) Model {
-	switch key {
+func newCronInput(expr string) textinput.Model {
+	in := textinput.New()
+	in.Prompt = ""
+	in.SetValue(expr)
+	in.CursorEnd()
+	styles := textinput.DefaultDarkStyles()
+	styles.Cursor.Blink = false
+	in.SetStyles(styles)
+	in.Focus()
+	return in
+}
+
+func cronExpr(in textinput.Model) string {
+	return strings.Join(strings.Fields(in.Value()), " ")
+}
+
+func (m Model) handleCronKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch msg.String() {
 	case "esc":
 		m.dialog = dialog{}
 	case "tab":
 		m.dialog.save = !m.dialog.save
 	case "enter":
-		expr := m.dialog.input.trimmed()
+		expr := cronExpr(m.dialog.input)
 		if _, err := cron.Parse(expr); err != nil {
-			return m
+			return m, nil
 		}
 		d := m.dialog
 		m.dialog = dialog{}
-		return m.enableCron(d.agent, expr, d.save)
+		return m.enableCron(d.agent, expr, d.save), nil
 	default:
-		m.dialog.input, _ = m.dialog.input.handle(key)
+		var cmd tea.Cmd
+		m.dialog.input, cmd = m.dialog.input.Update(msg)
+		return m, cmd
 	}
-	return m
+	return m, nil
 }
 
 func newFocusInput(width int) textarea.Model {
@@ -394,10 +411,10 @@ func (m Model) cronBox() string {
 		title, verb = "Edit cron of "+d.agent, "update"
 	}
 	label := func(s string) string { return styleMuted.Render(log.PadEnd(s, 9)) }
-	lines := []string{styleBoxHead.Render(title), "", label("cron") + d.input.view()}
+	lines := []string{styleBoxHead.Render(title), "", label("cron") + d.input.View()}
 
 	now := m.deps.Now()
-	expr := d.input.trimmed()
+	expr := cronExpr(d.input)
 	if s, err := cron.Parse(expr); err != nil {
 		lines = append(lines, label("")+styleFail.Render("✗ "+err.Error()), "")
 	} else {

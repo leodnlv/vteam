@@ -37,10 +37,37 @@ func update(t *testing.T, m Model, msg tea.Msg) Model {
 func press(t *testing.T, m Model, keys ...string) Model {
 	t.Helper()
 	for _, k := range keys {
-		next, _ := m.handleKey(k)
+		next, _ := m.Update(keyMsg(t, k))
 		m = next.(Model)
 	}
 	return m
+}
+
+func keyMsg(t *testing.T, name string) tea.KeyPressMsg {
+	t.Helper()
+	named := map[string]rune{
+		"enter": tea.KeyEnter, "esc": tea.KeyEscape, "tab": tea.KeyTab, "space": tea.KeySpace,
+		"up": tea.KeyUp, "down": tea.KeyDown, "left": tea.KeyLeft, "right": tea.KeyRight,
+		"home": tea.KeyHome, "end": tea.KeyEnd, "pgup": tea.KeyPgUp, "pgdown": tea.KeyPgDown,
+		"backspace": tea.KeyBackspace, "delete": tea.KeyDelete,
+	}
+	if code, ok := named[name]; ok {
+		if code == tea.KeySpace {
+			return tea.KeyPressMsg{Code: code, Text: " "}
+		}
+		return tea.KeyPressMsg{Code: code}
+	}
+	if name == "shift+tab" {
+		return tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
+	}
+	if rest, ok := strings.CutPrefix(name, "ctrl+"); ok && len(rest) == 1 {
+		return tea.KeyPressMsg{Code: rune(rest[0]), Mod: tea.ModCtrl}
+	}
+	r := []rune(name)
+	if len(r) != 1 {
+		t.Fatalf("unknown key %q", name)
+	}
+	return tea.KeyPressMsg{Code: r[0], Text: name}
 }
 
 func screen(m Model) string {

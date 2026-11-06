@@ -97,7 +97,7 @@ func TestEnablingACronFromTheActionMenu(t *testing.T) {
 	m = press(t, m, "space")
 	assertScreen(t, m, "Run once now…", "Run on cron…", "Stop cron", "Open log")
 	m = press(t, m, "j", "enter")
-	if m.dialog.kind != dialogCron || m.dialog.input.String() != "0 * * * *" {
+	if m.dialog.kind != dialogCron || m.dialog.input.Value() != "0 * * * *" {
 		t.Fatalf("cron dialog should open prefilled with the agent.json default: %+v", m.dialog)
 	}
 	assertScreen(t, m, "Run improver on cron", "every hour at :00", "next", "default  0 * * * * (agent.json)")
@@ -244,15 +244,27 @@ func TestDescribeCron(t *testing.T) {
 	}
 }
 
-func TestLineInputEditing(t *testing.T) {
-	in := newLineInput("0 * * * *")
-	for _, k := range []string{"home", "delete", "1", "5", "end", "backspace", "space", "x", "left", "ctrl+w"} {
-		in, _ = in.handle(k)
+func TestCronInputEditing(t *testing.T) {
+	in := newCronInput("0 * * * *")
+	for _, k := range []tea.KeyPressMsg{
+		{Code: 'a', Mod: tea.ModCtrl},
+		{Code: tea.KeyDelete},
+		{Code: '1', Text: "1"},
+		{Code: '5', Text: "5"},
+		{Code: 'e', Mod: tea.ModCtrl},
+		{Code: tea.KeyBackspace},
+		{Code: tea.KeySpace, Text: " "},
+		{Code: 'x', Text: "x"},
+		{Code: tea.KeyLeft},
+		{Code: 'w', Mod: tea.ModCtrl},
+	} {
+		in, _ = in.Update(k)
 	}
-	if got := in.String(); got != "15 * * x" {
+	if got := in.Value(); got != "15 * * x" {
 		t.Errorf("text = %q", got)
 	}
-	if _, ok := in.handle("ctrl+k"); ok {
-		t.Error("unknown control keys should not be handled")
+	in, _ = in.Update(tea.PasteMsg{Content: "7 8"})
+	if got := in.Value(); got != "15 * * 7 8x" {
+		t.Errorf("paste: text = %q", got)
 	}
 }

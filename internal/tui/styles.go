@@ -41,7 +41,6 @@ var (
 
 	styleSelected     = lipgloss.NewStyle().Reverse(true)
 	styleSelectedBlur = lipgloss.NewStyle().Background(fg(palette.Muted)).Foreground(fg(palette.OnBrand))
-	styleCursor       = styleSelected
 
 	styleToolName      = lipgloss.NewStyle().Foreground(fg(palette.Tool)).Bold(true)
 	styleFinishedOK    = lipgloss.NewStyle().Foreground(fg(palette.OK)).Bold(true)

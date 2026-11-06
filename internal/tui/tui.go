@@ -124,11 +124,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.dialog.kind == dialogRun && msg.String() != "ctrl+c" {
 			return m.handleRunKey(msg)
 		}
+		if m.dialog.kind == dialogCron && msg.String() != "ctrl+c" {
+			return m.handleCronKey(msg)
+		}
 		return m.handleKey(msg.String())
 	case tea.PasteMsg:
-		if m.dialog.kind == dialogRun {
-			var cmd tea.Cmd
+		var cmd tea.Cmd
+		switch m.dialog.kind {
+		case dialogRun:
 			m.dialog.focus, cmd = m.dialog.focus.Update(msg)
+			return m, cmd
+		case dialogCron:
+			m.dialog.input, cmd = m.dialog.input.Update(msg)
 			return m, cmd
 		}
 	case statusMsg:
