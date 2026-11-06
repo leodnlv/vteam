@@ -413,7 +413,7 @@ func (m Model) renderDialog(body []string) []string {
 	switch m.dialog.kind {
 	case dialogMenu:
 		box := m.menuBox()
-		y := min(2+m.agents.selected+1, max(0, height-lipgloss.Height(box)))
+		y := min(m.agents.selected+2, max(0, height-lipgloss.Height(box)))
 		return overlayAt(body, box, sidebarWidth-6, y, m.width, height)
 	case dialogConfirm:
 		return overlay(body, m.confirmBox(), m.width, height)

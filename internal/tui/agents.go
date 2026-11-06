@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/viewport"
@@ -11,6 +12,7 @@ import (
 	"github.com/leodnlv/vteam/internal/log"
 )
 
+// sidebarWidth is the width inside the sidebar pane's border.
 const sidebarWidth = 26
 
 type agentsState struct {
@@ -99,8 +101,9 @@ func (s agentsState) stepRun(dir int) agentsState {
 	return s
 }
 
+// logPaneWidth is the width inside the log pane's border.
 func (m Model) logPaneWidth() int {
-	return max(10, m.width-sidebarWidth-1)
+	return max(10, m.width-sidebarWidth-4)
 }
 
 func (m Model) logBodyHeight() int {
@@ -129,7 +132,7 @@ func (m Model) cronBanner() []string {
 }
 
 func (m Model) logRows() []string {
-	width := m.logPaneWidth() - 1
+	width := m.logPaneWidth() - 2
 	var rows []string
 	for _, raw := range m.agents.log.lines {
 		styled := colorizeLog(raw)
@@ -148,26 +151,17 @@ func (m Model) logRows() []string {
 func (m Model) renderAgents() []string {
 	height := m.bodyHeight()
 	sidebar := m.renderSidebar(height)
-	pane := m.renderLogPane(height)
-	divider := styleDivider.Render("│")
-	if m.agents.focusLog {
-		divider = styleDividerFocus.Render("│")
-	}
+	logPane := m.renderLogPane(height)
 	lines := make([]string, height)
 	for i := range lines {
-		lines[i] = sidebar[i] + divider + pane[i]
+		lines[i] = sidebar[i] + logPane[i]
 	}
 	return lines
 }
 
 func (m Model) renderSidebar(height int) []string {
 	s := m.agents
-	title := styleTitleFocus
-	if s.focusLog {
-		title = styleTitleBlur
-	}
-	lines := []string{fit(title.Render(" AGENTS"), sidebarWidth), fit(" "+rule(sidebarWidth-2), sidebarWidth)}
-
+	var lines []string
 	for i, a := range s.list {
 		glyph, age := styleMuted.Render("○"), styleMuted.Render(lastRunAge(a, m))
 		switch {
@@ -184,23 +178,26 @@ func (m Model) renderSidebar(height int) []string {
 			age = clock + " " + age
 		}
 		row := spread(" "+glyph+" "+log.Truncate(a.Name, sidebarWidth-12), age+" ", sidebarWidth)
-		switch {
-		case i != s.selected:
+		if i != s.selected {
 			lines = append(lines, fit(row, sidebarWidth))
-		case s.focusLog:
-			lines = append(lines, styleSelectedBlur.Render(fit(xansi.Strip(row), sidebarWidth)))
-		default:
-			lines = append(lines, styleSelected.Render(fit(xansi.Strip(row), sidebarWidth)))
+			continue
 		}
+		bar, fill := styleSelectBar, styleSelected
+		if s.focusLog {
+			bar, fill = styleSelectBarBlur, styleSelectedBlur
+		}
+		plain := fit(xansi.Strip(row), sidebarWidth)
+		lines = append(lines, bar.Render("▌")+fill.Render(strings.TrimPrefix(plain, " ")))
 	}
 
 	if a, ok := s.current(); ok {
-		lines = append(lines, "", fit(" "+rule(sidebarWidth-2), sidebarWidth))
+		lines = append(lines, "", " "+rule(sidebarWidth-2))
 		for _, d := range m.agentDetails(a) {
-			lines = append(lines, fit(" "+d, sidebarWidth))
+			lines = append(lines, " "+d)
 		}
 	}
-	return window(lines, height, sidebarWidth)
+	count := styleMuted.Render(fmt.Sprintf(" %d ", len(s.list)))
+	return pane(lines, sidebarWidth+2, height, !s.focusLog, tag("Agents", !s.focusLog), count)
 }
 
 func lastRunAge(a Agent, m Model) string {
@@ -218,9 +215,10 @@ func (m Model) agentDetails(a Agent) []string {
 	var lines []string
 	field := func(label, value string) { lines = append(lines, styleMuted.Render(log.PadEnd(label, 7))+value) }
 	if a.Running != nil {
-		field("status", styleLive.Render(fmt.Sprintf("running · pid %d", a.Running.PID)))
+		field("status", styleLive.Render("● running"))
+		field("pid", strconv.Itoa(a.Running.PID))
 	} else {
-		field("status", styleMuted.Render("idle"))
+		field("status", styleMuted.Render("○ idle"))
 	}
 	switch {
 	case a.Cron != "" && m.schedulerRunning():
@@ -248,22 +246,23 @@ func (m Model) agentDetails(a Agent) []string {
 }
 
 func (m Model) renderLogPane(height int) []string {
-	width := m.logPaneWidth()
+	width := m.logPaneWidth() + 2
+	focused := m.agents.focusLog
 	a, ok := m.agents.current()
 	path := m.agents.logPath()
 	if !ok || path == "" {
-		empty := "no agents found"
+		title, empty := tag("Log", focused), "no agents found"
 		if ok {
-			empty = "no logs yet for " + styleBold.Render(a.Name)
+			title, empty = tag(a.Name, focused), "no logs yet for "+styleBold.Render(a.Name)
 		}
-		lines := []string{}
+		var lines []string
 		for _, b := range m.cronBanner() {
 			lines = append(lines, " "+b, "")
 		}
-		return window(append(lines, " "+styleMuted.Render(empty)), height, width)
+		return pane(append(lines, " "+styleMuted.Render(empty)), width, height, focused, title, "")
 	}
 
-	parts := []string{styleBold.Render(a.Name)}
+	var parts []string
 	if started, ok := logStartedAt(path); ok {
 		parts = append(parts, log.FormatTimeOfDay(started.Local(), m.deps.Now().Local()))
 	}
@@ -274,20 +273,21 @@ func (m Model) renderLogPane(height int) []string {
 		parts = append(parts, styleWarn.Render("paused"))
 	}
 	if a.Running != nil && m.agents.onLatestRun() {
-		parts = append(parts, styleLive.Render("● live"))
+		parts = append(parts, styleLiveChip.Render(" ● live "))
 	}
-	wrap := "nowrap"
 	if m.agents.wrap {
-		wrap = "wrap"
+		parts = append(parts, styleMuted.Render("wrap"))
+	} else {
+		parts = append(parts, styleMuted.Render("nowrap"))
 	}
-	title := spread(" "+strings.Join(parts, styleMuted.Render(" · ")), styleMuted.Render(wrap)+" ", width)
+	info := " " + strings.Join(parts, styleMuted.Render(" · ")) + " "
 
-	lines := []string{fit(title, width), fit(" "+rule(width-2), width)}
+	var lines []string
 	for _, b := range m.cronBanner() {
-		lines = append(lines, fit(" "+b, width))
+		lines = append(lines, " "+b)
 	}
 	lines = append(lines, strings.Split(m.agents.view.View(), "\n")...)
-	return window(lines, height, width)
+	return pane(lines, width, height, focused, tag(a.Name, focused), info)
 }
 
 // runCounter shows which run is on screen; it stands out in yellow when that is not the newest one.

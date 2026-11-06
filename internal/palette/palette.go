@@ -20,31 +20,33 @@ const Default Color = ""
 
 // The values are tuned for dark terminal backgrounds.
 var (
-	// Brand colors the banner badge, section markers, active tab, dialog borders and titles, and key hints.
-	Brand = Color("#7dd3fc")
+	// Brand colors the banner badge, the active tab, selections, dialog borders, and focused pane borders, which blend it into Accent.
+	Brand = Color("#6b50ff")
+	// Accent colors section markers, key hints, and the git branch, and is the far end of Brand's gradients.
+	Accent = Color("#ff60ff")
 	// OnBrand is the text color on a Brand background.
-	OnBrand = Color("#14151b")
+	OnBrand = Color("#fffaf1")
+	// OnBright is the text color on a bright background, such as the live and severity chips.
+	OnBright = Color("#1b1a22")
 	// Muted colors secondary text: the time gutter, field labels, pids, durations, URLs, hints, tool details.
-	Muted = Color("#7c8190")
-	// Rule colors section rules, the gutter bar, and pane dividers.
-	Rule = Color("#343846")
-	// Focus colors the divider of the focused pane.
-	Focus = Brand
+	Muted = Color("#8a879c")
+	// Rule colors section rules, the gutter bar, and the borders of unfocused panes.
+	Rule = Color("#4a4660")
 	// Key colors key names in the TUI's hints and dialogs.
-	Key = Brand
+	Key = Accent
 
-	Info   = Color("#6cb6ff")
-	OK     = Color("#6bd68f")
-	Warn   = Color("#f2c45a")
-	Fail   = Color("#ff7a7a")
-	Claude = Color("#e59cff")
-	Tool   = Color("#e8b75a")
+	Info   = Color("#8b75ff")
+	OK     = Color("#00ffb2")
+	Warn   = Color("#e8fe96")
+	Fail   = Color("#ff577d")
+	Claude = Accent
+	Tool   = Color("#ff985a")
 	Live   = OK
-	Cron   = Brand
-	Branch = Claude
+	Cron   = Color("#00a4ff")
+	Branch = Accent
 
 	// Surface is the background of the TUI's header and footer bands.
-	Surface = Color("#232634")
+	Surface = Color("#272533")
 )
 
 // Value returns c as a color, and false for Default or an invalid color.

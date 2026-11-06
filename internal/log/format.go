@@ -128,7 +128,7 @@ func formatBanner(title, detail string, color bool) string {
 	if !color {
 		return ansi.Strip("vteam ▸ " + title + suffix)
 	}
-	return ansi.Badge(" vteam ") + ansi.Brand(" ▸ ") + ansi.Bold(title) + suffix
+	return ansi.Badge(" vteam ") + ansi.Accent(" ▸ ") + ansi.Bold(title) + suffix
 }
 
 func FormatSection(title string) string {
@@ -138,7 +138,7 @@ func FormatSection(title string) string {
 	}
 	head := "▍ " + title + "  "
 	rule := strings.Repeat("─", max(3, width-utf8.RuneCountInString(head)))
-	return "\n" + ansi.Brand("▍") + " " + ansi.Bold(title) + "  " + ansi.Rule(rule)
+	return "\n" + ansi.Accent("▍") + " " + ansi.Bold(title) + "  " + ansi.Rule(rule)
 }
 
 func FormatListItem(glyph, text string) string {

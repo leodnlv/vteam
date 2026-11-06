@@ -171,7 +171,7 @@ func TestAgentsTabShowsSidebarAndNewestLog(t *testing.T) {
 		{Name: "improver"},
 	})
 	out := screen(m)
-	for _, want := range []string{"AGENTS", "● coder", "3m", "○ improver", "running · pid 42", "following", "● live", "run1 line 2", "1 running"} {
+	for _, want := range []string{" Agents ", "● coder", "3m", "○ improver", "● running", "pid    42", "following", "● live", "run1 line 2", "1 running"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("agents tab is missing %q:\n%s", want, out)
 		}

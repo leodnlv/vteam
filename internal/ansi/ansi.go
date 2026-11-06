@@ -87,6 +87,7 @@ var (
 	Dim  = paint("2", "22")
 
 	Brand  = role(&palette.Brand)
+	Accent = role(&palette.Accent)
 	Muted  = role(&palette.Muted)
 	Rule   = role(&palette.Rule)
 	Info   = role(&palette.Info)

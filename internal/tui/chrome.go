@@ -9,10 +9,11 @@ import (
 	"charm.land/lipgloss/v2"
 	xansi "github.com/charmbracelet/x/ansi"
 	"github.com/leodnlv/vteam/internal/log"
+	"github.com/leodnlv/vteam/internal/palette"
 )
 
 func (m Model) renderHeader() []string {
-	parts := []string{styleBrand.Render("vteam ▸")}
+	parts := []string{gradient(" vteam ▸ ", styleOnBrand, true, palette.Brand, palette.Accent)}
 	for i, name := range tabNames {
 		label := fmt.Sprintf(" %d %s ", i+1, name)
 		if Tab(i) == m.tab {
@@ -22,7 +23,8 @@ func (m Model) renderHeader() []string {
 		}
 	}
 	left := " " + strings.Join(parts, " ")
-	return []string{band(spread(left, m.projectLabel(), m.width), m.width), rule(m.width)}
+	headerRule := gradient(strings.Repeat("━", max(0, m.width)), lipgloss.NewStyle(), false, palette.Brand, palette.Accent, palette.Cron)
+	return []string{band(spread(left, m.projectLabel(), m.width), m.width), headerRule}
 }
 
 func (m Model) projectLabel() string {

@@ -27,29 +27,58 @@ var (
 	styleBranch  = lipgloss.NewStyle().Foreground(fg(palette.Branch))
 	styleKey     = lipgloss.NewStyle().Foreground(fg(palette.Key)).Bold(true)
 	styleBrand   = lipgloss.NewStyle().Foreground(fg(palette.Brand)).Bold(true)
-	styleMarker  = lipgloss.NewStyle().Foreground(fg(palette.Brand))
+	styleAccent  = lipgloss.NewStyle().Foreground(fg(palette.Accent)).Bold(true)
+	styleMarker  = lipgloss.NewStyle().Foreground(fg(palette.Accent))
 	styleSection = styleBold
 
 	styleBand      = lipgloss.NewStyle().Background(fg(palette.Surface))
 	styleTab       = styleMuted
 	styleTabActive = lipgloss.NewStyle().Background(fg(palette.Brand)).Foreground(fg(palette.OnBrand)).Bold(true)
+	styleOnBrand   = lipgloss.NewStyle().Foreground(fg(palette.OnBrand)).Bold(true)
+	styleTagBlur   = lipgloss.NewStyle().Background(fg(palette.Rule)).Foreground(fg(palette.Muted)).Bold(true)
+	styleLiveChip  = lipgloss.NewStyle().Background(fg(palette.Live)).Foreground(fg(palette.OnBright)).Bold(true)
 
-	styleTitleFocus   = styleBrand
-	styleTitleBlur    = lipgloss.NewStyle().Foreground(fg(palette.Muted)).Bold(true)
-	styleDivider      = styleRule
-	styleDividerFocus = lipgloss.NewStyle().Foreground(fg(palette.Focus))
-
-	styleSelected     = lipgloss.NewStyle().Reverse(true)
-	styleSelectedBlur = lipgloss.NewStyle().Background(fg(palette.Muted)).Foreground(fg(palette.OnBrand))
+	styleSelected      = lipgloss.NewStyle().Background(fg(palette.Brand)).Foreground(fg(palette.OnBrand)).Bold(true)
+	styleSelectedBlur  = lipgloss.NewStyle().Background(fg(palette.Rule)).Foreground(fg(palette.OnBrand))
+	styleSelectBar     = lipgloss.NewStyle().Background(fg(palette.Brand)).Foreground(fg(palette.Accent))
+	styleSelectBarBlur = lipgloss.NewStyle().Background(fg(palette.Rule)).Foreground(fg(palette.Muted))
 
 	styleToolName      = lipgloss.NewStyle().Foreground(fg(palette.Tool)).Bold(true)
 	styleFinishedOK    = lipgloss.NewStyle().Foreground(fg(palette.OK)).Bold(true)
 	styleFinishedError = lipgloss.NewStyle().Foreground(fg(palette.Fail)).Bold(true)
 
 	styleBox     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(fg(palette.Brand)).Padding(0, 2)
-	styleBoxHead = styleBrand
+	styleBoxHead = styleAccent
 	styleHelpBox = styleBox
 )
+
+// gradient paints each cell of text in style, with its foreground (or background, when onBackground) blended across stops.
+func gradient(text string, style lipgloss.Style, onBackground bool, stops ...palette.Color) string {
+	runes := []rune(text)
+	colors := make([]color.Color, len(stops))
+	for i, c := range stops {
+		colors[i] = fg(c)
+	}
+	blend := lipgloss.Blend1D(len(runes), colors...)
+	var b strings.Builder
+	for i, r := range runes {
+		cell := style.Foreground(blend[i%len(blend)])
+		if onBackground {
+			cell = style.Background(blend[i%len(blend)])
+		}
+		b.WriteString(cell.Render(string(r)))
+	}
+	return b.String()
+}
+
+// tag renders a pane title: Brand blending into Accent behind it when its pane has focus, a muted chip otherwise.
+func tag(text string, focused bool) string {
+	text = " " + text + " "
+	if !focused {
+		return styleTagBlur.Render(text)
+	}
+	return gradient(text, styleOnBrand, true, palette.Brand, palette.Accent)
+}
 
 // bandOpen is the escape sequence that turns on the band background.
 var bandOpen = func() string {
@@ -65,7 +94,8 @@ func band(line string, width int) string {
 
 // section renders a section heading as the commands do: an accent marker, the bold title, and a rule up to width cells.
 func section(title string, width int) string {
-	return styleMarker.Render("▍") + " " + styleSection.Render(title) + "  " + styleRule.Render(strings.Repeat("─", max(3, width-lipgloss.Width(title)-4)))
+	fade := gradient(strings.Repeat("─", max(3, width-lipgloss.Width(title)-4)), lipgloss.NewStyle(), false, palette.Brand, palette.Rule, palette.Rule)
+	return styleMarker.Render("▍") + " " + styleSection.Render(title) + "  " + fade
 }
 
 // stretchSections redraws the section headings among lines, which commands cap at 72 columns, to width cells.
