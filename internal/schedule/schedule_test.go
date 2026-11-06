@@ -63,7 +63,7 @@ func waitForFile(t *testing.T, path, want string) {
 
 func TestSpawnRunStartsADetachedRunWithItsLogPath(t *testing.T) {
 	cwd := t.TempDir()
-	path, err := SpawnRun(cwd, "improver", "", false, time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC))
+	path, err := SpawnRun(cwd, "improver", RunOptions{}, time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,13 +82,14 @@ func TestSpawnFinalizeAppendsToTheRunLog(t *testing.T) {
 	waitForFile(t, path, "session finalize 20261106-120000-coder sid-leader=true")
 }
 
-func TestSpawnRunPassesTheFocusAndInteractive(t *testing.T) {
+func TestSpawnRunPassesItsOptions(t *testing.T) {
 	cwd := t.TempDir()
-	path, err := SpawnRun(cwd, "improver", "look at\nthe parser", true, time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC))
+	opts := RunOptions{Focus: "look at\nthe parser", Task: "APP-7KQ9", Interactive: true}
+	path, err := SpawnRun(cwd, "improver", opts, time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForFile(t, path, "run improver --focus look at\nthe parser --interactive sid-leader=true")
+	waitForFile(t, path, "run improver --focus look at\nthe parser --task APP-7KQ9 --interactive sid-leader=true")
 }
 
 func TestStartDetachedWritesToTheSchedulerLog(t *testing.T) {

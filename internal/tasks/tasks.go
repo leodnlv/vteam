@@ -49,17 +49,14 @@ func MatchesFilter(task model.Task, filter config.TaskFilter) bool {
 	return true
 }
 
-// PickNext returns the ready task an agent should work on next: filtered, under the retry limit,
-// highest severity first, then oldest.
-func PickNext(ready []model.Task, filter config.TaskFilter, maxRetries int) (model.Task, bool) {
+// Candidates returns the ready tasks routed to filter in pick order: highest severity first, then oldest.
+// Tasks at the retry limit are included; PickNext skips them.
+func Candidates(ready []model.Task, filter config.TaskFilter) []model.Task {
 	var candidates []model.Task
 	for _, t := range ready {
-		if MatchesFilter(t, filter) && t.RetryCount < maxRetries {
+		if MatchesFilter(t, filter) {
 			candidates = append(candidates, t)
 		}
-	}
-	if len(candidates) == 0 {
-		return model.Task{}, false
 	}
 	slices.SortStableFunc(candidates, func(a, b model.Task) int {
 		if d := a.Severity.Priority() - b.Severity.Priority(); d != 0 {
@@ -67,7 +64,17 @@ func PickNext(ready []model.Task, filter config.TaskFilter, maxRetries int) (mod
 		}
 		return strings.Compare(a.CreatedAt, b.CreatedAt)
 	})
-	return candidates[0], true
+	return candidates
+}
+
+// PickNext returns the ready task an agent should work on next: the first of its Candidates under the retry limit.
+func PickNext(ready []model.Task, filter config.TaskFilter, maxRetries int) (model.Task, bool) {
+	for _, t := range Candidates(ready, filter) {
+		if t.RetryCount < maxRetries {
+			return t, true
+		}
+	}
+	return model.Task{}, false
 }
 
 func FormatDescription(body model.TaskContentBody) string {

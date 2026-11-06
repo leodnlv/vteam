@@ -123,11 +123,16 @@ func (h *harness) deps() Deps {
 
 func (h *harness) run(agentName, focus string) error {
 	h.t.Helper()
+	return h.runWith(agentName, Options{Focus: focus})
+}
+
+func (h *harness) runWith(agentName string, opts Options) error {
+	h.t.Helper()
 	agent, err := config.ResolveAgent(agentName, h.cwd)
 	if err != nil {
 		h.t.Fatal(err)
 	}
-	return Run(context.Background(), h.deps(), agent, Options{Focus: focus})
+	return Run(context.Background(), h.deps(), agent, opts)
 }
 
 func (h *harness) mustRun() {
@@ -550,6 +555,49 @@ func TestTaskInputLifecycle(t *testing.T) {
 		}
 		requireContains(t, h.out.String(), "no eligible tasks, nothing to do")
 	})
+
+	t.Run("claims the task chosen with --task over priority and the retry limit", func(t *testing.T) {
+		h := setup(t, project{agent: obj{"input": "task"}})
+		seedTask(h, model.Task{Ref: "VTM-CRIT", Severity: "critical"})
+		seedTask(h, model.Task{Ref: "VTM-SPNT", Severity: "low", RetryCount: 3})
+		h.claude.thenText(looked)
+		if err := h.runWith("test-agent", Options{Task: "vtm-spnt"}); err != nil {
+			t.Fatalf("run failed: %v\n%s", err, h.out.String())
+		}
+		if first := h.tasks.Updates()[0]; first.Ref != "VTM-SPNT" || first.Update.Status != "active" {
+			t.Errorf("first update = %+v", first)
+		}
+		requireContains(t, h.out.String(), "picked task VTM-SPNT", "chosen with --task")
+	})
+
+	for name, tc := range map[string]struct {
+		agent obj
+		task  model.Task
+		want  string
+	}{
+		"fails without claiming when the chosen task is not ready": {
+			agent: obj{"input": "task"},
+			task:  model.Task{Ref: "VTM-OTHR"},
+			want:  "task VTM-GONE is not ready",
+		},
+		"fails without claiming when the chosen task is not routed to the agent": {
+			agent: obj{"input": "task", "taskFilter": obj{"actor": "mr-reviewer"}},
+			task:  model.Task{Ref: "VTM-GONE"},
+			want:  "task VTM-GONE is not routed to test-agent",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := setup(t, project{agent: tc.agent})
+			seedTask(h, tc.task)
+			if err := h.runWith("test-agent", Options{Task: "VTM-GONE"}); !errors.Is(err, ErrFailed) {
+				t.Fatalf("err = %v", err)
+			}
+			if len(h.claude.Calls()) != 0 || len(h.tasks.Updates()) != 0 {
+				t.Error("agent ran or a task was updated")
+			}
+			requireContains(t, h.out.String(), tc.want)
+		})
+	}
 
 	t.Run("does nothing when no task is ready", func(t *testing.T) {
 		h := setup(t, project{agent: obj{"input": "task"}})

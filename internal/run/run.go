@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -89,6 +90,9 @@ var ErrStopKeepWorktree = errors.New("stopped, keeping the worktree")
 
 type Options struct {
 	Focus string
+	// Task is the ref of the task to claim instead of the next one by priority (input: task agents only).
+	// It must be ready and routed to the agent; the retry limit does not apply.
+	Task string
 	// Interactive hands the prompt to an interactive Claude session in a workmux window instead of running claude -p.
 	Interactive bool
 	// LogPath is the run's log file, which submitting an interactive session appends to.
@@ -128,6 +132,8 @@ type runner struct {
 	agent   *config.Agent
 	focus   string
 	logPath string
+	// chosenTask is the ref given with --task, or "" to pick the next task by priority.
+	chosenTask string
 
 	interactive bool
 	// handle is the workmux worktree of an interactive run, localBranch its branch.
@@ -157,7 +163,7 @@ type runner struct {
 
 // Run runs agent once. It returns ErrFailed when the run failed; the failure is already in the output.
 func Run(ctx context.Context, d Deps, agent *config.Agent, opts Options) error {
-	r := &runner{Deps: d, ctx: ctx, stopCtx: ctx, agent: agent, focus: opts.Focus, interactive: opts.Interactive, logPath: opts.LogPath}
+	r := &runner{Deps: d, ctx: ctx, stopCtx: ctx, agent: agent, focus: opts.Focus, chosenTask: opts.Task, interactive: opts.Interactive, logPath: opts.LogPath}
 	r.runID = RunID(agent.Name, d.Now())
 	r.startedAt = model.ISOTime(d.Now())
 	if err := os.MkdirAll(LocksDir(d.Cwd), 0o755); err != nil {
@@ -286,7 +292,11 @@ func (r *runner) pickWork() (done bool, err error) {
 			return true, nil
 		}
 		r.task = task
-		r.Log.Step(fmt.Sprintf("picked task %s: %s (%s)", task.Ref, task.Title, task.Severity))
+		picked := fmt.Sprintf("picked task %s: %s (%s)", task.Ref, task.Title, task.Severity)
+		if r.chosenTask != "" {
+			picked += ", chosen with --task"
+		}
+		r.Log.Step(picked)
 
 		existing := task.Metadata[model.MetaPRURL]
 		if !r.agent.Worktree || existing == "" {
@@ -348,9 +358,9 @@ func (r *runner) claimTask() (*model.Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	task, ok := tasks.PickNext(ready, r.agent.TaskFilter, r.Config.Tasks.MaxRetries)
-	if !ok {
-		return nil, nil
+	task, ok, err := r.chooseTask(ready)
+	if err != nil || !ok {
+		return nil, err
 	}
 	claim := tasks.ClaimMetadata(r.runID, r.PID, r.Host)
 	if r.interactive {
@@ -360,6 +370,21 @@ func (r *runner) claimTask() (*model.Task, error) {
 		return nil, err
 	}
 	return &task, nil
+}
+
+func (r *runner) chooseTask(ready []model.Task) (model.Task, bool, error) {
+	if r.chosenTask == "" {
+		task, ok := tasks.PickNext(ready, r.agent.TaskFilter, r.Config.Tasks.MaxRetries)
+		return task, ok, nil
+	}
+	i := slices.IndexFunc(ready, func(t model.Task) bool { return strings.EqualFold(t.Ref, r.chosenTask) })
+	if i < 0 {
+		return model.Task{}, false, fmt.Errorf("task %s is not ready: it must be a todo task labelled %q with no open dependencies, not claimed by another run", r.chosenTask, r.Config.Tasks.Label)
+	}
+	if !tasks.MatchesFilter(ready[i], r.agent.TaskFilter) {
+		return model.Task{}, false, fmt.Errorf("task %s is not routed to %s: it does not match the agent's taskFilter", ready[i].Ref, r.agent.Name)
+	}
+	return ready[i], true, nil
 }
 
 func (r *runner) claimKeys() []string {

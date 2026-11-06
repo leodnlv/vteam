@@ -27,6 +27,10 @@ stdout 'bad  \(invalid config\)'
 # Without a config the run fails after the banner.
 mkdir vteam/agents/ok
 cp prompt.md vteam/agents/ok/AGENT.md
+! exec vteam run ok --task APP-7KQ9
+stderr '--task only works for agents with input: "task"'
+! stdout 'vteam ▸'
+
 ! exec vteam run ok
 stdout 'vteam ▸ ok   log: vteam/\.logs/ok/'
 stderr 'vteam.config.json not found'

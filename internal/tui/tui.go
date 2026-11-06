@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"github.com/leodnlv/vteam/internal/config"
+	"github.com/leodnlv/vteam/internal/schedule"
 )
 
 const (
@@ -46,9 +47,10 @@ type Deps struct {
 	SchedulerPID func() int
 	Now          func() time.Time
 
-	// RunOnce starts one run of an agent (or the merge ensurer) in the background; focus is "" for none.
-	// An interactive run opens Claude in a workmux window instead of running it headless.
-	RunOnce func(name, focus string, interactive bool) error
+	// RunOnce starts one run of an agent (or the merge ensurer) in the background with the given `vteam run` flags.
+	RunOnce func(name string, opts schedule.RunOptions) error
+	// TaskChoices lists the tasks the run dialog offers an input: task agent, in pick order.
+	TaskChoices func(ctx context.Context, agent string) ([]TaskChoice, error)
 	// StopRun asks the live run of an agent (or the merge ensurer) to stop; keepWorktree leaves its worktree in place.
 	StopRun func(name string, keepWorktree bool) error
 	// EnableCron turns on a cron with expr; DisableCron turns it off.
@@ -130,7 +132,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case tea.KeyPressMsg:
-		return m.handleKey(msg)
+		next, cmd := m.handleKey(msg)
+		return next.(Model).requestTaskChoices(cmd)
+	case taskChoicesMsg:
+		return m.receiveTaskChoices(msg), nil
 	case tea.MouseWheelMsg:
 		return m.handleWheel(msg), nil
 	case tea.PasteMsg:

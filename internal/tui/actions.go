@@ -52,6 +52,7 @@ type dialog struct {
 	focus  textarea.Model
 	// interactive opens the run in an interactive Claude session (vteam run --interactive).
 	interactive bool
+	picker      taskPicker
 }
 
 type toast struct {
@@ -153,7 +154,7 @@ func (m Model) agentAction(key string) Model {
 		if a.Builtin {
 			m.dialog = dialog{kind: dialogConfirm, agent: a.Name}
 		} else {
-			m.dialog = dialog{kind: dialogRun, agent: a.Name, focus: newFocusInput(m.runDialogWidth())}
+			m.dialog = dialog{kind: dialogRun, agent: a.Name, focus: newFocusInput(m.runDialogWidth()), picker: newTaskPicker(a)}
 		}
 	case "c":
 		if !a.Runnable() {
@@ -199,7 +200,7 @@ func (m Model) handleDialogKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		case "enter", "y":
 			name := m.dialog.agent
 			m.dialog = dialog{}
-			return m.runOnce(name, "", false), nil
+			return m.runOnce(name, schedule.RunOptions{}), nil
 		case "esc", "n", "q":
 			m.dialog = dialog{}
 		}
@@ -328,7 +329,8 @@ func (m Model) runDialogWidth() int {
 	return max(24, min(runDialogWidth, m.width-4))
 }
 
-// handleRunKey edits the focus text; enter runs the agent with it, shift+enter (or alt+enter, ctrl+j) adds a line.
+// handleRunKey edits the focus text and moves the task picker; enter runs the agent, shift+enter (or alt+enter,
+// ctrl+j) adds a line.
 func (m Model) handleRunKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Cancel):
@@ -337,26 +339,38 @@ func (m Model) handleRunKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case key.Matches(msg, keys.Interactive):
 		m.dialog.interactive = !m.dialog.interactive
 		return m, nil
+	case m.dialog.picker.enabled && key.Matches(msg, keys.TaskDown):
+		m.dialog.picker = m.dialog.picker.move(1)
+		return m, nil
+	case m.dialog.picker.enabled && key.Matches(msg, keys.TaskUp):
+		m.dialog.picker = m.dialog.picker.move(-1)
+		return m, nil
 	case key.Matches(msg, keys.Confirm):
-		name, focus, interactive := m.dialog.agent, strings.TrimSpace(m.dialog.focus.Value()), m.dialog.interactive
+		name := m.dialog.agent
+		opts := schedule.RunOptions{
+			Focus: strings.TrimSpace(m.dialog.focus.Value()), Task: m.dialog.picker.selected(), Interactive: m.dialog.interactive,
+		}
 		m.dialog = dialog{}
-		return m.runOnce(name, focus, interactive), nil
+		return m.runOnce(name, opts), nil
 	}
 	var cmd tea.Cmd
 	m.dialog.focus, cmd = m.dialog.focus.Update(msg)
 	return m, cmd
 }
 
-func (m Model) runOnce(name, focus string, interactive bool) Model {
-	if err := m.deps.RunOnce(name, focus, interactive); err != nil {
+func (m Model) runOnce(name string, opts schedule.RunOptions) Model {
+	if err := m.deps.RunOnce(name, opts); err != nil {
 		return m.withToast(styleFail.Render("✗ " + name + " could not start: " + firstLine(err.Error())))
 	}
 	m.agents.runIndex, m.agents.follow = -1, true
 	text := styleLive.Render("● ") + "started " + styleBold.Render(name)
-	if interactive {
+	if opts.Task != "" {
+		text += " on " + styleBold.Render(opts.Task)
+	}
+	if opts.Interactive {
 		text += styleMuted.Render(" interactively")
 	}
-	if focus != "" {
+	if opts.Focus != "" {
 		text += styleMuted.Render(" with focus")
 	}
 	return m.refreshAfterAction().withToast(text)
@@ -500,19 +514,21 @@ func (m Model) runBox() string {
 		interactiveBox = styleOK.Render("[x]")
 		interactiveHint = "Opens Claude in a workmux window and switches to it."
 	}
-	lines := []string{
-		styleBoxHead.Render("Run ") + styleBold.Render(m.dialog.agent) + styleBoxHead.Render(" once"),
-		"",
-		styleMuted.Render("focus") + styleMuted.Render(" (optional, passed as --focus)"),
+	lines := []string{styleBoxHead.Render("Run ") + styleBold.Render(m.dialog.agent) + styleBoxHead.Render(" once"), ""}
+	if m.dialog.picker.enabled {
+		lines = append(append(lines, m.pickerLines(m.runDialogWidth()-styleBox.GetHorizontalFrameSize())...), "")
+	}
+	lines = append(lines,
+		styleMuted.Render("focus")+styleMuted.Render(" (optional, passed as --focus)"),
 		m.dialog.focus.View(),
 		"",
-		interactiveBox + " interactive session" + styleMuted.Render("  tab"),
+		interactiveBox+" interactive session"+styleMuted.Render("  tab"),
 		styleMuted.Render(interactiveHint),
 		"",
-		styleKey.Render("⏎") + styleMuted.Render(" run now   ") +
-			styleKey.Render("shift+⏎") + styleMuted.Render("/") + styleKey.Render("ctrl+j") + styleMuted.Render(" new line   ") +
-			styleKey.Render("esc") + styleMuted.Render(" cancel"),
-	}
+		styleKey.Render("⏎")+styleMuted.Render(" run now   ")+
+			styleKey.Render("shift+⏎")+styleMuted.Render("/")+styleKey.Render("ctrl+j")+styleMuted.Render(" new line   ")+
+			styleKey.Render("esc")+styleMuted.Render(" cancel"),
+	)
 	return styleBox.Width(m.runDialogWidth()).Render(strings.Join(lines, "\n"))
 }
 

@@ -28,15 +28,27 @@ func StartDetached(cwd string) (int, error) {
 	return startDetached(cwd, []string{"cron", "start"}, out, nil)
 }
 
+// RunOptions are the `vteam run` flags of a spawned run; the merge ensurer takes none of them.
+type RunOptions struct {
+	// Focus is passed as --focus when set.
+	Focus string
+	// Task is passed as --task when set: the ref of the task to claim instead of the next one by priority.
+	Task string
+	// Interactive passes --interactive.
+	Interactive bool
+}
+
 // SpawnRun starts one run of a job in its own session and returns the path of the log it will write.
-// A non-empty focus is passed as `--focus` and interactive as `--interactive`, which only `vteam run` accepts.
-func SpawnRun(cwd, name, focus string, interactive bool, now time.Time) (string, error) {
+func SpawnRun(cwd, name string, opts RunOptions, now time.Time) (string, error) {
 	logPath := runlog.Path(cwd, name, now)
 	args := JobCommand(name)
-	if focus != "" {
-		args = append(args, "--focus", focus)
+	if opts.Focus != "" {
+		args = append(args, "--focus", opts.Focus)
 	}
-	if interactive {
+	if opts.Task != "" {
+		args = append(args, "--task", opts.Task)
+	}
+	if opts.Interactive {
 		args = append(args, "--interactive")
 	}
 	_, err := startDetached(cwd, args, nil, []string{runlog.Env + "=" + logPath})

@@ -112,7 +112,7 @@ func initCmd() *cobra.Command {
 }
 
 func runCmd() *cobra.Command {
-	var focus string
+	var focus, task string
 	var interactive bool
 	cmd := &cobra.Command{
 		Use:    "run [agent]",
@@ -128,10 +128,11 @@ func runCmd() *cobra.Command {
 				listAgents(dir, cmd.OutOrStdout())
 				return nil
 			}
-			return runAgent(cmd.Context(), dir, args[0], run.Options{Focus: focus, Interactive: interactive})
+			return runAgent(cmd.Context(), dir, args[0], run.Options{Focus: focus, Task: task, Interactive: interactive})
 		},
 	}
 	cmd.Flags().StringVar(&focus, "focus", "", "priority context injected into the agent prompt")
+	cmd.Flags().StringVar(&task, "task", "", "aven ref of the task to work on instead of the next one by priority (input: task agents)")
 	cmd.Flags().BoolVar(&interactive, "interactive", false, "open the prompt in an interactive Claude session in a workmux window")
 	return cmd
 }
@@ -178,6 +179,9 @@ func runAgent(ctx context.Context, dir, name string, opts run.Options) error {
 	agent, err := config.ResolveAgent(name, dir)
 	if err != nil {
 		return err
+	}
+	if opts.Task != "" && agent.Input != config.InputTask {
+		return fmt.Errorf("--task only works for agents with input: %q", config.InputTask)
 	}
 	if opts.Interactive {
 		if _, err := exec.LookPath("workmux"); err != nil {
@@ -260,9 +264,20 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 		LoadConfig:   func() (*config.Config, error) { return config.Load(dir) },
 		SchedulerPID: func() int { return schedule.ReadPID(dir) },
 		Now:          time.Now,
-		RunOnce: func(name, focus string, interactive bool) error {
-			_, err := schedule.SpawnRun(dir, name, focus, interactive, time.Now())
+		RunOnce: func(name string, opts schedule.RunOptions) error {
+			_, err := schedule.SpawnRun(dir, name, opts, time.Now())
 			return err
+		},
+		TaskChoices: func(ctx context.Context, name string) ([]tui.TaskChoice, error) {
+			cfg, err := config.Load(dir)
+			if err != nil {
+				return nil, err
+			}
+			agent, err := config.ResolveAgent(name, dir)
+			if err != nil {
+				return nil, err
+			}
+			return tui.LoadTaskChoices(ctx, tasks.NewAven(cfg.Tasks), agent, cfg.Tasks.MaxRetries)
 		},
 		StopRun: func(name string, keepWorktree bool) error {
 			_, err := runstate.Stop(dir, name, keepWorktree)

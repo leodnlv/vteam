@@ -1,6 +1,7 @@
 package tasks
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -160,5 +161,21 @@ func TestLabelConventions(t *testing.T) {
 	}
 	if diff := cmp.Diff([]string{"vteam-coder"}, LabelsOnDone(cfg, "coder")); diff != "" {
 		t.Error(diff)
+	}
+}
+
+func TestCandidates(t *testing.T) {
+	ready := []model.Task{
+		{Ref: "LOW", Severity: "low", CreatedAt: "2026-01-01"},
+		{Ref: "OTHER", Severity: "critical", Metadata: map[string]string{"found-by": "human"}},
+		{Ref: "SPENT", Severity: "high", CreatedAt: "2026-01-01", RetryCount: 3},
+		{Ref: "HIGH", Severity: "high", CreatedAt: "2026-02-01"},
+	}
+	var refs []string
+	for _, c := range Candidates(ready, config.TaskFilter{"found-by": {""}}) {
+		refs = append(refs, c.Ref)
+	}
+	if want := []string{"SPENT", "HIGH", "LOW"}; !slices.Equal(refs, want) {
+		t.Errorf("candidates = %v, want %v", refs, want)
 	}
 }

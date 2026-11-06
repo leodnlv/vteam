@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/lock"
+	"github.com/leodnlv/vteam/internal/schedule"
 )
 
 // fakeActions records what the TUI asked for and keeps the agent list and scheduler pid in step with it.
@@ -34,12 +35,15 @@ func actionsModel(t *testing.T, f *fakeActions) Model {
 	m := newTestModel(t, nil)
 	m.deps.Agents = func(time.Time) []Agent { return slices.Clone(f.agents) }
 	m.deps.SchedulerPID = func() int { return f.pid }
-	m.deps.RunOnce = func(name, focus string, interactive bool) error {
+	m.deps.RunOnce = func(name string, opts schedule.RunOptions) error {
 		call := "run " + name
-		if focus != "" {
-			call += " --focus " + focus
+		if opts.Focus != "" {
+			call += " --focus " + opts.Focus
 		}
-		if interactive {
+		if opts.Task != "" {
+			call += " --task " + opts.Task
+		}
+		if opts.Interactive {
 			call += " --interactive"
 		}
 		f.calls = append(f.calls, call)

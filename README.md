@@ -158,6 +158,14 @@ vteam run improver --focus "only look at the auth module"
 vteam run security-analyst --focus "file upload endpoints"
 ```
 
+### `--task` option
+
+Agents with `input: "task"` accept `--task <ref>` to work on one specific aven task instead of the next one by priority. The task must still be ready (`todo`, no open dependencies, not claimed) and match the agent's `taskFilter`. Otherwise the run fails without claiming anything. The `maxRetries` limit does not apply, so this is how you give a retry-exhausted task one more go. In the TUI, the run dialog has a task picker for this.
+
+```bash
+vteam run coder --task APP-7KQ9
+```
+
 ### Interactive mode (`--interactive`)
 
 `vteam run <agent> --interactive` (or the **interactive session** toggle in the TUI run dialog) runs the same agent, but instead of `claude -p` it opens the prompt in an interactive Claude Code session that you can pair with. It needs [workmux](https://github.com/raine/workmux) and tmux. Cron runs are always headless.
@@ -194,7 +202,7 @@ Claude is read-only — it scans and reports. The orchestrator owns all file cre
 ### `vteam run coder`
 
 1. Acquires an advisory lock (`vteam/.locks/coder.lock`)
-2. Under a short-lived claim lock shared by all agents (`vteam/.locks/task-claim.lock`), picks the highest-severity ready task routed to it from aven (`aven list --status todo --ready` filtered by its `taskFilter`, see [Routing tasks to agents](#routing-tasks-to-agents); oldest first within a severity; skips tasks that have failed `maxRetries` times) and sets it to `active` with `claimed-*` metadata
+2. Under a short-lived claim lock shared by all agents (`vteam/.locks/task-claim.lock`), picks the highest-severity ready task routed to it from aven (`aven list --status todo --ready` filtered by its `taskFilter`, see [Routing tasks to agents](#routing-tasks-to-agents); oldest first within a severity; skips tasks that have failed `maxRetries` times), or the task given with `--task`, and sets it to `active` with `claimed-*` metadata
 3. Fetches the base branch and creates a git worktree at `.vteam-worktrees/vteam/<task-title-slug>-<runId>` branched from `origin/<baseBranch>`, so the branch starts from the latest remote code and never picks up unpushed local commits
 4. Builds the prompt with the task description, the task's aven notes (including summaries from earlier attempts), existing task titles, and agent instructions
 5. Spawns `claude -p` in the worktree — Claude implements the fix and returns a commit message as structured JSON
@@ -258,7 +266,7 @@ Running `vteam` with no arguments inside a project opens a full-screen, keyboard
 
 - **Agents** — a sidebar of your agents (plus the merge ensurer) with a live/idle marker and details for the selected one, next to its newest run log. The log pane follows the log while the agent runs; scroll up to pause, `G` to follow again. `p` / `n` step to the previous / next run, and the `run i/n` counter in the title turns yellow when you are looking at an older run. `w` toggles line wrap.
   - **Running agents from the TUI** — `space` (or `a`) opens an action menu for the selected agent: run once, stop its run, run on cron or edit its cron, stop its cron, start the scheduler, open the log. Each action also has its own key (`r`, `x`, `c`, `s`, `S`).
-    - **Run once** opens a dialog with an optional, multiline focus field, then starts `vteam run <agent>` in the background, passing the text as `--focus`. `⏎` runs, `shift+⏎` (or `alt+⏎`, `ctrl+j`) adds a line, `esc` cancels. Leave it empty for a normal run. `tab` toggles **interactive session**, which passes `--interactive` (see [Interactive mode](#interactive-mode---interactive)). The run keeps going after you quit the TUI.
+    - **Run once** opens a dialog with an optional, multiline focus field, then starts `vteam run <agent>` in the background, passing the text as `--focus`. `⏎` runs, `shift+⏎` (or `alt+⏎`, `ctrl+j`) adds a line, `esc` cancels. Leave it empty for a normal run. For an agent with `input: "task"`, a task list sits above the focus field: the ready tasks routed to the agent in pick order, with retry-exhausted ones and PR follow-ups marked. `↑`/`↓` (or `ctrl+p`/`ctrl+n`) choose one, which is passed as `--task`. The first row, **Auto**, keeps the usual pick and shows which task that will be. `tab` toggles **interactive session**, which passes `--interactive` (see [Interactive mode](#interactive-mode---interactive)). The run keeps going after you quit the TUI.
     - **Stop run** asks before stopping the selected agent's run (see [Stopping a run](#stopping-a-run)). For an agent with a worktree, choose with `j` / `k` between removing the worktree and keeping it for inspection.
     - **Run on cron** opens a dialog prefilled with the enabled pattern, or else the `agent.json` default. As you type it shows the schedule in words, the next three fire times, or the parse error. `tab` toggles saving the pattern as the default in `agent.json` (`vteam.config.json` for the merge ensurer). Confirming enables the cron and, if no scheduler is running, starts one in the background (see [Running on a schedule](#running-on-a-schedule)).
     - **Cron markers** — an agent on cron shows `◷` in the sidebar, its pattern and next run in the details, and a line above its log. All three turn yellow with "paused" when the scheduler is not running.
