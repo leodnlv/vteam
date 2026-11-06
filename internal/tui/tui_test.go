@@ -225,3 +225,39 @@ func TestQuitKeys(t *testing.T) {
 		}
 	}
 }
+
+func wheel(t *testing.T, m Model, button tea.MouseButton, times int) Model {
+	t.Helper()
+	for range times {
+		m = update(t, m, tea.MouseWheelMsg{Button: button})
+	}
+	return m
+}
+
+func TestViewEnablesMouseWheel(t *testing.T) {
+	if mode := newTestModel(t, nil).View().MouseMode; mode != tea.MouseModeCellMotion {
+		t.Fatalf("MouseMode = %v, want cell motion", mode)
+	}
+}
+
+func TestMouseWheelScrollsTheActiveTab(t *testing.T) {
+	m := newTestModel(t, nil)
+	m = update(t, m, statusMsg{lines: statusLines(50), started: fixedNow})
+	m = wheel(t, m, tea.MouseWheelDown, 2)
+	if m.overview.view.YOffset() != 6 {
+		t.Fatalf("two wheel notches down offset = %d, want 6", m.overview.view.YOffset())
+	}
+	m = wheel(t, m, tea.MouseWheelUp, 1)
+	if m.overview.view.YOffset() != 3 {
+		t.Fatalf("wheel up offset = %d, want 3", m.overview.view.YOffset())
+	}
+}
+
+func TestMouseWheelScrollsTheHelpOverlayNotTheTab(t *testing.T) {
+	m := newTestModel(t, nil)
+	m = update(t, m, statusMsg{lines: statusLines(50), started: fixedNow})
+	m = wheel(t, press(t, m, "?"), tea.MouseWheelDown, 1)
+	if m.helpView.YOffset() != 3 || m.overview.view.YOffset() != 0 {
+		t.Fatalf("help offset = %d, overview offset = %d", m.helpView.YOffset(), m.overview.view.YOffset())
+	}
+}

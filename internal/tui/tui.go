@@ -128,6 +128,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+	case tea.MouseWheelMsg:
+		return m.handleWheel(msg), nil
 	case tea.PasteMsg:
 		var cmd tea.Cmd
 		switch m.dialog.kind {
@@ -175,6 +177,7 @@ func (m Model) View() tea.View {
 	lines = append(lines, m.renderFooter()...)
 	v := tea.NewView(strings.Join(lines, "\n"))
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 

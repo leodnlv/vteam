@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+
 	xansi "github.com/charmbracelet/x/ansi"
 	"github.com/leodnlv/vteam/internal/lock"
 	"github.com/leodnlv/vteam/internal/schedule"
@@ -273,5 +275,18 @@ func TestStretchSectionsFillsTheWidth(t *testing.T) {
 	}
 	if lines[1] != "  • lock acquired" {
 		t.Errorf("other lines changed: %q", lines[1])
+	}
+}
+
+func TestMouseWheelScrollsTheLogAndFollowsAtTheBottom(t *testing.T) {
+	_, logs := logDir(t, 100)
+	m := agentsModel(t, []Agent{{Name: "a", Logs: logs}})
+	m = wheel(t, m, tea.MouseWheelUp, 1)
+	if m.agents.follow || strings.Contains(screen(m), "run1 line 99") {
+		t.Fatal("wheel up should pause following")
+	}
+	m = wheel(t, m, tea.MouseWheelDown, 1)
+	if !m.agents.follow {
+		t.Fatal("wheel back to the bottom should resume following")
 	}
 }

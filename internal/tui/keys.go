@@ -130,19 +130,41 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleAgentsKey(msg, pendingG), nil
 	}
 
-	var vp *viewport.Model
-	switch m.tab {
-	case TabInfo:
-		vp = &m.info.view
-	case TabAbout:
-		vp = &m.about
-	default:
-		vp = &m.overview.view
-	}
-	if !scroll(vp, msg, pendingG) {
+	if !scroll(m.tabView(), msg, pendingG) {
 		m.pendingG = key.Matches(msg, keys.GG)
 	}
 	return m, nil
+}
+
+// tabView is the scrollable pane of the Overview, Info, or About tab.
+func (m *Model) tabView() *viewport.Model {
+	switch m.tab {
+	case TabInfo:
+		return &m.info.view
+	case TabAbout:
+		return &m.about
+	default:
+		return &m.overview.view
+	}
+}
+
+// handleWheel scrolls the help overlay when it is open, else the active tab's pane; the log pane follows
+// again once the wheel reaches its bottom. Dialogs ignore the wheel.
+func (m Model) handleWheel(msg tea.MouseWheelMsg) Model {
+	m.pendingG = false
+	m = m.syncViewport()
+	switch {
+	case m.dialog.kind != dialogNone:
+	case m.help:
+		m.helpView, _ = m.helpView.Update(msg)
+	case m.tab == TabAgents:
+		m.agents.view, _ = m.agents.view.Update(msg)
+		m.agents.follow = m.agents.view.AtBottom()
+	default:
+		vp := m.tabView()
+		*vp, _ = vp.Update(msg)
+	}
+	return m
 }
 
 func (m Model) handleAgentsKey(msg tea.KeyPressMsg, pendingG bool) Model {
