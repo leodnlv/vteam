@@ -1,165 +1,200 @@
 package tui
 
 import (
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 )
 
-// scrollAction turns a key into a scroll delta. top and bottom are huge deltas that clamping turns into the ends.
-func scrollAction(key string, pendingG bool, halfPage int) (delta int, ok bool) {
-	const huge = 1 << 30
-	switch key {
-	case "j", "down":
-		return 1, true
-	case "k", "up":
-		return -1, true
-	case "ctrl+d", "pgdown", "space":
-		return halfPage, true
-	case "ctrl+u", "pgup":
-		return -halfPage, true
-	case "G", "end":
-		return huge, true
-	case "home":
-		return -huge, true
-	case "g":
-		if pendingG {
-			return -huge, true
-		}
+// keyMap holds every key binding; key handling matches against it and the footer and help overlay render from it.
+type keyMap struct {
+	Tabs, Refresh, Help, Quit, ForceQuit key.Binding
+
+	Down, Up, HalfPageDown, HalfPageUp, Top, GG, Bottom key.Binding
+
+	SwitchPane, FocusLog, FocusSidebar, PrevRun, NextRun       key.Binding
+	Actions, Run, Cron, StopCron, StartScheduler, Follow, Wrap key.Binding
+
+	Confirm, Cancel, SaveDefault, NewLine key.Binding
+}
+
+func binding(keys []string, help, desc string) key.Binding {
+	return key.NewBinding(key.WithKeys(keys...), key.WithHelp(help, desc))
+}
+
+var keys = keyMap{
+	Tabs:      binding([]string{"1", "2", "3", "4"}, "1 2 3 4", "jump to Overview / Agents / Info / About"),
+	Refresh:   binding([]string{"ctrl+r"}, "ctrl+r", "refresh now"),
+	Help:      binding([]string{"?"}, "?", "toggle this help"),
+	Quit:      binding([]string{"q"}, "q  ctrl+c", "quit"),
+	ForceQuit: binding([]string{"ctrl+c"}, "ctrl+c", "quit"),
+
+	Down:         binding([]string{"j", "down"}, "j  ↓", "line down"),
+	Up:           binding([]string{"k", "up"}, "k  ↑", "line up"),
+	HalfPageDown: binding([]string{"ctrl+d", "pgdown", "space"}, "ctrl+d", "half page down"),
+	HalfPageUp:   binding([]string{"ctrl+u", "pgup"}, "ctrl+u", "half page up"),
+	Top:          binding([]string{"home"}, "home", "top"),
+	GG:           binding([]string{"g"}, "gg", "top"),
+	Bottom:       binding([]string{"G", "end"}, "G", "bottom"),
+
+	SwitchPane:     binding([]string{"tab", "shift+tab"}, "tab  shift+tab", "switch between the sidebar and the log"),
+	FocusLog:       binding([]string{"l", "enter", "right"}, "l  enter  →", "focus the log"),
+	FocusSidebar:   binding([]string{"h", "esc", "left"}, "h  esc  ←", "back to the sidebar"),
+	PrevRun:        binding([]string{"p"}, "p", "previous (older) run"),
+	NextRun:        binding([]string{"n"}, "n", "next (newer) run"),
+	Actions:        binding([]string{"space", "a"}, "space  a", "actions menu of the selected agent"),
+	Run:            binding([]string{"r"}, "r", "run the selected agent once"),
+	Cron:           binding([]string{"c"}, "c", "run it on cron / edit its cron"),
+	StopCron:       binding([]string{"s"}, "s", "stop its cron"),
+	StartScheduler: binding([]string{"S"}, "S", "start the scheduler when crons are paused"),
+	Follow:         binding([]string{"f"}, "f", "toggle follow"),
+	Wrap:           binding([]string{"w"}, "w", "toggle line wrap"),
+
+	Confirm:     binding([]string{"enter"}, "⏎", "confirm"),
+	Cancel:      binding([]string{"esc"}, "esc", "cancel"),
+	SaveDefault: binding([]string{"tab"}, "tab", "save as default"),
+	NewLine:     binding([]string{"shift+enter", "alt+enter", "ctrl+j"}, "shift+⏎/ctrl+j", "new line"),
+}
+
+// relabel returns b with other help text, for places that describe the same keys differently.
+func relabel(b key.Binding, help, desc string) key.Binding {
+	b.SetHelp(help, desc)
+	return b
+}
+
+// newScrollView is a viewport driven by the shared scroll bindings; top, gg and bottom are handled by scroll.
+func newScrollView() viewport.Model {
+	vp := viewport.New()
+	vp.KeyMap = viewport.KeyMap{
+		Down:         keys.Down,
+		Up:           keys.Up,
+		HalfPageDown: keys.HalfPageDown,
+		HalfPageUp:   keys.HalfPageUp,
 	}
-	return 0, false
+	return vp
 }
 
-func scrolled(offset, delta, total, height int) int {
-	return clampOffset(clampOffset(offset, total, height)+delta, total, height)
+// scroll applies a scroll key to vp and reports whether it was one. g after a pending g jumps to the top.
+func scroll(vp *viewport.Model, msg tea.KeyPressMsg, pendingG bool) bool {
+	switch {
+	case key.Matches(msg, keys.Bottom):
+		vp.GotoBottom()
+	case key.Matches(msg, keys.Top), pendingG && key.Matches(msg, keys.GG):
+		vp.GotoTop()
+	case key.Matches(msg, keys.Down, keys.Up, keys.HalfPageDown, keys.HalfPageUp):
+		*vp, _ = vp.Update(msg)
+	default:
+		return false
+	}
+	return true
 }
 
-func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
+func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	pendingG := m.pendingG
 	m.pendingG = false
+	m = m.syncViewport()
 
-	if key == "ctrl+c" {
+	if key.Matches(msg, keys.ForceQuit) {
 		return m, tea.Quit
 	}
 	if m.dialog.kind != dialogNone {
-		return m.handleDialogKey(key), nil
+		return m.handleDialogKey(msg)
 	}
-	if key == "?" {
+	if key.Matches(msg, keys.Help) {
 		m.help = !m.help
 		return m, nil
 	}
 	if m.help {
-		switch key {
-		case "esc", "q":
+		if key.Matches(msg, keys.Cancel, keys.Quit) {
 			m.help = false
-		case "g":
-			m.pendingG = !pendingG
 		}
 		return m, nil
 	}
 
-	switch key {
-	case "q":
+	switch {
+	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
-	case "1", "2", "3", "4":
-		m.tab = Tab(key[0] - '1')
+	case key.Matches(msg, keys.Tabs):
+		m.tab = Tab(msg.String()[0] - '1')
 		return m, nil
-	case "ctrl+r":
+	case key.Matches(msg, keys.Refresh):
 		m.agents = m.agents.reload(m.deps.Agents(m.deps.Now()))
 		m.info = m.refreshInfo()
 		return m, m.fetchStatus
 	}
 	if m.tab == TabAgents {
-		return m.handleAgentsKey(key, pendingG), nil
+		return m.handleAgentsKey(msg, pendingG), nil
 	}
 
-	height := m.bodyHeight()
-	delta, ok := scrollAction(key, pendingG, max(1, height/2))
-	if !ok {
-		m.pendingG = key == "g"
-		return m, nil
-	}
+	var vp *viewport.Model
 	switch m.tab {
-	case TabOverview:
-		m.overview.offset = scrolled(m.overview.offset, delta, len(m.overview.lines), height)
 	case TabInfo:
-		m.info.offset = scrolled(m.info.offset, delta, len(m.infoLines()), height)
+		vp = &m.info.view
 	case TabAbout:
-		m.about.offset = scrolled(m.about.offset, delta, len(m.aboutLines()), height)
+		vp = &m.about
+	default:
+		vp = &m.overview.view
+	}
+	if !scroll(vp, msg, pendingG) {
+		m.pendingG = key.Matches(msg, keys.GG)
 	}
 	return m, nil
 }
 
-func (m Model) handleAgentsKey(key string, pendingG bool) Model {
+func (m Model) handleAgentsKey(msg tea.KeyPressMsg, pendingG bool) Model {
 	s := m.agents
-	switch key {
-	case "w":
+	switch {
+	case key.Matches(msg, keys.Wrap):
 		s.wrap = !s.wrap
-	case "f":
+	case key.Matches(msg, keys.Follow):
 		s.follow = !s.follow
-		if !s.follow {
-			s.offset = m.logOffset(len(m.logRows()))
-		}
-	case "tab", "shift+tab":
+	case key.Matches(msg, keys.SwitchPane):
 		s.focusLog = !s.focusLog
-	case "p":
+	case key.Matches(msg, keys.PrevRun):
 		s = s.stepRun(-1)
-	case "n":
+	case key.Matches(msg, keys.NextRun):
 		s = s.stepRun(1)
-	case "ctrl+d", "ctrl+u", "pgdown", "pgup":
-		return m.scrollLog(key, pendingG)
-	case "r", "c", "s", "S", "a":
-		return m.agentAction(key)
+	case key.Matches(msg, keys.Run, keys.Cron, keys.StopCron, keys.StartScheduler, keys.Actions):
+		return m.agentAction(msg.String())
+	case key.Matches(msg, keys.HalfPageDown, keys.HalfPageUp):
+		return m.scrollLog(msg, pendingG)
+	case !s.focusLog:
+		return m.handleSidebarKey(msg, pendingG)
+	case key.Matches(msg, keys.FocusSidebar):
+		s.focusLog = false
 	default:
-		if !s.focusLog {
-			return m.handleSidebarKey(key, pendingG)
-		}
-		switch key {
-		case "h", "esc", "left":
-			s.focusLog = false
-		default:
-			return m.scrollLog(key, pendingG)
-		}
+		return m.scrollLog(msg, pendingG)
 	}
 	m.agents = s
 	return m
 }
 
-func (m Model) handleSidebarKey(key string, pendingG bool) Model {
+func (m Model) handleSidebarKey(msg tea.KeyPressMsg, pendingG bool) Model {
 	s := m.agents
-	switch key {
-	case "j", "down":
+	switch {
+	case key.Matches(msg, keys.Down):
 		s = s.selectAgent(s.selected + 1)
-	case "k", "up":
+	case key.Matches(msg, keys.Up):
 		s = s.selectAgent(s.selected - 1)
-	case "G", "end":
+	case key.Matches(msg, keys.Bottom):
 		s = s.selectAgent(len(s.list) - 1)
-	case "home":
+	case key.Matches(msg, keys.Top), pendingG && key.Matches(msg, keys.GG):
 		s = s.selectAgent(0)
-	case "g":
-		if pendingG {
-			s = s.selectAgent(0)
-		} else {
-			m.pendingG = true
-		}
-	case "l", "enter", "right":
+	case key.Matches(msg, keys.GG):
+		m.pendingG = true
+	case key.Matches(msg, keys.FocusLog):
 		s.focusLog = true
-	case "space":
-		return m.agentAction(key)
 	}
 	m.agents = s
 	return m
 }
 
 // scrollLog scrolls the log pane; reaching the bottom turns follow back on, leaving it turns follow off.
-func (m Model) scrollLog(key string, pendingG bool) Model {
-	height := m.logBodyHeight()
-	delta, ok := scrollAction(key, pendingG, max(1, height/2))
-	if !ok {
-		m.pendingG = key == "g"
+func (m Model) scrollLog(msg tea.KeyPressMsg, pendingG bool) Model {
+	if !scroll(&m.agents.view, msg, pendingG) {
+		m.pendingG = key.Matches(msg, keys.GG)
 		return m
 	}
-	total := len(m.logRows())
-	offset := clampOffset(m.logOffset(total)+delta, total, height)
-	m.agents.offset = offset
-	m.agents.follow = offset >= max(0, total-height)
+	m.agents.follow = m.agents.view.AtBottom()
 	return m
 }

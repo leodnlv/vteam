@@ -32,21 +32,17 @@ func spread(left, right string, width int) string {
 	return left + strings.Repeat(" ", gap) + right
 }
 
-// window returns height lines of lines starting at offset, each fitted to width.
-func window(lines []string, offset, height, width int) []string {
+// window returns the first height lines of lines, each fitted to width and padded with blank lines.
+func window(lines []string, height, width int) []string {
 	out := make([]string, 0, height)
-	for i := offset; i < offset+height; i++ {
+	for i := range height {
 		line := ""
-		if i >= 0 && i < len(lines) {
+		if i < len(lines) {
 			line = lines[i]
 		}
 		out = append(out, fit(line, width))
 	}
 	return out
-}
-
-func clampOffset(offset, total, height int) int {
-	return max(0, min(offset, total-height))
 }
 
 func splitLines(blocks []string) []string {
@@ -81,5 +77,5 @@ func overlayAt(base []string, box string, x, y, width, height int) []string {
 		lipgloss.NewLayer(strings.Join(base, "\n")),
 		lipgloss.NewLayer(box).X(x).Y(y).Z(1),
 	).Render()
-	return window(strings.Split(composed, "\n"), 0, height, width)
+	return window(strings.Split(composed, "\n"), height, width)
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"github.com/leodnlv/vteam/internal/config"
 )
@@ -61,7 +62,7 @@ type overviewState struct {
 	err     string
 	updated time.Time
 	loaded  bool
-	offset  int
+	view    viewport.Model
 }
 
 type Model struct {
@@ -75,13 +76,16 @@ type Model struct {
 	overview overviewState
 	agents   agentsState
 	info     infoState
-	about    struct{ offset int }
+	about    viewport.Model
 	dialog   dialog
 	toast    toast
 }
 
 func New(ctx context.Context, deps Deps) Model {
-	m := Model{ctx: ctx, deps: deps, width: 80, height: 24, agents: newAgentsState()}
+	m := Model{
+		ctx: ctx, deps: deps, width: 80, height: 24, agents: newAgentsState(),
+		overview: overviewState{view: newScrollView()}, info: infoState{view: newScrollView()}, about: newScrollView(),
+	}
 	m.agents = m.agents.reload(deps.Agents(deps.Now()))
 	m.info = m.refreshInfo()
 	return m
@@ -121,16 +125,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case tea.KeyPressMsg:
-		if m.dialog.kind == dialogRun && msg.String() != "ctrl+c" {
-			return m.handleRunKey(msg)
-		}
-		return m.handleKey(msg.String())
+		return m.handleKey(msg)
 	case tea.PasteMsg:
-		if m.dialog.kind == dialogRun {
-			var cmd tea.Cmd
+		var cmd tea.Cmd
+		switch m.dialog.kind {
+		case dialogRun:
 			m.dialog.focus, cmd = m.dialog.focus.Update(msg)
-			return m, cmd
+		case dialogCron:
+			m.dialog.input, cmd = m.dialog.input.Update(msg)
 		}
+		return m, cmd
 	case statusMsg:
 		m.overview.loaded = true
 		m.overview.updated = m.deps.Now()
@@ -172,23 +176,52 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) renderBody() []string {
-	height := m.bodyHeight()
+	m = m.syncViewport()
 	switch m.tab {
 	case TabAgents:
 		return m.renderAgents()
 	case TabInfo:
-		lines := stretchSections(m.infoLines(), m.width-1)
-		return window(lines, clampOffset(m.info.offset, len(lines), height), height, m.width)
+		return strings.Split(m.info.view.View(), "\n")
 	case TabAbout:
-		lines := stretchSections(m.aboutLines(), m.width-1)
-		return window(lines, clampOffset(m.about.offset, len(lines), height), height, m.width)
+		return strings.Split(m.about.View(), "\n")
+	default:
+		return strings.Split(m.overview.view.View(), "\n")
+	}
+}
+
+// syncViewport sizes the active tab's scrollable pane to the window and refills it, so scrolling and
+// rendering both see the current content. A following log pane stays at the bottom.
+func (m Model) syncViewport() Model {
+	switch m.tab {
+	case TabAgents:
+		fill(&m.agents.view, m.logRows(), m.logPaneWidth(), m.logBodyHeight())
+		if m.agents.follow {
+			m.agents.view.GotoBottom()
+		}
+	case TabInfo:
+		fill(&m.info.view, stretchSections(m.infoLines(), m.width-1), m.width, m.bodyHeight())
+	case TabAbout:
+		fill(&m.about, stretchSections(m.aboutLines(), m.width-1), m.width, m.bodyHeight())
 	default:
 		lines := stretchSections(m.overview.lines, m.width-1)
 		if !m.overview.loaded {
 			lines = []string{styleMuted.Render("  loading status from aven…")}
 		}
-		return window(lines, clampOffset(m.overview.offset, len(lines), height), height, m.width)
+		fill(&m.overview.view, lines, m.width, m.bodyHeight())
 	}
+	return m
+}
+
+// fill resizes vp and sets its lines, each cut to the width inside vp's frame so long lines end in "…".
+func fill(vp *viewport.Model, lines []string, width, height int) {
+	vp.SetWidth(width)
+	vp.SetHeight(height)
+	inner := width - vp.Style.GetHorizontalFrameSize()
+	fitted := make([]string, len(lines))
+	for i, line := range lines {
+		fitted[i] = fit(line, inner)
+	}
+	vp.SetContentLines(fitted)
 }
 
 func firstLine(s string) string {

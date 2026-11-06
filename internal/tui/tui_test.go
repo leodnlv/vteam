@@ -34,11 +34,34 @@ func update(t *testing.T, m Model, msg tea.Msg) Model {
 	return next.(Model)
 }
 
+// keyPress builds the key press whose String() is name, e.g. "j", "G", "ctrl+d", "space", "enter".
+func keyPress(name string) tea.KeyPressMsg {
+	named := map[string]rune{
+		"enter": tea.KeyEnter, "esc": tea.KeyEscape, "tab": tea.KeyTab, "backspace": tea.KeyBackspace,
+		"up": tea.KeyUp, "down": tea.KeyDown, "left": tea.KeyLeft, "right": tea.KeyRight,
+		"home": tea.KeyHome, "end": tea.KeyEnd, "pgup": tea.KeyPgUp, "pgdown": tea.KeyPgDown,
+	}
+	switch {
+	case name == "space":
+		return tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
+	case strings.HasPrefix(name, "ctrl+"):
+		return tea.KeyPressMsg{Code: rune(name[len("ctrl+")]), Mod: tea.ModCtrl}
+	}
+	if code, ok := named[name]; ok {
+		return tea.KeyPressMsg{Code: code}
+	}
+	r := []rune(name)[0]
+	return tea.KeyPressMsg{Code: r, Text: name}
+}
+
 func press(t *testing.T, m Model, keys ...string) Model {
 	t.Helper()
 	for _, k := range keys {
-		next, _ := m.handleKey(k)
-		m = next.(Model)
+		msg := keyPress(k)
+		if got := msg.String(); got != k {
+			t.Fatalf("keyPress(%q).String() = %q", k, got)
+		}
+		m = update(t, m, msg)
 	}
 	return m
 }
@@ -135,24 +158,24 @@ func TestOverviewScrollingClampsAndSupportsVimKeys(t *testing.T) {
 	maxOffset := 50 - m.bodyHeight()
 
 	m = press(t, m, "j", "j")
-	if m.overview.offset != 2 {
-		t.Fatalf("j j offset = %d", m.overview.offset)
+	if m.overview.view.YOffset() != 2 {
+		t.Fatalf("j j offset = %d", m.overview.view.YOffset())
 	}
 	m = press(t, m, "G")
-	if m.overview.offset != maxOffset {
-		t.Fatalf("G offset = %d, want %d", m.overview.offset, maxOffset)
+	if m.overview.view.YOffset() != maxOffset {
+		t.Fatalf("G offset = %d, want %d", m.overview.view.YOffset(), maxOffset)
 	}
 	m = press(t, m, "k")
-	if m.overview.offset != maxOffset-1 {
-		t.Fatalf("k after G offset = %d, want %d", m.overview.offset, maxOffset-1)
+	if m.overview.view.YOffset() != maxOffset-1 {
+		t.Fatalf("k after G offset = %d, want %d", m.overview.view.YOffset(), maxOffset-1)
 	}
 	m = press(t, m, "g", "g")
-	if m.overview.offset != 0 {
-		t.Fatalf("gg offset = %d", m.overview.offset)
+	if m.overview.view.YOffset() != 0 {
+		t.Fatalf("gg offset = %d", m.overview.view.YOffset())
 	}
 	m = press(t, m, "ctrl+d")
-	if m.overview.offset != m.bodyHeight()/2 {
-		t.Fatalf("ctrl+d offset = %d", m.overview.offset)
+	if m.overview.view.YOffset() != m.bodyHeight()/2 {
+		t.Fatalf("ctrl+d offset = %d", m.overview.view.YOffset())
 	}
 }
 
@@ -174,7 +197,7 @@ func TestHelpOverlayTogglesAndSwallowsKeys(t *testing.T) {
 
 func TestQuitKeys(t *testing.T) {
 	for _, key := range []string{"q", "ctrl+c"} {
-		_, cmd := newTestModel(t, nil).handleKey(key)
+		_, cmd := newTestModel(t, nil).Update(keyPress(key))
 		if cmd == nil {
 			t.Fatalf("%q returned no command", key)
 		}

@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"charm.land/bubbles/v2/viewport"
 	"charm.land/lipgloss/v2"
 	xansi "github.com/charmbracelet/x/ansi"
 	"github.com/leodnlv/vteam/internal/log"
@@ -18,14 +19,16 @@ type agentsState struct {
 	focusLog bool
 	// runIndex indexes the selected agent's Logs; -1 follows the newest run.
 	runIndex int
-	offset   int
+	view     viewport.Model
 	follow   bool
 	wrap     bool
 	log      logFile
 }
 
 func newAgentsState() agentsState {
-	return agentsState{runIndex: -1, follow: true, wrap: true}
+	view := newScrollView()
+	view.Style = lipgloss.NewStyle().PaddingLeft(1)
+	return agentsState{runIndex: -1, follow: true, wrap: true, view: view}
 }
 
 func (s agentsState) current() (Agent, bool) {
@@ -142,15 +145,6 @@ func (m Model) logRows() []string {
 	return rows
 }
 
-// logOffset is the first visible row: the bottom while following, otherwise the clamped scroll position.
-func (m Model) logOffset(total int) int {
-	height := m.logBodyHeight()
-	if m.agents.follow {
-		return max(0, total-height)
-	}
-	return clampOffset(m.agents.offset, total, height)
-}
-
 func (m Model) renderAgents() []string {
 	height := m.bodyHeight()
 	sidebar := m.renderSidebar(height)
@@ -206,7 +200,7 @@ func (m Model) renderSidebar(height int) []string {
 			lines = append(lines, fit(" "+d, sidebarWidth))
 		}
 	}
-	return window(lines, 0, height, sidebarWidth)
+	return window(lines, height, sidebarWidth)
 }
 
 func lastRunAge(a Agent, m Model) string {
@@ -266,7 +260,7 @@ func (m Model) renderLogPane(height int) []string {
 		for _, b := range m.cronBanner() {
 			lines = append(lines, " "+b, "")
 		}
-		return window(append(lines, " "+styleMuted.Render(empty)), 0, height, width)
+		return window(append(lines, " "+styleMuted.Render(empty)), height, width)
 	}
 
 	parts := []string{styleBold.Render(a.Name)}
@@ -288,16 +282,12 @@ func (m Model) renderLogPane(height int) []string {
 	}
 	title := spread(" "+strings.Join(parts, styleMuted.Render(" · ")), styleMuted.Render(wrap)+" ", width)
 
-	rows := m.logRows()
-	body := window(rows, m.logOffset(len(rows)), m.logBodyHeight(), width-1)
 	lines := []string{fit(title, width), fit(" "+rule(width-2), width)}
 	for _, b := range m.cronBanner() {
 		lines = append(lines, fit(" "+b, width))
 	}
-	for _, r := range body {
-		lines = append(lines, " "+r)
-	}
-	return window(lines, 0, height, width)
+	lines = append(lines, strings.Split(m.agents.view.View(), "\n")...)
+	return window(lines, height, width)
 }
 
 // runCounter shows which run is on screen; it stands out in yellow when that is not the newest one.

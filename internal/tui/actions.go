@@ -8,6 +8,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textarea"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/leodnlv/vteam/internal/cron"
@@ -23,6 +24,7 @@ const (
 	focusMinRows     = 3
 	focusMaxRows     = 10
 	menuLabelWidth   = 20
+	cronLabelWidth   = 9
 	nextFiresInPopup = 3
 )
 
@@ -42,7 +44,7 @@ type dialog struct {
 	kind   dialogKind
 	agent  string
 	cursor int
-	input  lineInput
+	input  textinput.Model
 	save   bool
 	focus  textarea.Model
 }
@@ -145,7 +147,7 @@ func (m Model) agentAction(key string) Model {
 		if expr == "" {
 			expr = fallbackCron
 		}
-		m.dialog = dialog{kind: dialogCron, agent: a.Name, input: newLineInput(expr)}
+		m.dialog = dialog{kind: dialogCron, agent: a.Name, input: newCronInput(expr)}
 	case "s":
 		if a.Cron == "" {
 			return m.withToast(styleWarn.Render("! " + a.Name + " has no cron enabled"))
@@ -164,72 +166,95 @@ func (m Model) agentAction(key string) Model {
 	return m
 }
 
-func (m Model) handleDialogKey(key string) Model {
+func (m Model) handleDialogKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch m.dialog.kind {
 	case dialogMenu:
-		return m.handleMenuKey(key)
+		return m.handleMenuKey(msg), nil
 	case dialogConfirm:
-		switch key {
+		switch msg.String() {
 		case "enter", "y":
 			name := m.dialog.agent
 			m.dialog = dialog{}
-			return m.runOnce(name, "")
+			return m.runOnce(name, ""), nil
 		case "esc", "n", "q":
 			m.dialog = dialog{}
 		}
+	case dialogRun:
+		return m.handleRunKey(msg)
 	case dialogCron:
-		return m.handleCronKey(key)
+		return m.handleCronKey(msg)
 	}
-	return m
+	return m, nil
 }
 
-func (m Model) handleMenuKey(key string) Model {
+func (m Model) handleMenuKey(msg tea.KeyPressMsg) Model {
 	a, ok := m.agentByName(m.dialog.agent)
 	if !ok {
 		m.dialog = dialog{}
 		return m
 	}
 	items := m.menuItems(a)
-	switch key {
-	case "esc", "q", "space", "a":
+	pressed := msg.String()
+	switch {
+	case key.Matches(msg, keys.Cancel, keys.Quit, keys.Actions):
 		m.dialog = dialog{}
 		return m
-	case "j", "down":
+	case key.Matches(msg, keys.Down):
 		m.dialog.cursor = min(len(items)-1, m.dialog.cursor+1)
 		return m
-	case "k", "up":
+	case key.Matches(msg, keys.Up):
 		m.dialog.cursor = max(0, m.dialog.cursor-1)
 		return m
-	case "enter":
-		key = items[min(m.dialog.cursor, len(items)-1)].key
+	case key.Matches(msg, keys.Confirm):
+		pressed = items[min(m.dialog.cursor, len(items)-1)].key
 	}
 	for _, it := range items {
-		if it.key == key && it.enabled {
+		if it.key == pressed && it.enabled {
 			m.dialog = dialog{}
-			return m.agentAction(key)
+			return m.agentAction(pressed)
 		}
 	}
 	return m
 }
 
-func (m Model) handleCronKey(key string) Model {
-	switch key {
-	case "esc":
+func (m Model) handleCronKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, keys.Cancel):
 		m.dialog = dialog{}
-	case "tab":
+	case key.Matches(msg, keys.SaveDefault):
 		m.dialog.save = !m.dialog.save
-	case "enter":
-		expr := m.dialog.input.trimmed()
+	case key.Matches(msg, keys.Confirm):
+		expr := cronExpr(m.dialog.input)
 		if _, err := cron.Parse(expr); err != nil {
-			return m
+			return m, nil
 		}
 		d := m.dialog
 		m.dialog = dialog{}
-		return m.enableCron(d.agent, expr, d.save)
+		return m.enableCron(d.agent, expr, d.save), nil
 	default:
-		m.dialog.input, _ = m.dialog.input.handle(key)
+		var cmd tea.Cmd
+		m.dialog.input, cmd = m.dialog.input.Update(msg)
+		return m, cmd
 	}
-	return m
+	return m, nil
+}
+
+func newCronInput(expr string) textinput.Model {
+	in := textinput.New()
+	in.Prompt = ""
+	styles := textinput.DefaultDarkStyles()
+	styles.Focused.Text = lipgloss.NewStyle()
+	styles.Cursor.Blink = false
+	in.SetStyles(styles)
+	in.SetWidth(cronDialogWidth - styleBox.GetHorizontalFrameSize() - cronLabelWidth - 1)
+	in.SetValue(expr)
+	in.Focus()
+	return in
+}
+
+// cronExpr is the typed pattern with runs of spaces collapsed.
+func cronExpr(in textinput.Model) string {
+	return strings.Join(strings.Fields(in.Value()), " ")
 }
 
 func newFocusInput(width int) textarea.Model {
@@ -240,7 +265,7 @@ func newFocusInput(width int) textarea.Model {
 	in.DynamicHeight = true
 	in.MinHeight = focusMinRows
 	in.MaxHeight = focusMaxRows
-	in.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter", "alt+enter", "ctrl+j"))
+	in.KeyMap.InsertNewline = keys.NewLine
 	styles := textarea.DefaultDarkStyles()
 	styles.Focused.CursorLine = lipgloss.NewStyle()
 	styles.Focused.Prompt = styleMuted
@@ -257,11 +282,11 @@ func (m Model) runDialogWidth() int {
 
 // handleRunKey edits the focus text; enter runs the agent with it, shift+enter (or alt+enter, ctrl+j) adds a line.
 func (m Model) handleRunKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
+	switch {
+	case key.Matches(msg, keys.Cancel):
 		m.dialog = dialog{}
 		return m, nil
-	case "enter":
+	case key.Matches(msg, keys.Confirm):
 		name, focus := m.dialog.agent, strings.TrimSpace(m.dialog.focus.Value())
 		m.dialog = dialog{}
 		return m.runOnce(name, focus), nil
@@ -393,11 +418,11 @@ func (m Model) cronBox() string {
 	if a.Cron != "" {
 		title, verb = "Edit cron of "+d.agent, "update"
 	}
-	label := func(s string) string { return styleMuted.Render(log.PadEnd(s, 9)) }
-	lines := []string{styleBoxHead.Render(title), "", label("cron") + d.input.view()}
+	label := func(s string) string { return styleMuted.Render(log.PadEnd(s, cronLabelWidth)) }
+	lines := []string{styleBoxHead.Render(title), "", label("cron") + d.input.View()}
 
 	now := m.deps.Now()
-	expr := d.input.trimmed()
+	expr := cronExpr(d.input)
 	if s, err := cron.Parse(expr); err != nil {
 		lines = append(lines, label("")+styleFail.Render("✗ "+err.Error()), "")
 	} else {

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 	xansi "github.com/charmbracelet/x/ansi"
 	"github.com/leodnlv/vteam/internal/log"
@@ -39,34 +41,48 @@ func (m Model) projectLabel() string {
 	return strings.Join(parts, styleMuted.Render(" · ")) + " "
 }
 
-type hint struct{ keys, label string }
-
-var globalHints = []hint{{"1-4", "tabs"}, {"?", "help"}, {"q", "quit"}}
-
-func (m Model) hints() []hint {
+// hints are the footer's key hints for what is on screen.
+func (m Model) hints() []key.Binding {
+	global := []key.Binding{relabel(keys.Tabs, "1-4", "tabs"), relabel(keys.Help, "?", "help"), relabel(keys.Quit, "q", "quit")}
+	scrollKeys := relabel(keys.Down, "j/k", "scroll")
 	if m.help {
-		return []hint{{"j/k", "scroll"}, {"?/esc", "close help"}}
+		return []key.Binding{scrollKeys, relabel(keys.Cancel, "?/esc", "close help")}
 	}
 	if m.tab == TabAgents && m.dialog.kind != dialogNone {
 		switch m.dialog.kind {
 		case dialogMenu:
-			return []hint{{"j/k", "move"}, {"⏎", "choose"}, {"esc", "close"}}
+			return []key.Binding{relabel(keys.Down, "j/k", "move"), relabel(keys.Confirm, "⏎", "choose"), relabel(keys.Cancel, "esc", "close")}
 		case dialogConfirm:
-			return []hint{{"⏎", "run"}, {"esc", "cancel"}}
+			return []key.Binding{relabel(keys.Confirm, "⏎", "run"), keys.Cancel}
 		case dialogRun:
-			return []hint{{"⏎", "run"}, {"shift+⏎/ctrl+j", "new line"}, {"esc", "cancel"}}
+			return []key.Binding{relabel(keys.Confirm, "⏎", "run"), keys.NewLine, keys.Cancel}
 		default:
-			return []hint{{"⏎", "confirm"}, {"tab", "save as default"}, {"esc", "cancel"}}
+			return []key.Binding{keys.Confirm, keys.SaveDefault, keys.Cancel}
 		}
 	}
 	if m.tab == TabAgents {
-		focus := []hint{{"j/k", "select"}, {"space", "actions"}, {"tab/l/⏎", "open log"}}
+		focus := []key.Binding{relabel(keys.Down, "j/k", "select"), relabel(keys.Actions, "space", "actions"), relabel(keys.FocusLog, "tab/l/⏎", "open log")}
 		if m.agents.focusLog {
-			focus = []hint{{"j/k", "scroll"}, {"tab/h", "agents"}, {"G", "follow"}}
+			focus = []key.Binding{scrollKeys, relabel(keys.FocusSidebar, "tab/h", "agents"), relabel(keys.Bottom, "G", "follow")}
 		}
-		return append(append(focus, hint{"p/n", "prev/next run"}, hint{"w", "wrap"}), globalHints...)
+		return append(append(focus, relabel(keys.PrevRun, "p/n", "prev/next run"), relabel(keys.Wrap, "w", "wrap")), global...)
 	}
-	return append([]hint{{"j/k", "scroll"}, {"gg/G", "top/bottom"}}, globalHints...)
+	return append([]key.Binding{scrollKeys, relabel(keys.GG, "gg/G", "top/bottom")}, global...)
+}
+
+// newHelp renders key bindings in the footer's colors. Its width stays unset because help.Model's own
+// cut keeps adding items when the "…" lands exactly on the limit; the footer truncates instead.
+func newHelp() help.Model {
+	h := help.New()
+	h.ShortSeparator = "  "
+	h.Styles = help.Styles{
+		Ellipsis:  styleMuted,
+		ShortKey:  styleKey,
+		ShortDesc: styleMuted,
+		FullKey:   styleKey,
+		FullDesc:  lipgloss.NewStyle(),
+	}
+	return h
 }
 
 func (m Model) statusText() string {
@@ -102,11 +118,7 @@ func (m Model) statusText() string {
 }
 
 func (m Model) renderFooter() []string {
-	items := make([]string, 0, len(m.hints()))
-	for _, h := range m.hints() {
-		items = append(items, styleKey.Render(h.keys)+" "+styleMuted.Render(h.label))
-	}
-	left, right := " "+strings.Join(items, "  "), m.statusText()+" "
+	left, right := " "+newHelp().ShortHelpView(m.hints()), m.statusText()+" "
 	if room := m.width - lipgloss.Width(right) - 2; lipgloss.Width(left) > room {
 		left = xansi.Truncate(left, max(0, room), "…")
 	}
@@ -114,45 +126,44 @@ func (m Model) renderFooter() []string {
 }
 
 var helpGroups = []struct {
-	title string
-	keys  [][2]string
+	title    string
+	bindings []key.Binding
 }{
-	{"Global", [][2]string{
-		{"1 2 3 4", "jump to Overview / Agents / Info / About"},
-		{"ctrl+r", "refresh now"},
-		{"?", "toggle this help"},
-		{"q  ctrl+c", "quit"},
+	{"Global", []key.Binding{keys.Tabs, keys.Refresh, keys.Help, keys.Quit}},
+	{"Scrolling", []key.Binding{
+		relabel(keys.Down, "j k  ↓ ↑", "line down / up"),
+		relabel(keys.HalfPageDown, "ctrl+d ctrl+u", "half page down / up"),
+		relabel(keys.GG, "gg  G", "top / bottom"),
 	}},
-	{"Scrolling", [][2]string{
-		{"j k  ↓ ↑", "line down / up"},
-		{"ctrl+d ctrl+u", "half page down / up"},
-		{"gg  G", "top / bottom"},
-	}},
-	{"Agents tab", [][2]string{
-		{"j k", "select agent (sidebar) or scroll log"},
-		{"tab  shift+tab", "switch between the sidebar and the log"},
-		{"l  enter  →", "focus the log"},
-		{"h  esc  ←", "back to the sidebar"},
-		{"p  n", "previous (older) / next (newer) run"},
-		{"space  a", "actions menu of the selected agent"},
-		{"r", "run the selected agent once"},
-		{"c", "run it on cron / edit its cron"},
-		{"s", "stop its cron"},
-		{"S", "start the scheduler when crons are paused"},
-		{"f", "toggle follow"},
-		{"w", "toggle line wrap"},
+	{"Agents tab", []key.Binding{
+		relabel(keys.Down, "j k", "select agent (sidebar) or scroll log"),
+		keys.SwitchPane, keys.FocusLog, keys.FocusSidebar,
+		relabel(keys.PrevRun, "p  n", "previous (older) / next (newer) run"),
+		keys.Actions, keys.Run, keys.Cron, keys.StopCron, keys.StartScheduler, keys.Follow, keys.Wrap,
 	}},
 }
 
+// helpBox renders every group's bindings with bubbles/help, with the key column the same width in all groups.
 func helpBox() string {
+	keyWidth := 0
+	for _, g := range helpGroups {
+		for _, b := range g.bindings {
+			keyWidth = max(keyWidth, lipgloss.Width(b.Help().Key))
+		}
+	}
+	h := newHelp()
 	var lines []string
 	for i, g := range helpGroups {
 		if i > 0 {
 			lines = append(lines, "")
 		}
 		lines = append(lines, section(g.title, 50))
-		for _, k := range g.keys {
-			lines = append(lines, "  "+styleKey.Render(log.PadEnd(k[0], 17))+k[1])
+		padded := make([]key.Binding, len(g.bindings))
+		for j, b := range g.bindings {
+			padded[j] = relabel(b, log.PadEnd(b.Help().Key, keyWidth+1), b.Help().Desc)
+		}
+		for _, line := range strings.Split(h.FullHelpView([][]key.Binding{padded}), "\n") {
+			lines = append(lines, "  "+line)
 		}
 	}
 	lines = append(lines, "", styleMuted.Render("press ? or esc to close"))

@@ -108,10 +108,10 @@ func TestInfoScrolls(t *testing.T) {
 	}
 	m := infoModel(t, agents, testConfig, 0)
 	m = press(t, m, "G")
-	if want := len(m.infoLines()) - m.bodyHeight(); m.info.offset != want || want <= 0 {
-		t.Fatalf("G offset = %d, want %d", m.info.offset, want)
+	if want := len(m.infoLines()) - m.bodyHeight(); m.info.view.YOffset() != want || want <= 0 {
+		t.Fatalf("G offset = %d, want %d", m.info.view.YOffset(), want)
 	}
-	if m = press(t, m, "g", "g"); m.info.offset != 0 {
+	if m = press(t, m, "g", "g"); m.info.view.YOffset() != 0 {
 		t.Fatal("gg should return to the top")
 	}
 }

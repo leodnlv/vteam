@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"charm.land/bubbles/v2/viewport"
 	xansi "github.com/charmbracelet/x/ansi"
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/log"
@@ -16,7 +17,7 @@ type infoState struct {
 	config       *config.Config
 	configErr    string
 	schedulerPID int
-	offset       int
+	view         viewport.Model
 }
 
 func (m Model) refreshInfo() infoState {

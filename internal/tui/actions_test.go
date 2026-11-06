@@ -97,7 +97,7 @@ func TestEnablingACronFromTheActionMenu(t *testing.T) {
 	m = press(t, m, "space")
 	assertScreen(t, m, "Run once now…", "Run on cron…", "Stop cron", "Open log")
 	m = press(t, m, "j", "enter")
-	if m.dialog.kind != dialogCron || m.dialog.input.String() != "0 * * * *" {
+	if m.dialog.kind != dialogCron || m.dialog.input.Value() != "0 * * * *" {
 		t.Fatalf("cron dialog should open prefilled with the agent.json default: %+v", m.dialog)
 	}
 	assertScreen(t, m, "Run improver on cron", "every hour at :00", "next", "default  0 * * * * (agent.json)")
@@ -244,15 +244,15 @@ func TestDescribeCron(t *testing.T) {
 	}
 }
 
-func TestLineInputEditing(t *testing.T) {
-	in := newLineInput("0 * * * *")
-	for _, k := range []string{"home", "delete", "1", "5", "end", "backspace", "space", "x", "left", "ctrl+w"} {
-		in, _ = in.handle(k)
-	}
-	if got := in.String(); got != "15 * * x" {
+func TestCronInputEditing(t *testing.T) {
+	f := &fakeActions{agents: testAgents()}
+	m := press(t, actionsModel(t, f), "c")
+	m = press(t, m, "home", "ctrl+d", "1", "5", "end", "backspace", "space", "x", "left", "ctrl+w")
+	if got := m.dialog.input.Value(); got != "15 * * x" {
 		t.Errorf("text = %q", got)
 	}
-	if _, ok := in.handle("ctrl+k"); ok {
-		t.Error("unknown control keys should not be handled")
+	m = update(t, press(t, m, "end"), tea.PasteMsg{Content: " *"})
+	if got := cronExpr(m.dialog.input); got != "15 * * x *" {
+		t.Errorf("after paste = %q", got)
 	}
 }
