@@ -215,8 +215,12 @@ func renderNeedsAttention(ctx context.Context, d Deps, loaded loadedAgents, idx 
 	for _, e := range loaded.errors {
 		failure(e)
 	}
-	if n := len(idx.ByStatus[model.StatusInbox]); n > 0 {
-		warning(fmt.Sprintf("%d task(s) in inbox awaiting triage", n))
+	if inbox := idx.ByStatus[model.StatusInbox]; len(inbox) > 0 {
+		lines := []string{fmt.Sprintf("%d task(s) in inbox awaiting triage", len(inbox))}
+		for _, t := range inbox {
+			lines = append(lines, formatTask(t))
+		}
+		warning(strings.Join(lines, "\n"))
 	}
 
 	var taskAgents []*config.Agent

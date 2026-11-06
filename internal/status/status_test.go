@@ -104,7 +104,7 @@ func TestRenderEverything(t *testing.T) {
 		"  • APP-5 Awaiting  https://github.com/o/r/pull/5",
 		log.FormatSection("Needs attention"),
 		`  ✗ agent "broken" failed to load: invalid config in broken/agent.json:` + "\n" + `      - (root): Unrecognized key: "bogus"`,
-		"  ! 1 task(s) in inbox awaiting triage",
+		"  ! 1 task(s) in inbox awaiting triage\n    APP-7 [low] Inbox one",
 		"  ✗ APP-3 matches no agent's taskFilter and will never be picked",
 		"  ✗ APP-4 hit max retries (3/3) and will not be picked",
 		"  ! APP-8 is active without a vteam claim (reset it by hand if it is stuck)",
