@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/leodnlv/vteam/internal/log"
 	"github.com/leodnlv/vteam/internal/model"
 	"github.com/leodnlv/vteam/internal/platform"
+	"github.com/leodnlv/vteam/internal/workmux"
 )
 
 type fakeClaude struct {
@@ -81,6 +83,11 @@ type fakeWorktrees struct {
 	conflict []string
 	newSHA   string
 	onPush   func()
+	branches []string
+	deleted  []string
+	pushErr  error
+	// realSHA reads HEAD from the scratch repo instead of returning a fixed sha.
+	realSHA bool
 }
 
 func newFakeWorktrees(t *testing.T, root string) *fakeWorktrees {
@@ -135,12 +142,61 @@ func (f *fakeWorktrees) Push(ctx context.Context, path, branch, remoteSHA string
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if f.pushErr != nil {
+		return f.pushErr
+	}
 	f.record("push")
 	f.pushes = append(f.pushes, pushCall{path, branch, remoteSHA})
 	return nil
 }
 
-func (f *fakeWorktrees) CommitSHA(context.Context, string) (string, error) { return "abc1234def", nil }
+func (f *fakeWorktrees) CommitSHA(ctx context.Context, dir string) (string, error) {
+	if f.realSHA {
+		return f.real.CommitSHA(ctx, dir)
+	}
+	return "abc1234def", nil
+}
+
+func (f *fakeWorktrees) CreateBranch(_ context.Context, _, branch, remote string) (string, error) {
+	f.branches = append(f.branches, branch+"<-"+remote)
+	return "remote-" + remote + "-sha", nil
+}
+
+func (f *fakeWorktrees) DeleteBranch(_ context.Context, _, branch string) error {
+	f.deleted = append(f.deleted, branch)
+	return nil
+}
+
+type fakeWorkmux struct {
+	git       *fakeWorktrees
+	added     []string
+	opened    []workmux.OpenOptions
+	removed   []string
+	list      []workmux.Worktree
+	openErr   error
+	removeErr error
+}
+
+func (f *fakeWorkmux) Add(_ context.Context, _, branch string) (workmux.Worktree, error) {
+	f.added = append(f.added, branch)
+	handle := strings.ReplaceAll(branch, "/", "-")
+	return workmux.Worktree{Handle: handle, Branch: branch, Path: f.git.scratchRepo(handle)}, nil
+}
+
+func (f *fakeWorkmux) Open(_ context.Context, _ string, o workmux.OpenOptions) error {
+	f.opened = append(f.opened, o)
+	return f.openErr
+}
+
+func (f *fakeWorkmux) Remove(_ context.Context, _, handle string) error {
+	if f.removeErr != nil {
+		return f.removeErr
+	}
+	f.removed = append(f.removed, handle)
+	return nil
+}
+
+func (f *fakeWorkmux) List(context.Context, string) ([]workmux.Worktree, error) { return f.list, nil }
 
 func (f *fakeWorktrees) HasUncommittedChanges(ctx context.Context, dir string) bool {
 	return f.real.HasUncommittedChanges(ctx, dir)

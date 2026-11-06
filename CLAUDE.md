@@ -39,6 +39,7 @@ Claude's text output (extracted from the `result` field of the JSON envelope) mu
 All fields except `status` and `summary` are optional. The `content` field is a discriminated union controlled by the `output` field in `agent.json`:
 
 - **`output: "task"`** → `content: { type: "task", body: { title, severity, description, suggestedFix?, files } }` — the orchestrator creates an aven task from the finding.
+- **Interactive runs only** → task agents may also return `content: { type: "tasks", body: [ { title, severity, ... }, ... ] }`; the orchestrator creates one aven task per item (`Content.Findings`). `output.ParseInteractive` accepts it; `output.Parse` (headless) rejects it.
 - **Default (no `output` field)** → `content: { type: "generic", body: "string" }` — a freeform deliverable (review, analysis, report). The orchestrator passes it through to the ON_FINISH hook via `RunOutcome.content`.
 
 The `filesChanged` and `commitMessage` fields are present only when the agent modified files. The orchestrator commits when `commitMessage` is present and `readOnly` is false.
@@ -48,6 +49,16 @@ The optional `memoryUpdate` field is included in the output format instructions 
 The optional `threadReplies` field (`[{ thread, body }]`) is included only when the run is a follow-up on an existing PR with unresolved review threads. The prompt labels the threads `T1`, `T2`, …; Claude replies by label, and the orchestrator maps labels back to platform thread IDs, so Claude never handles real IDs.
 
 The output format instructions are injected into every agent's user prompt by the prompt builder (`outputInstruction` in `internal/prompt`). `prompt.Build` also returns the matching JSON Schema (`Parts.OutputSchema`, from `output.Schema`), which offers `memoryUpdate` and `threadReplies` under the same conditions; the runner passes it as `--json-schema`. The orchestrator parses `structured_output` when present and falls back to the result text otherwise. It validates the output with `output.Parse` (`internal/output`). Unknown keys are ignored, `null` values are rejected. Markdown fences are stripped before parsing as a fallback.
+
+### Interactive runs
+
+`vteam run <agent> --interactive` (or the TUI run dialog's interactive toggle, which passes the flag) hands the prompt to an interactive Claude Code session in a workmux window instead of running `claude -p`. It is per run only: no config field, and cron runs are always headless. It needs `workmux` (checked on PATH up front) and tmux. Plan and workmux findings: `docs/interactive-mode.md`.
+
+- **Hand-off** (`run.Run` with `Options.Interactive`, `internal/run/interactive.go`): the task is claimed with `tasks.SessionClaimMetadata` (`claimed-by`, `claimed-host`, `claimed-session=<runId>`, no pid; released with `tasks.SessionClaimKeys`). `prepareSession` creates the local branch with `git.CreateBranch` (fetch + `git branch --no-track`): `vteam/<slug>-<runId>` from `origin/<baseBranch>`, or `vteam-session/<runId>` from the PR branch for follow-ups and `input: "pr"` (pushed to the PR branch with the fetched sha as lease, and unique so an abandoned worktree holding the PR branch never blocks it). `workmux add <branch> --headless --json` creates the worktree; a conflicting follow-up is merged with `MergeBaseBranch` before the prompt is built. Agents without `worktree: true` get one too (`scratch`), and nothing is committed from it. `handOff` builds the prompt with `SubmitCommand` (`<vteam> submit --project <dir> --session <runId>`), which swaps the "Output Format" section for an "Interactive Session" one (`interactiveOutputInstruction`), writes `vteam/.sessions/<runId>/` (`session.json`, `system-prompt.md`, `prompt.md`, `workmux.yaml` with `agent: <claude.InteractiveCommand>`), and runs `workmux open <handle> --prompt-file … --config …`. Inside tmux (`Deps.InTmux`, from `$TMUX`, which a TUI-spawned run inherits) the window opens in the user's session and workmux switches to it; outside tmux `--parent-session vteam-<tasks.project>` (`run.TmuxSession`) creates it there and the log says to attach. The run ends with `◆ <agent> handed off to an interactive session` (`Logger.HandedOff`), run state `interactive`, the task still `active`, and the worktree kept; the agent lock is released, so headless runs of the same agent carry on. If the open fails, the run cleans up like any failure (task to `todo`, `workmux remove`, session dir deleted).
+- **Submit** (`vteam submit`, `internal/cli/session.go` → `run.Submit`): finds the project (`--project`, or `session.ProjectDir` via `git rev-parse --git-common-dir`) and the session (`--session`, or `session.FindByDir`), refuses anything not `open`, parses stdin (or `--file`) with `output.ParseInteractive` (errors go back to Claude to fix), takes the `submit` lock in the session dir, appends to the hand-off log (`runlog.Open`), and rebuilds the runner from `session.json` (`fromSession`). `applyOutput` runs as headless, plus: HEAD past the session's `StartSHA` with status completed/partial publishes even without `commitMessage` (commits the user made; this also makes a resubmit after a failed push push the earlier commit). On an error the session stays `open` and the task claimed. On success the task is released if unsettled, the session becomes `submitting` with the `RunOutcome` and `memoryUpdate`, and `schedule.SpawnFinalize` starts a detached `vteam session finalize <runId>` (hidden), which runs the on-finish hook and memory curation, closes the session, and sets `submitted`. A window opened in the user's own tmux session (`Session.InUserSession`) is closed with `workmux remove --force`, which also removes the worktree and branch. A window in the dedicated session is left open and only the worktree (`Git.RemoveWorktree`) and local branch (`Git.DeleteBranch`) are removed, because killing a session's last window ends the session and detaches whoever is attached; the same git cleanup is the fallback when `workmux remove` fails.
+- **Abandon**: closing the window without a submit. `ensuremerge.Sweep` first checks `open` sessions against one `workmux list --json`; a handle that is missing or has `is_open: false` gets its task returned to `todo` (only when still `active` under that session's claim; retries unchanged) with a `<agent>: abandoned` note, and the session is marked `abandoned`. The worktree is left for the user (`workmux remove <handle>`); `submit` refuses abandoned sessions.
+- `vteam status` has an `Interactive sessions` section (open ones, and abandoned ones whose worktree still exists). `vteam clean` and the status orphan checks treat session worktrees as in use and leave session-claimed tasks alone. The TUI sidebar shows `◆N` for an agent's open sessions and lists their handles in the details.
+- Detached spawns (`schedule.startDetached`) and the submit command resolve the vteam binary with `execx.Self` (`os.Args[0]` through PATH), so a symlinked binary keeps its name; a `go run` build falls back to `vteam` on PATH in the submit command.
 
 ### Memory management
 
@@ -140,7 +151,7 @@ Lifecycle for `input: "task"` agents:
 
 ### Merge ensurer
 
-`vteam ensure-merge` (`internal/ensuremerge`) is a deterministic sweep, not a `claude -p` agent. A `done` task only means its PR is open; the ensurer moves it through review. It only sees PRs that have a task, so every PR vteam opens must have one (see Worktrees). Under `vteam/.locks/merge-ensurer`, it calls `ListDone` and, for each task with `pr-url` and without `merged=true` metadata, calls `PullRequest`:
+`vteam ensure-merge` (`internal/ensuremerge`) is a deterministic sweep, not a `claude -p` agent. It first abandons interactive sessions whose window is gone (see Interactive runs). A `done` task only means its PR is open; the ensurer moves it through review. It only sees PRs that have a task, so every PR vteam opens must have one (see Worktrees). Under `vteam/.locks/merge-ensurer`, it calls `ListDone` and, for each task with `pr-url` and without `merged=true` metadata, calls `PullRequest`:
 
 - merged → metadata `merged=true` (stays `done`, never checked again)
 - closed → `canceled` + note (canceled stays in dedup, so the finding is not re-reported)
@@ -181,6 +192,10 @@ Skills live in `skills/` and are symlinked into `~/.claude/skills/` via `vteam s
 
 A non-interactive skill (`skills/vteam/SKILL.md`) that injects full vteam knowledge into the current Claude Code session. No questions, no output — it loads background context so Claude can assist with vteam configuration, agent authoring, and troubleshooting from any project.
 
+### `/vteam-submit` — submit an interactive session
+
+`skills/vteam-submit/SKILL.md` (user-invoked) tells Claude to write the session's `AgentOutput` following the prompt's "Interactive Session" section and pipe it to the `vteam submit` command found there, retrying on validation errors.
+
 ### `/create-vteam-agent` — agent scaffolding
 
 An interactive skill (`skills/create-vteam-agent/SKILL.md`) that scaffolds new vteam agents. It walks through clarifying questions (input mode, output mode, worktree, tools, memory, hooks, model, cron) and generates `agent.json` + `AGENT.md` + optional `MEMORY.md` / `ON_FINISH.md` files.
@@ -198,12 +213,14 @@ An interactive skill (`skills/create-vteam-agent/SKILL.md`) that scaffolds new v
 skills/
 ├── vteam/
 │   └── SKILL.md                  Context injection skill — loads vteam knowledge into any session
-└── create-vteam-agent/
-    └── SKILL.md                  Interactive skill for scaffolding agents
+├── create-vteam-agent/
+│   └── SKILL.md                  Interactive skill for scaffolding agents
+└── vteam-submit/
+    └── SKILL.md                  Submits an interactive session's output with `vteam submit`
 cmd/vteam/
 ├── main.go                       Entry point; calls cli.Main
-├── main_test.go                  testscript e2e harness (fake claude/gh, real aven on a temp db)
-└── testdata/script/*.txtar       e2e scripts: init, errors, failed run, full lifecycle, stopped runs
+├── main_test.go                  testscript e2e harness (fake claude/gh/workmux, real aven on a temp db)
+└── testdata/script/*.txtar       e2e scripts: init, errors, failed run, full lifecycle, stopped runs, interactive sessions
 internal/
 ├── cli/                          Cobra commands; wires real dependencies into the packages below
 ├── model/                        Shared types (tasks, AgentOutput, Content union, PRs, run outcome)
@@ -224,7 +241,9 @@ internal/
 ├── git/                          Git worktree create/checkout/merge/push/remove/cleanup
 │   └── gittest/                  Temp-repo helpers for tests
 ├── platform/                     Platform interface; GitHub (gh) and GitLab (glab) PRs, threads, labels
-├── run/                          vteam run <agent> — main orchestration flow on injected Deps
+├── run/                          vteam run <agent> — main orchestration flow on injected Deps; interactive hand-off, Submit, Finalize
+├── session/                      Interactive session state under vteam/.sessions/<runId>/; find by id or worktree dir
+├── workmux/                      workmux CLI client (add --headless, open, list, remove) for interactive runs
 ├── ensuremerge/                  vteam ensure-merge — record merges, cancel closed PRs, reopen labelled/conflicting PR tasks
 ├── schedule/                     vteam cron — enabled-cron state, long-lived scheduler, detached scheduler/run spawning, Scheduler section
 ├── status/                       vteam status — running agents, scheduler, next picks, tasks needing attention
@@ -260,6 +279,8 @@ vteam init                              # scaffold vteam/ directory
 vteam run                               # list available agents (hidden from --help)
 vteam run <agent>                       # run a specific agent (hidden from --help)
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
+vteam run <agent> --interactive         # open the prompt in an interactive Claude session in a workmux window
+vteam submit                            # submit an interactive session's AgentOutput (stdin) and close it
 vteam status                            # show running agents, scheduler state, next picks, tasks needing attention
 vteam clean                             # remove worktrees no running agent uses, break stale locks, release orphaned active tasks
 vteam ensure-merge                      # record merged PRs, cancel closed ones, reopen labelled or conflicting PR tasks (hidden from --help)
@@ -306,6 +327,7 @@ All three must pass before any commit or PR:
 - No Slack integration yet.
 - No `--max-budget-usd` caps on agent runs.
 - Requires the `aven` CLI on PATH for task management.
+- Interactive runs require `workmux` and tmux.
 - Go 1.27+ (see `go.mod`), single binary. Installed with `go install github.com/leodnlv/vteam/cmd/vteam@latest`.
 - Templates live in `internal/scaffold/templates/` and are embedded with `go:embed`.
 

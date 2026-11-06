@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/leodnlv/vteam/internal/session"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -31,6 +32,8 @@ type Agent struct {
 	DefaultCron string
 	// NextRun is the next fire time of the enabled cron.
 	NextRun time.Time
+	// Sessions are the handles of the agent's open interactive sessions.
+	Sessions []string
 }
 
 // Runnable reports whether the agent can be started: it loads and is an agent or the merge ensurer.
@@ -42,6 +45,10 @@ func (a Agent) Runnable() bool {
 func LoadAgents(cwd string, now time.Time) []Agent {
 	cfg, _ := config.Load(cwd)
 	enabled, _ := schedule.Enabled(cwd)
+	sessions := map[string][]string{}
+	for _, s := range session.ListOpen(cwd) {
+		sessions[s.Agent] = append(sessions[s.Agent], s.Handle)
+	}
 	live := map[string]lock.Info{}
 	for _, run := range runstate.FindLive(cwd) {
 		live[run.Name] = run.Lock
@@ -61,7 +68,7 @@ func LoadAgents(cwd string, now time.Time) []Agent {
 
 	agents := make([]Agent, 0, len(names))
 	for name := range names {
-		a := Agent{Name: name, Logs: listLogs(cwd, name), Cron: enabled[name]}
+		a := Agent{Name: name, Logs: listLogs(cwd, name), Cron: enabled[name], Sessions: sessions[name]}
 		if info, ok := live[name]; ok {
 			a.Running = &info
 		}

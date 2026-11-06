@@ -4,6 +4,7 @@ package status
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/leodnlv/vteam/internal/model"
 	"github.com/leodnlv/vteam/internal/runstate"
 	"github.com/leodnlv/vteam/internal/schedule"
+	"github.com/leodnlv/vteam/internal/session"
 	"github.com/leodnlv/vteam/internal/tasks"
 	"golang.org/x/sync/errgroup"
 )
@@ -55,6 +57,7 @@ func Render(ctx context.Context, d Deps) ([]string, error) {
 
 	lines := []string{log.FormatBanner("status", fmt.Sprintf("aven: %s · label: %s", d.Config.Tasks.Project, d.Config.Tasks.Label))}
 	lines = append(lines, renderRunning(d.Cwd, running, now)...)
+	lines = append(lines, renderSessions(d.Cwd, now)...)
 	lines = append(lines, schedule.RenderScheduler(d.Cwd, now)...)
 	lines = append(lines, renderUpNext(loaded.agents, ready, d.Config)...)
 	lines = append(lines, renderAwaitingMerge(idx)...)
@@ -118,6 +121,36 @@ func renderRunning(cwd string, running []runningJob, now time.Time) []string {
 		}
 	}
 	return lines
+}
+
+// renderSessions lists open interactive sessions, and abandoned ones whose worktree is still there to clean up.
+func renderSessions(cwd string, now time.Time) []string {
+	var lines []string
+	for _, s := range session.List(cwd) {
+		age := ""
+		if started, err := time.Parse(time.RFC3339Nano, s.StartedAt); err == nil {
+			age = " · " + log.FormatAge(now.Sub(started))
+		}
+		task := ""
+		if s.Task != nil {
+			task = "  " + formatTask(*s.Task)
+		}
+		switch s.Status {
+		case session.Open, session.Submitting:
+			lines = append(lines, log.FormatListItem(ansi.Live("◆"), ansi.Bold(s.Agent)+"  "+ansi.Muted(s.Handle+age)+task))
+			lines = append(lines, log.FormatListDetail("worktree", s.WorktreePath))
+		case session.Abandoned:
+			if _, err := os.Stat(s.WorktreePath); err != nil {
+				continue
+			}
+			lines = append(lines, log.FormatListItem(ansi.Warn("!"), ansi.Bold(s.Agent)+"  "+ansi.Muted(s.Handle+" · abandoned"+age)+task))
+			lines = append(lines, log.FormatListDetail("worktree", s.WorktreePath+" "+ansi.Muted("(workmux remove "+s.Handle+")")))
+		}
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+	return append([]string{log.FormatSection("Interactive sessions")}, lines...)
 }
 
 func renderUpNext(agents []*config.Agent, ready []model.Task, cfg *config.Config) []string {
@@ -213,6 +246,7 @@ func renderNeedsAttention(ctx context.Context, d Deps, loaded loadedAgents, idx 
 		ref := ansi.Bold(t.Ref)
 		pid := tasks.ClaimedPID(t)
 		switch {
+		case tasks.HeldBySession(t):
 		case pid == 0:
 			warning(ref + " is active without a vteam claim " + ansi.Muted("(reset it by hand if it is stuck)"))
 		case t.Metadata[model.MetaClaimedHost] == d.Host && !d.IsAlive(pid):
@@ -220,7 +254,7 @@ func renderNeedsAttention(ctx context.Context, d Deps, loaded loadedAgents, idx 
 		}
 	}
 
-	var inUse []string
+	inUse := session.WorktreePaths(d.Cwd)
 	for _, r := range running {
 		if r.State != nil && r.State.WorktreePath != "" {
 			inUse = append(inUse, r.State.WorktreePath)

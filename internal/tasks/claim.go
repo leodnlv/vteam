@@ -18,6 +18,22 @@ func ClaimMetadata(runID string, pid int, host string) map[string]string {
 	}
 }
 
+// SessionClaimKeys are the claim metadata of an interactive session, which has no live process to check.
+var SessionClaimKeys = []string{model.MetaClaimedBy, model.MetaClaimedHost, model.MetaClaimedSession}
+
+func SessionClaimMetadata(runID, host string) map[string]string {
+	return map[string]string{
+		model.MetaClaimedBy:      runID,
+		model.MetaClaimedHost:    host,
+		model.MetaClaimedSession: runID,
+	}
+}
+
+// HeldBySession reports whether t is claimed by an interactive session.
+func HeldBySession(t model.Task) bool {
+	return t.Metadata[model.MetaClaimedSession] != ""
+}
+
 func Hostname() string {
 	host, _ := os.Hostname()
 	return host
@@ -32,6 +48,8 @@ type OrphanSweep struct {
 	Released    []model.Task
 	ForeignHost []model.Task
 	Unclaimed   []model.Task
+	// Sessions are held by interactive sessions; the merge ensurer releases those whose window was closed.
+	Sessions []model.Task
 }
 
 // ReleaseOrphaned returns active tasks claimed on this host by a dead process to todo.
@@ -44,6 +62,8 @@ func ReleaseOrphaned(ctx context.Context, m Manager, isAlive func(int) bool, hos
 	for _, t := range idx.ByStatus[model.StatusActive] {
 		pid := ClaimedPID(t)
 		switch {
+		case HeldBySession(t):
+			sweep.Sessions = append(sweep.Sessions, t)
 		case pid == 0:
 			sweep.Unclaimed = append(sweep.Unclaimed, t)
 		case t.Metadata[model.MetaClaimedHost] != host:

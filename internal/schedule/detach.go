@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/leodnlv/vteam/internal/execx"
 	"github.com/leodnlv/vteam/internal/runlog"
 )
 
@@ -28,19 +29,33 @@ func StartDetached(cwd string) (int, error) {
 }
 
 // SpawnRun starts one run of a job in its own session and returns the path of the log it will write.
-// A non-empty focus is passed as `--focus`, which only `vteam run` accepts.
-func SpawnRun(cwd, name, focus string, now time.Time) (string, error) {
+// A non-empty focus is passed as `--focus` and interactive as `--interactive`, which only `vteam run` accepts.
+func SpawnRun(cwd, name, focus string, interactive bool, now time.Time) (string, error) {
 	logPath := runlog.Path(cwd, name, now)
 	args := JobCommand(name)
 	if focus != "" {
 		args = append(args, "--focus", focus)
 	}
+	if interactive {
+		args = append(args, "--interactive")
+	}
 	_, err := startDetached(cwd, args, nil, []string{runlog.Env + "=" + logPath})
 	return logPath, err
 }
 
+// SpawnFinalize starts `vteam session finalize <runID>` in its own session, appending to the run's log, so it
+// outlives the submit that started it and the tmux window it closes.
+func SpawnFinalize(cwd, runID, logPath string) error {
+	var env []string
+	if logPath != "" {
+		env = []string{runlog.Env + "=" + logPath}
+	}
+	_, err := startDetached(cwd, []string{"session", "finalize", runID}, nil, env)
+	return err
+}
+
 func startDetached(cwd string, args []string, out *os.File, env []string) (int, error) {
-	self, err := os.Executable()
+	self, err := execx.Self()
 	if err != nil {
 		return 0, err
 	}

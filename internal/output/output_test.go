@@ -294,3 +294,46 @@ func TestParseFindsJSONAfterAFenceWithoutJSON(t *testing.T) {
 		t.Errorf("got %+v", out)
 	}
 }
+
+func TestParseInteractiveTaskList(t *testing.T) {
+	const doc = `{"status":"completed","summary":"two findings","content":{"type":"tasks","body":[
+		{"title":"A","severity":"high","description":"a","files":["a.go"]},
+		{"title":"B","severity":"low","description":"b","suggestedFix":"fix b","files":["b.go"]}]}}`
+	out, err := ParseInteractive(doc)
+	if err != nil {
+		t.Fatalf("ParseInteractive: %v", err)
+	}
+	want := []model.TaskContentBody{
+		{Title: "A", Severity: model.SeverityHigh, Description: "a", Files: []string{"a.go"}},
+		{Title: "B", Severity: model.SeverityLow, Description: "b", SuggestedFix: "fix b", Files: []string{"b.go"}},
+	}
+	if diff := cmp.Diff(want, out.Content.Findings()); diff != "" {
+		t.Errorf("findings (-want +got):\n%s", diff)
+	}
+	data, _ := json.Marshal(out.Content)
+	var back model.Content
+	if err := json.Unmarshal(data, &back); err != nil || len(back.Tasks) != 2 {
+		t.Errorf("round trip: %v %+v", err, back)
+	}
+}
+
+func TestParseRejectsTaskListOutsideInteractive(t *testing.T) {
+	const doc = `{"status":"completed","summary":"s","content":{"type":"tasks","body":[{"title":"A","severity":"high","description":"a","files":["a.go"]}]}}`
+	if _, err := Parse(doc); err == nil || !strings.Contains(err.Error(), `expected "task" or "generic"`) {
+		t.Errorf("Parse error = %v", err)
+	}
+}
+
+func TestParseInteractiveRejectsBadTaskLists(t *testing.T) {
+	cases := map[string]string{
+		`"body":[]`: "content.body: expected at least 1 item",
+		`"body":{}`: "content.body: expected array",
+		`"body":[{"title":"","severity":"high","description":"a","files":["a"]}]`: "content.body[0].title",
+	}
+	for body, want := range cases {
+		doc := `{"status":"completed","summary":"s","content":{"type":"tasks",` + body + `}}`
+		if _, err := ParseInteractive(doc); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: error = %v, want %q", body, err, want)
+		}
+	}
+}

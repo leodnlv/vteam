@@ -17,9 +17,10 @@ import (
 
 func TestMain(m *testing.M) {
 	testscript.Main(m, map[string]func(){
-		"vteam":  func() { os.Exit(cli.Main()) },
-		"claude": fakeClaude,
-		"gh":     fakeGH,
+		"vteam":   func() { os.Exit(cli.Main()) },
+		"claude":  fakeClaude,
+		"gh":      fakeGH,
+		"workmux": fakeWorkmux,
 	})
 }
 
@@ -158,4 +159,68 @@ func fakeGH() {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// fakeWorkmux makes real git worktrees under $WORK/wm, logs every call to $FAKE_DIR/workmux.log, and links the
+// last worktree to $WORK/session so scripts can cd into it. A window counts as open until $FAKE_DIR/closed/<handle>
+// exists.
+func fakeWorkmux() {
+	dir := os.Getenv("FAKE_DIR")
+	state := filepath.Join(dir, "workmux")
+	_ = os.MkdirAll(state, 0o755)
+	logFile, _ := os.OpenFile(filepath.Join(dir, "workmux.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	fmt.Fprintln(logFile, strings.Join(os.Args[1:], " "))
+	_ = logFile.Close()
+	work := filepath.Dir(dir)
+	fail := func(err error, out []byte) {
+		fmt.Fprintln(os.Stderr, err, string(out))
+		os.Exit(1)
+	}
+	switch os.Args[1] {
+	case "add":
+		branch := os.Args[2]
+		handle := strings.ReplaceAll(branch, "/", "-")
+		path := filepath.Join(work, "wm", handle)
+		if out, err := exec.Command("git", "worktree", "add", "-q", path, branch).CombinedOutput(); err != nil {
+			fail(err, out)
+		}
+		_ = os.WriteFile(filepath.Join(state, handle), []byte(path+"\n"+branch), 0o644)
+		_ = os.Remove(filepath.Join(work, "session"))
+		_ = os.Symlink(path, filepath.Join(work, "session"))
+		data, _ := json.Marshal(map[string]any{"handle": handle, "branch": branch, "worktree_path": path})
+		fmt.Println(string(data))
+	case "open":
+		prompt := ""
+		for i, a := range os.Args {
+			if a == "--prompt-file" {
+				prompt = os.Args[i+1]
+			}
+		}
+		data, _ := os.ReadFile(prompt)
+		_ = os.WriteFile(filepath.Join(dir, "session-prompt.md"), data, 0o644)
+	case "list":
+		entries, _ := os.ReadDir(state)
+		list := []map[string]any{}
+		for _, e := range entries {
+			data, _ := os.ReadFile(filepath.Join(state, e.Name()))
+			path, branch, _ := strings.Cut(string(data), "\n")
+			list = append(list, map[string]any{"handle": e.Name(), "branch": branch, "path": path,
+				"is_open": !fileExists(filepath.Join(dir, "closed", e.Name()))})
+		}
+		data, _ := json.Marshal(list)
+		fmt.Println(string(data))
+	case "remove":
+		handle := os.Args[len(os.Args)-1]
+		data, err := os.ReadFile(filepath.Join(state, handle))
+		if err != nil {
+			fail(err, nil)
+		}
+		path, branch, _ := strings.Cut(string(data), "\n")
+		main := filepath.Dir(filepath.Dir(path))
+		if out, err := exec.Command("git", "-C", filepath.Join(main, "app"), "worktree", "remove", "--force", path).CombinedOutput(); err != nil {
+			fail(err, out)
+		}
+		_ = exec.Command("git", "-C", filepath.Join(main, "app"), "branch", "-D", branch).Run()
+		_ = os.Remove(filepath.Join(state, handle))
+	}
 }

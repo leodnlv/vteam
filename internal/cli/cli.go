@@ -32,6 +32,7 @@ import (
 	"github.com/leodnlv/vteam/internal/status"
 	"github.com/leodnlv/vteam/internal/tasks"
 	"github.com/leodnlv/vteam/internal/tui"
+	"github.com/leodnlv/vteam/internal/workmux"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -72,7 +73,7 @@ func NewRoot() *cobra.Command {
 		Args:          cobra.NoArgs,
 		RunE:          runTUI,
 	}
-	root.AddCommand(initCmd(), runCmd(), statusCmd(), cleanCmd(), ensureMergeCmd(), cronCmd(), skillCmd())
+	root.AddCommand(initCmd(), runCmd(), submitCmd(), sessionCmd(), statusCmd(), cleanCmd(), ensureMergeCmd(), cronCmd(), skillCmd())
 	return root
 }
 
@@ -112,6 +113,7 @@ func initCmd() *cobra.Command {
 
 func runCmd() *cobra.Command {
 	var focus string
+	var interactive bool
 	cmd := &cobra.Command{
 		Use:    "run [agent]",
 		Short:  "Run a specific agent (omit the agent to list available agents)",
@@ -126,10 +128,11 @@ func runCmd() *cobra.Command {
 				listAgents(dir, cmd.OutOrStdout())
 				return nil
 			}
-			return runAgent(cmd.Context(), dir, args[0], focus)
+			return runAgent(cmd.Context(), dir, args[0], run.Options{Focus: focus, Interactive: interactive})
 		},
 	}
 	cmd.Flags().StringVar(&focus, "focus", "", "priority context injected into the agent prompt")
+	cmd.Flags().BoolVar(&interactive, "interactive", false, "open the prompt in an interactive Claude session in a workmux window")
 	return cmd
 }
 
@@ -171,10 +174,15 @@ func listAgents(dir string, out io.Writer) {
 	}
 }
 
-func runAgent(ctx context.Context, dir, name, focus string) error {
+func runAgent(ctx context.Context, dir, name string, opts run.Options) error {
 	agent, err := config.ResolveAgent(name, dir)
 	if err != nil {
 		return err
+	}
+	if opts.Interactive {
+		if _, err := exec.LookPath("workmux"); err != nil {
+			return errors.New("interactive runs need workmux on PATH (https://github.com/raine/workmux)")
+		}
 	}
 	ctx, stop := stopKeepingWorktreeOnSignal(ctx)
 	defer stop()
@@ -192,7 +200,8 @@ func runAgent(ctx context.Context, dir, name, focus string) error {
 		logger.WriteFile(err.Error() + "\n")
 		return err
 	}
-	return run.Run(ctx, run.NewDeps(dir, cfg, logger), agent, run.Options{Focus: focus})
+	opts.LogPath = runLog.Path
+	return run.Run(ctx, run.NewDeps(dir, cfg, logger), agent, opts)
 }
 
 // stopKeepingWorktreeOnSignal cancels ctx with run.ErrStopKeepWorktree on runstate.StopKeepWorktreeSignal.
@@ -251,8 +260,8 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 		LoadConfig:   func() (*config.Config, error) { return config.Load(dir) },
 		SchedulerPID: func() int { return schedule.ReadPID(dir) },
 		Now:          time.Now,
-		RunOnce: func(name, focus string) error {
-			_, err := schedule.SpawnRun(dir, name, focus, time.Now())
+		RunOnce: func(name, focus string, interactive bool) error {
+			_, err := schedule.SpawnRun(dir, name, focus, interactive, time.Now())
 			return err
 		},
 		StopRun: func(name string, keepWorktree bool) error {
@@ -367,7 +376,7 @@ func ensureMerge(ctx context.Context, dir string) error {
 		}
 		defer l.Release()
 		logger.Step("lock acquired")
-		res, err := ensuremerge.Sweep(ctx, ensuremerge.Deps{Config: cfg, Log: logger, Tasks: tasks.NewAven(cfg.Tasks), Platform: platform.New(cfg.Platform, dir)})
+		res, err := ensuremerge.Sweep(ctx, ensuremerge.Deps{Cwd: dir, Config: cfg, Log: logger, Tasks: tasks.NewAven(cfg.Tasks), Platform: platform.New(cfg.Platform, dir), Workmux: workmux.New()})
 		if err != nil {
 			return err
 		}

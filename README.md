@@ -40,6 +40,7 @@ The orchestrator never reasons about code. Claude never creates tasks, commits, 
 - **Git** — the project must be a git repository
 - **aven** — the local-first task manager CLI. `aven` must be installed and on your PATH; vteam stores all tasks in it.
 - **`gh`** (GitHub CLI) or **`glab`** (GitLab CLI) — required for automatic pull request creation. Without it, branches are pushed but PRs must be created manually.
+- **workmux** and **tmux** — only for [interactive runs](#interactive-mode---interactive).
 
 ## Installation
 
@@ -149,6 +150,22 @@ vteam run improver --focus "only look at the auth module"
 vteam run security-analyst --focus "file upload endpoints"
 ```
 
+### Interactive mode (`--interactive`)
+
+`vteam run <agent> --interactive` (or the **interactive session** toggle in the TUI run dialog) runs the same agent, but instead of `claude -p` it opens the prompt in an interactive Claude Code session that you can pair with. It needs [workmux](https://github.com/raine/workmux) and tmux. Cron runs are always headless.
+
+1. vteam picks the task (claimed with `claimed-session` metadata instead of a pid), creates the branch, and creates the worktree with `workmux add --headless`. For PR follow-ups it also merges the base branch when the PR conflicts.
+2. It opens the worktree with `workmux open`. Inside tmux (including from the TUI) the window opens in your current session and you are switched to it; outside tmux it goes to a tmux session `vteam-<tasks.project>`, which vteam tells you to attach to. Claude starts with the agent's `AGENT.md` as system prompt, its model and tools, and the usual prompt plus an **Interactive Session** section. `vteam run` exits, and the agent lock is released, so cron runs carry on.
+3. When you are done, run `/vteam-submit` in the session (install it with `vteam skill install`). Claude pipes its `AgentOutput` JSON to `vteam submit`, which validates it (Claude fixes and resubmits on errors), commits any uncommitted changes, pushes (commits you made yourself are pushed too), opens or updates the PR, settles the task, and creates one task per finding for task-producing agents (`"content": {"type": "tasks", "body": [...]}`). Then a detached `vteam session finalize` runs the on-finish hook and memory curation and closes the window with `workmux remove`, which also removes the worktree and its local branch. A window in the `vteam-<tasks.project>` session (run started outside tmux) is not closed, because killing a session's last window would detach you from it; vteam removes the worktree and you close the window. If submit fails (a rejected push, say), the session stays open and you can submit again.
+4. Closing the window without submitting abandons the session. The next `vteam ensure-merge` marks it abandoned and returns its task to `todo` with a note. The worktree is kept; remove it with `workmux remove <handle>`. An abandoned session cannot be submitted.
+
+Agents without `worktree: true` still get a worktree to host the session, but nothing is committed from it. Sessions are recorded in `vteam/.sessions/` (gitignored). `vteam status` lists open sessions and abandoned ones whose worktree still exists, and the TUI sidebar shows `◆N` next to an agent with open sessions.
+
+```bash
+vteam run coder --interactive
+vteam run improver --interactive --focus "the auth module"
+```
+
 ### Logs
 
 Every `vteam run <agent>` writes its full output to a new file at `vteam/.logs/<agent>/<ISO-timestamp>.log`, whether you start it by hand, from the TUI, or the scheduler starts it. The output still goes to your terminal; the log file gets a copy of it. This includes Claude's tool calls, orchestrator messages, the ON_FINISH hook and memory curation, plus the error if the run crashes. The path is printed when the run starts.
@@ -233,7 +250,7 @@ Running `vteam` with no arguments inside a project opens a full-screen, keyboard
 
 - **Agents** — a sidebar of your agents (plus the merge ensurer) with a live/idle marker and details for the selected one, next to its newest run log. The log pane follows the log while the agent runs; scroll up to pause, `G` to follow again. `p` / `n` step to the previous / next run, and the `run i/n` counter in the title turns yellow when you are looking at an older run. `w` toggles line wrap.
   - **Running agents from the TUI** — `space` (or `a`) opens an action menu for the selected agent: run once, stop its run, run on cron or edit its cron, stop its cron, start the scheduler, open the log. Each action also has its own key (`r`, `x`, `c`, `s`, `S`).
-    - **Run once** opens a dialog with an optional, multiline focus field, then starts `vteam run <agent>` in the background, passing the text as `--focus`. `⏎` runs, `shift+⏎` (or `alt+⏎`, `ctrl+j`) adds a line, `esc` cancels. Leave it empty for a normal run. The run keeps going after you quit the TUI.
+    - **Run once** opens a dialog with an optional, multiline focus field, then starts `vteam run <agent>` in the background, passing the text as `--focus`. `⏎` runs, `shift+⏎` (or `alt+⏎`, `ctrl+j`) adds a line, `esc` cancels. Leave it empty for a normal run. `tab` toggles **interactive session**, which passes `--interactive` (see [Interactive mode](#interactive-mode---interactive)). The run keeps going after you quit the TUI.
     - **Stop run** asks before stopping the selected agent's run (see [Stopping a run](#stopping-a-run)). For an agent with a worktree, choose with `j` / `k` between removing the worktree and keeping it for inspection.
     - **Run on cron** opens a dialog prefilled with the enabled pattern, or else the `agent.json` default. As you type it shows the schedule in words, the next three fire times, or the parse error. `tab` toggles saving the pattern as the default in `agent.json` (`vteam.config.json` for the merge ensurer). Confirming enables the cron and, if no scheduler is running, starts one in the background (see [Running on a schedule](#running-on-a-schedule)).
     - **Cron markers** — an agent on cron shows `◷` in the sidebar, its pattern and next run in the details, and a line above its log. All three turn yellow with "paused" when the scheduler is not running.
@@ -589,6 +606,10 @@ A non-interactive skill that injects full vteam knowledge into the current Claud
 An interactive skill that scaffolds new vteam agents. It asks clarifying questions about the agent's purpose, input/output modes, worktree needs, tool permissions, memory, and hooks — then generates `agent.json` and `AGENT.md` (and optionally `MEMORY.md` / `ON_FINISH.md`).
 
 Invoke from any project with `/create-vteam-agent`.
+
+### `/vteam-submit` — submit an interactive session
+
+Run it inside a session opened by `vteam run <agent> --interactive` when you are done. Claude writes the `AgentOutput` JSON for the session and pipes it to the `vteam submit` command from its prompt, retrying on validation errors.
 
 ## Development
 

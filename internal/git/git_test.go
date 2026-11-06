@@ -477,3 +477,34 @@ func TestListWorktreesAndHelpers(t *testing.T) {
 	}
 	g.RemoveWorktree(ctx, repo, filepath.Join(repo, "missing"))
 }
+
+func TestCreateBranch(t *testing.T) {
+	g := newParallelGit(t)
+	local, origin := gittest.InitWithOrigin(t)
+	want := strings.TrimSpace(gittest.Run(t, origin, "rev-parse", "feature-branch"))
+	sha := must(g.CreateBranch(ctx, local, "vteam-session/run-1", "feature-branch"))(t)
+	if sha != want {
+		t.Errorf("sha = %q, want %q", sha, want)
+	}
+	if got := strings.TrimSpace(gittest.Run(t, local, "rev-parse", "vteam-session/run-1")); got != want {
+		t.Errorf("branch at %q", got)
+	}
+	if upstream, err := g.run(ctx, local, "rev-parse", "--abbrev-ref", "vteam-session/run-1@{upstream}"); err == nil {
+		t.Errorf("branch tracks %q", upstream)
+	}
+	if _, err := g.CreateBranch(ctx, local, "vteam-session/run-1", "feature-branch"); err == nil {
+		t.Error("expected an error for an existing branch")
+	}
+}
+
+func TestDeleteBranch(t *testing.T) {
+	g := newParallelGit(t)
+	local, _ := gittest.InitWithOrigin(t)
+	must(g.CreateBranch(ctx, local, "vteam/gone", "main"))(t)
+	if err := g.DeleteBranch(ctx, local, "vteam/gone"); err != nil {
+		t.Fatal(err)
+	}
+	if out := gittest.Run(t, local, "branch", "--list", "vteam/gone"); strings.TrimSpace(out) != "" {
+		t.Errorf("branch still there: %q", out)
+	}
+}

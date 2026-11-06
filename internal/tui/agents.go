@@ -177,6 +177,9 @@ func (m Model) renderSidebar(height int) []string {
 			}
 			age = clock + " " + age
 		}
+		if n := len(a.Sessions); n > 0 {
+			age = styleLive.Render(fmt.Sprintf("◆%d", n)) + " " + age
+		}
 		row := spread(" "+glyph+" "+log.Truncate(a.Name, sidebarWidth-12), age+" ", sidebarWidth)
 		if i != s.selected {
 			lines = append(lines, fit(row, sidebarWidth))
@@ -232,6 +235,13 @@ func (m Model) agentDetails(a Agent) []string {
 		field("cron", styleMuted.Render("off ("+a.DefaultCron+")"))
 	case a.Runnable():
 		field("cron", styleMuted.Render("off"))
+	}
+	for i, handle := range a.Sessions {
+		label := ""
+		if i == 0 {
+			label = "open"
+		}
+		field(label, styleLive.Render("◆ ")+log.Truncate(handle, sidebarWidth-10))
 	}
 	if a.Config != nil && a.Config.Model != "" {
 		field("model", a.Config.Model)

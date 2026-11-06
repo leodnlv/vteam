@@ -28,6 +28,8 @@ vteam                                   # interactive TUI, opens on Agents: Agen
 vteam init                              # scaffold vteam/ directory in the current project
 vteam run <agent>                       # run a specific agent (hidden from --help, still works)
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt
+vteam run <agent> --interactive         # open the prompt in an interactive Claude session in a workmux window instead of claude -p
+vteam submit                            # (inside an interactive session) submit its AgentOutput JSON from stdin; settles the run and closes the session
 vteam run                               # (no agent) list available agents
 vteam status                            # running agents (pid, task, worktree), scheduler state + next fires, each task agent's next pick, PRs awaiting merge, tasks/worktrees needing attention
 vteam clean                             # remove worktrees no running agent uses, break stale locks, release orphaned active tasks
@@ -256,6 +258,10 @@ The hook receives: agent name, status, timestamps, task details, branch, PR URL,
 ## Worktrees
 
 Agents with `worktree: true` get an isolated git worktree, branched from a freshly fetched `origin/<baseBranch>`. Claude edits files there but does NOT commit — it returns a commit message in its JSON output. The orchestrator runs `git add -A` + `git commit`, pushes the branch, and optionally creates a PR. Worktrees are cleaned up after each run. Pushes use `--force-with-lease` against the remote sha at worktree creation (new branch: must not exist; PR branch: the checked-out sha), so a human's concurrent pushes are never overwritten. Network errors are retried twice.
+
+## Interactive runs
+
+`vteam run <agent> --interactive` (or the TUI run dialog's interactive toggle) is per run only; there is no config for it, and cron runs are always headless. It needs `workmux` and tmux. vteam claims the task with `claimed-session=<runId>` (no pid, so `vteam clean` leaves it alone), creates the branch itself (`vteam/<slug>-<runId>`, or `vteam-session/<runId>` pushing to the PR branch for follow-ups), runs `workmux add <branch> --headless --json`, does any base-branch merge, then `workmux open <handle> --prompt-file … --config <workmux.yaml with the claude command>`, which inside tmux opens the window in the user's session and switches to it (outside tmux it adds `--parent-session vteam-<tasks.project>`). State lives in `vteam/.sessions/<runId>/` (`session.json`, `system-prompt.md`, `prompt.md`, `workmux.yaml`). The prompt ends with an "Interactive Session" section instead of "Output Format": Claude pipes its `AgentOutput` to `vteam submit --project <dir> --session <runId>` when the user says done (`/vteam-submit` skill). Task agents may return `"content": {"type": "tasks", "body": [...]}` (one aven task each); headless runs never accept `"tasks"`. Submit validates, applies the output like a headless run (commits uncommitted changes with `commitMessage`, and publishes when HEAD moved past the hand-off commit even without one), and on failure keeps the session open with the task claimed. A detached `vteam session finalize` then runs the on-finish hook and memory curation and runs `workmux remove --force` (worktree, branch, window) when the window is in the user's own tmux session; a window in the dedicated `vteam-<tasks.project>` session is left open and only the worktree and branch are removed with git. A session whose window was closed without a submit is abandoned by `vteam ensure-merge`: task back to `todo` (retries unchanged) with a note, worktree kept for the user.
 
 ## Locking
 

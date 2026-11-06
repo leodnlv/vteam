@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -84,6 +85,15 @@ func (e streamEvent) blocks() []ContentBlock {
 
 func Args(systemPromptFile string, opts Options) []string {
 	args := []string{"-p", "--append-system-prompt-file", systemPromptFile, "--output-format", "stream-json", "--verbose", "--no-session-persistence"}
+	args = append(args, agentArgs(opts)...)
+	if opts.JSONSchema != "" {
+		args = append(args, "--json-schema", opts.JSONSchema)
+	}
+	return args
+}
+
+func agentArgs(opts Options) []string {
+	var args []string
 	if opts.Model != "" {
 		args = append(args, "--model", opts.Model)
 	}
@@ -96,10 +106,28 @@ func Args(systemPromptFile string, opts Options) []string {
 	if len(opts.DisallowedTools) > 0 {
 		args = append(append(args, "--disallowedTools"), opts.DisallowedTools...)
 	}
-	if opts.JSONSchema != "" {
-		args = append(args, "--json-schema", opts.JSONSchema)
-	}
 	return args
+}
+
+// InteractiveCommand is the shell command that starts an interactive Claude Code session with the agent's system
+// prompt, model, and tools. The first prompt is appended by whoever starts it (workmux adds `-- <prompt>`).
+func InteractiveCommand(systemPromptFile string, opts Options) string {
+	words := []string{"claude", "--append-system-prompt-file", systemPromptFile}
+	words = append(words, agentArgs(opts)...)
+	for i, w := range words {
+		words[i] = ShellQuote(w)
+	}
+	return strings.Join(words, " ")
+}
+
+var shellSafe = regexp.MustCompile(`^[A-Za-z0-9_@%+=:,./-]+$`)
+
+// ShellQuote quotes s for a POSIX shell, leaving plain words as they are.
+func ShellQuote(s string) string {
+	if shellSafe.MatchString(s) {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // BuiltinTools turns allowedTools into the --tools list: --allowedTools only pre-approves tools, while --tools is

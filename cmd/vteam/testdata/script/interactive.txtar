@@ -1,0 +1,122 @@
+# An interactive run hands the task to a workmux session; submit settles it; a closed window is abandoned.
+[!aven] skip 'aven is not installed'
+mkdir $FAKE_DIR/claude $FAKE_DIR/closed
+
+exec git init -q --bare origin.git
+mkdir app
+cd app
+exec git init -q -b main
+cp ../files/README.md README.md
+exec git add -A
+exec git commit -q -m init
+exec git remote add origin $WORK/origin.git
+exec git push -q origin main
+
+mkdir vteam/agents/improver vteam/agents/coder
+cp ../files/vteam.config.json vteam/vteam.config.json
+cp ../files/improver.json vteam/agents/improver/agent.json
+cp ../files/prompt.md vteam/agents/improver/AGENT.md
+cp ../files/coder.json vteam/agents/coder/agent.json
+cp ../files/prompt.md vteam/agents/coder/AGENT.md
+
+cp ../files/finding.json $FAKE_DIR/claude/1.json
+exec vteam run improver
+triage e2e
+
+# Inside tmux, the coder hands its task to an interactive session in the user's tmux session.
+env TMUX=/tmp/tmux-test/default,1,0
+exec vteam run coder --interactive
+env TMUX=
+stdout 'picked task \S+: Missing null check \(high\)'
+stdout 'branch    vteam/missing-null-check-'
+stdout '✓ session open in workmux window vteam-missing-null-check-'
+! stdout 'tmux attach'
+stdout '◆ coder handed off to an interactive session'
+! stdout 'worktree removed'
+grep '## Your Task\n\nTitle: Missing null check' $FAKE_DIR/session-prompt.md
+grep '## Interactive Session' $FAKE_DIR/session-prompt.md
+grep 'submit --project \S+app --session \S+-coder' $FAKE_DIR/session-prompt.md
+grep 'open vteam-missing-null-check-\S+ --prompt-file \S+ --config \S+workmux.yaml$' $FAKE_DIR/workmux.log
+exec vteam status
+stdout 'Interactive sessions'
+stdout '◆ coder'
+
+# Bad output is rejected and the session stays open; good output is committed, pushed, and closes the session.
+cd $WORK/session
+exec sh -c 'echo fixed >> README.md'
+stdin $WORK/files/bad.json
+! exec vteam submit
+stderr 'invalid agent output'
+stderr 'fix the JSON and submit again'
+stdin $WORK/files/fix.json
+exec vteam submit
+stdout '✓ committed vteam: add null check'
+stdout '✓ pushed vteam/missing-null-check-'
+stdout '✓ created PR https://github.com/org/repo/pull/1'
+stdout '✓ task \S+ done'
+stdout '✓ submitted'
+cd $WORK/app
+exec sh -c 'for i in $(seq 100); do grep -q "coder completed" vteam/.logs/coder/*.log && exit 0; sleep 0.1; done; exit 1'
+grep 'remove --force vteam-missing-null-check-' $FAKE_DIR/workmux.log
+exec sh -c 'cat vteam/.logs/coder/*.log'
+stdout 'session window closed, worktree removed'
+exec sh -c '[ ! -d "$(readlink "$WORK/session")" ]'
+exec git branch --list 'vteam/missing-null-check-*'
+! stdout .
+
+exec git -C ../origin.git log --all --format=%s
+stdout 'vteam: add null check'
+exec vteam status
+! stdout 'Interactive sessions'
+stdout 'Awaiting merge \(1\)'
+
+# Outside tmux the window opens in a vteam tmux session. A session whose window is closed is abandoned by the
+# merge ensurer; its task goes back to todo.
+cp ../files/finding2.json $FAKE_DIR/claude/2.json
+exec vteam run improver
+triage e2e
+exec vteam run coder --interactive
+stdout '✓ session open in workmux window vteam-flaky-test-'
+stdout 'tmux      session vteam-e2e \(attach with .tmux attach -t vteam-e2e.\)'
+grep 'open vteam-flaky-test-\S+ --prompt-file \S+ --config \S+workmux.yaml --parent-session vteam-e2e' $FAKE_DIR/workmux.log
+exec sh -c 'touch "$FAKE_DIR/closed/$(basename "$(readlink "$WORK/session")")"'
+cp ../files/merged.json $FAKE_DIR/gh-pr-view.json
+exec vteam ensure-merge
+stdout 'Interactive sessions'
+stderr '! vteam-flaky-test-\S+ coder session window closed'
+stdout 'action    abandoned, task \S+ moved to todo'
+stderr 'abandoned 1 interactive session'
+exec vteam status
+stdout 'abandoned'
+stdout 'coder  \S+ \[medium\] Flaky test'
+
+cd $WORK/session
+stdin $WORK/files/fix.json
+! exec vteam submit
+stderr 'abandoned'
+
+-- files/README.md --
+# app
+-- files/prompt.md --
+You are an agent.
+-- files/vteam.config.json --
+{
+  "baseBranch": "main",
+  "platform": "github",
+  "worktreeDir": ".vteam-worktrees",
+  "tasks": { "maxRetries": 3, "project": "e2e" }
+}
+-- files/improver.json --
+{ "output": "task" }
+-- files/coder.json --
+{ "worktree": true, "input": "task", "autoPR": true }
+-- files/finding.json --
+{"status":"completed","summary":"Found one.","content":{"type":"task","body":{"title":"Missing null check","severity":"high","description":"Crashes on null.","files":["README.md:1"]}}}
+-- files/finding2.json --
+{"status":"completed","summary":"Found one.","content":{"type":"task","body":{"title":"Flaky test","severity":"medium","description":"Fails sometimes.","files":["README.md:1"]}}}
+-- files/bad.json --
+{"status":"done","summary":"x"}
+-- files/fix.json --
+{"status":"completed","summary":"Added the check.","filesChanged":["README.md"],"commitMessage":{"subject":"vteam: add null check","body":"Guards the null case."}}
+-- files/merged.json --
+{"number":1,"title":"t","headRefName":"x","baseRefName":"main","url":"https://github.com/org/repo/pull/1","state":"MERGED","labels":[],"mergeable":"UNKNOWN","reviewDecision":"","latestReviews":[]}

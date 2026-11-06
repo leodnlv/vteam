@@ -38,6 +38,11 @@ func Start(cwd, agent string, now time.Time, logger *log.Logger) (*RunLog, error
 	if path == "" {
 		path = Path(cwd, agent, now)
 	}
+	return Open(path, logger)
+}
+
+// Open appends to the log at path and attaches it to logger.
+func Open(path string, logger *log.Logger) (*RunLog, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}

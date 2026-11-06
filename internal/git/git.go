@@ -87,6 +87,19 @@ func (g *Git) CheckoutWorktree(ctx context.Context, repoRoot, remoteBranch, work
 	return Session{Path: path, Branch: remoteBranch, RemoteSHA: sha}, nil
 }
 
+// CreateBranch fetches origin/<remoteBranch> and creates the local branch at it, without tracking, for a worktree
+// someone else (workmux) creates. It returns the commit the branch starts at.
+func (g *Git) CreateBranch(ctx context.Context, repoRoot, branch, remoteBranch string) (string, error) {
+	if _, err := g.run(ctx, repoRoot, "fetch", "origin", remoteBranch); err != nil {
+		return "", err
+	}
+	if _, err := g.run(ctx, repoRoot, "branch", "--no-track", branch, "origin/"+remoteBranch); err != nil {
+		return "", err
+	}
+	out, err := g.run(ctx, repoRoot, "rev-parse", "origin/"+remoteBranch)
+	return strings.TrimSpace(out), err
+}
+
 // MergeBaseBranch merges origin/<base> into the worktree. On conflicts it leaves the merge in progress
 // and returns the conflicted files; MERGE_HEAD makes the next commit the merge commit.
 func (g *Git) MergeBaseBranch(ctx context.Context, worktree, baseBranch string) ([]string, error) {
@@ -129,6 +142,12 @@ func (g *Git) ensureCleanPath(ctx context.Context, repoRoot, path string) error 
 		return err
 	}
 	_, err := g.run(ctx, repoRoot, "worktree", "prune")
+	return err
+}
+
+// DeleteBranch deletes a local branch, merged or not.
+func (g *Git) DeleteBranch(ctx context.Context, repoRoot, branch string) error {
+	_, err := g.run(ctx, repoRoot, "branch", "-D", branch)
 	return err
 }
 

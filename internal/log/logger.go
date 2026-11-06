@@ -227,6 +227,11 @@ func (l *Logger) Finished(agent, failure string) {
 	l.Println("\n" + ansi.Bold(ansi.OK("✓ "+agent+" completed in "+elapsed)))
 }
 
+// HandedOff ends a run that left its work to an interactive session.
+func (l *Logger) HandedOff(agent string) {
+	l.Println("\n" + ansi.Bold(ansi.Live("◆ "+agent+" handed off to an interactive session after "+FormatDuration(l.Elapsed()))))
+}
+
 func (l *Logger) Stopped(agent string) {
 	l.Eprintln("\n" + ansi.Bold(ansi.Warn("! "+agent+" stopped after "+FormatDuration(l.Elapsed()))))
 }

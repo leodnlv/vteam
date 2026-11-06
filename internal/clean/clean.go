@@ -14,6 +14,7 @@ import (
 	"github.com/leodnlv/vteam/internal/lock"
 	"github.com/leodnlv/vteam/internal/model"
 	"github.com/leodnlv/vteam/internal/runstate"
+	"github.com/leodnlv/vteam/internal/session"
 	"github.com/leodnlv/vteam/internal/tasks"
 )
 
@@ -46,11 +47,15 @@ func Run(ctx context.Context, d Deps) {
 	p("=== vteam clean ===\n")
 
 	inUse := runstate.LiveWorktreePaths(runstate.FindLive(d.Cwd))
-	if cleaned, err := d.Cleanup(ctx, d.Cwd, worktreeDir(d.Cwd), inUse); err != nil {
+	sessions := session.WorktreePaths(d.Cwd)
+	if cleaned, err := d.Cleanup(ctx, d.Cwd, worktreeDir(d.Cwd), append(inUse, sessions...)); err != nil {
 		p("No worktrees to clean (or not a git repo).")
 	} else {
 		if len(inUse) > 0 {
 			p("Kept %d worktree(s) in use by a running agent.", len(inUse))
+		}
+		if len(sessions) > 0 {
+			p("Kept %d interactive session worktree(s); remove abandoned ones with `workmux remove`.", len(sessions))
 		}
 		if len(cleaned) > 0 {
 			p("Removed %d worktree(s):", len(cleaned))
@@ -110,4 +115,5 @@ func releaseOrphanedTasks(ctx context.Context, d Deps, p func(string, ...any)) {
 	list(fmt.Sprintf("Returned %d orphaned task(s) to todo:", len(sweep.Released)), sweep.Released)
 	list("Left active (claimed on another host):", sweep.ForeignHost)
 	list("Left active (no vteam claim, reset manually if stuck):", sweep.Unclaimed)
+	list("Left active (held by an interactive session):", sweep.Sessions)
 }

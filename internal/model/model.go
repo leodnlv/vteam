@@ -65,6 +65,8 @@ const (
 	MetaClaimedBy   = "claimed-by"
 	MetaClaimedPID  = "claimed-pid"
 	MetaClaimedHost = "claimed-host"
+	// MetaClaimedSession marks a claim held by an interactive session rather than a live process.
+	MetaClaimedSession = "claimed-session"
 )
 
 type TaskNote struct {
@@ -175,21 +177,41 @@ type ContentType string
 const (
 	ContentTask    ContentType = "task"
 	ContentGeneric ContentType = "generic"
+	// ContentTasks is a list of findings. Only interactive runs are offered it.
+	ContentTasks ContentType = "tasks"
 )
 
-// Content is the agent's primary deliverable: a task finding or a generic string.
+// Content is the agent's primary deliverable: a task finding, a list of them, or a generic string.
 type Content struct {
 	Type    ContentType
 	Task    *TaskContentBody
+	Tasks   []TaskContentBody
 	Generic string
 }
 
+// Findings returns the task findings the content carries, none for generic content.
+func (c Content) Findings() []TaskContentBody {
+	switch c.Type {
+	case ContentTask:
+		return []TaskContentBody{*c.Task}
+	case ContentTasks:
+		return c.Tasks
+	}
+	return nil
+}
+
 func (c Content) MarshalJSON() ([]byte, error) {
-	if c.Type == ContentTask {
+	switch c.Type {
+	case ContentTask:
 		return json.Marshal(struct {
 			Type ContentType      `json:"type"`
 			Body *TaskContentBody `json:"body"`
 		}{c.Type, c.Task})
+	case ContentTasks:
+		return json.Marshal(struct {
+			Type ContentType       `json:"type"`
+			Body []TaskContentBody `json:"body"`
+		}{c.Type, c.Tasks})
 	}
 	return json.Marshal(struct {
 		Type ContentType `json:"type"`
@@ -212,6 +234,12 @@ func (c *Content) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("content.body: %w", err)
 		}
 		*c = Content{Type: raw.Type, Task: &body}
+	case ContentTasks:
+		var body []TaskContentBody
+		if err := json.Unmarshal(raw.Body, &body); err != nil {
+			return fmt.Errorf("content.body: %w", err)
+		}
+		*c = Content{Type: raw.Type, Tasks: body}
 	case ContentGeneric:
 		var body string
 		if err := json.Unmarshal(raw.Body, &body); err != nil {
@@ -219,7 +247,7 @@ func (c *Content) UnmarshalJSON(data []byte) error {
 		}
 		*c = Content{Type: raw.Type, Generic: body}
 	default:
-		return fmt.Errorf("content.type: expected \"task\" or \"generic\", got %q", raw.Type)
+		return fmt.Errorf("content.type: expected \"task\", \"tasks\" or \"generic\", got %q", raw.Type)
 	}
 	return nil
 }
@@ -279,6 +307,8 @@ const (
 	RunCompleted     RunStatus = "completed"
 	RunFailed        RunStatus = "failed"
 	RunStopped       RunStatus = "stopped"
+	// RunInteractive is a run handed off to an interactive session, settled later by `vteam submit`.
+	RunInteractive RunStatus = "interactive"
 )
 
 type RunState struct {

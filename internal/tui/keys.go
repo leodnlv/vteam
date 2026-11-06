@@ -15,7 +15,7 @@ type keyMap struct {
 	SwitchPane, FocusLog, FocusSidebar, PrevRun, NextRun                key.Binding
 	Actions, Run, StopRun, Cron, StopCron, StartScheduler, Follow, Wrap key.Binding
 
-	Confirm, Cancel, SaveDefault, NewLine key.Binding
+	Confirm, Cancel, SaveDefault, Interactive, NewLine key.Binding
 }
 
 func binding(keys []string, help, desc string) key.Binding {
@@ -54,6 +54,7 @@ var keys = keyMap{
 	Confirm:     binding([]string{"enter"}, "⏎", "confirm"),
 	Cancel:      binding([]string{"esc"}, "esc", "cancel"),
 	SaveDefault: binding([]string{"tab"}, "tab", "save as default"),
+	Interactive: binding([]string{"tab"}, "tab", "interactive session"),
 	NewLine:     binding([]string{"shift+enter", "alt+enter", "ctrl+j"}, "shift+⏎/ctrl+j", "new line"),
 }
 

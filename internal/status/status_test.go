@@ -12,11 +12,13 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/leodnlv/vteam/internal/ansi"
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/lock"
 	"github.com/leodnlv/vteam/internal/log"
 	"github.com/leodnlv/vteam/internal/model"
 	"github.com/leodnlv/vteam/internal/runstate"
+	"github.com/leodnlv/vteam/internal/session"
 	"github.com/leodnlv/vteam/internal/tasks/taskstest"
 )
 
@@ -163,5 +165,37 @@ func TestRenderFailsWhenTasksCannotBeRead(t *testing.T) {
 	d.Tasks = failingTasks{taskstest.New()}
 	if _, err := Render(context.Background(), d); err == nil || !strings.Contains(err.Error(), "aven down") {
 		t.Errorf("err = %v", err)
+	}
+}
+
+func TestRenderSessions(t *testing.T) {
+	cwd := t.TempDir()
+	if lines := renderSessions(cwd, time.Now()); lines != nil {
+		t.Errorf("lines = %v", lines)
+	}
+	kept := t.TempDir()
+	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	save := func(runID, handle string, status session.Status, path string) {
+		err := session.Save(cwd, session.Session{RunID: runID, Agent: "coder", Status: status, Handle: handle, WorktreePath: path,
+			StartedAt: "2026-11-06T11:00:00.000Z", Task: &model.Task{Ref: "APP-1", Title: "Fix it", Severity: "high"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	save("run-1", "open-one", session.Open, "/w/open-one")
+	save("run-2", "left", session.Abandoned, kept)
+	save("run-3", "cleaned", session.Abandoned, filepath.Join(cwd, "gone"))
+	save("run-4", "done", session.Submitted, "/w/done")
+
+	text := ansi.Strip(strings.Join(renderSessions(cwd, now), "\n"))
+	for _, want := range []string{"Interactive sessions", "coder  open-one · 1h", "APP-1 [high] Fix it", "left · abandoned", "workmux remove left"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("missing %q in:\n%s", want, text)
+		}
+	}
+	for _, unwanted := range []string{"cleaned", "/w/done"} {
+		if strings.Contains(text, unwanted) {
+			t.Errorf("unexpected %q in:\n%s", unwanted, text)
+		}
 	}
 }

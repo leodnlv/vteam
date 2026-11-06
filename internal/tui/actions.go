@@ -50,6 +50,8 @@ type dialog struct {
 	input  textinput.Model
 	save   bool
 	focus  textarea.Model
+	// interactive opens the run in an interactive Claude session (vteam run --interactive).
+	interactive bool
 }
 
 type toast struct {
@@ -197,7 +199,7 @@ func (m Model) handleDialogKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		case "enter", "y":
 			name := m.dialog.agent
 			m.dialog = dialog{}
-			return m.runOnce(name, ""), nil
+			return m.runOnce(name, "", false), nil
 		case "esc", "n", "q":
 			m.dialog = dialog{}
 		}
@@ -332,22 +334,28 @@ func (m Model) handleRunKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case key.Matches(msg, keys.Cancel):
 		m.dialog = dialog{}
 		return m, nil
+	case key.Matches(msg, keys.Interactive):
+		m.dialog.interactive = !m.dialog.interactive
+		return m, nil
 	case key.Matches(msg, keys.Confirm):
-		name, focus := m.dialog.agent, strings.TrimSpace(m.dialog.focus.Value())
+		name, focus, interactive := m.dialog.agent, strings.TrimSpace(m.dialog.focus.Value()), m.dialog.interactive
 		m.dialog = dialog{}
-		return m.runOnce(name, focus), nil
+		return m.runOnce(name, focus, interactive), nil
 	}
 	var cmd tea.Cmd
 	m.dialog.focus, cmd = m.dialog.focus.Update(msg)
 	return m, cmd
 }
 
-func (m Model) runOnce(name, focus string) Model {
-	if err := m.deps.RunOnce(name, focus); err != nil {
+func (m Model) runOnce(name, focus string, interactive bool) Model {
+	if err := m.deps.RunOnce(name, focus, interactive); err != nil {
 		return m.withToast(styleFail.Render("✗ " + name + " could not start: " + firstLine(err.Error())))
 	}
 	m.agents.runIndex, m.agents.follow = -1, true
 	text := styleLive.Render("● ") + "started " + styleBold.Render(name)
+	if interactive {
+		text += styleMuted.Render(" interactively")
+	}
 	if focus != "" {
 		text += styleMuted.Render(" with focus")
 	}
@@ -487,13 +495,19 @@ func (m Model) stopBox() string {
 }
 
 func (m Model) runBox() string {
+	interactiveBox, interactiveHint := styleMuted.Render("[ ]"), "Keeps running after you quit the TUI."
+	if m.dialog.interactive {
+		interactiveBox = styleOK.Render("[x]")
+		interactiveHint = "Opens Claude in a workmux window and switches to it."
+	}
 	lines := []string{
 		styleBoxHead.Render("Run ") + styleBold.Render(m.dialog.agent) + styleBoxHead.Render(" once"),
 		"",
 		styleMuted.Render("focus") + styleMuted.Render(" (optional, passed as --focus)"),
 		m.dialog.focus.View(),
 		"",
-		styleMuted.Render("Keeps running after you quit the TUI."),
+		interactiveBox + " interactive session" + styleMuted.Render("  tab"),
+		styleMuted.Render(interactiveHint),
 		"",
 		styleKey.Render("⏎") + styleMuted.Render(" run now   ") +
 			styleKey.Render("shift+⏎") + styleMuted.Render("/") + styleKey.Render("ctrl+j") + styleMuted.Render(" new line   ") +

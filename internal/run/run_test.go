@@ -45,6 +45,7 @@ type harness struct {
 	claude   *fakeClaude
 	git      *fakeWorktrees
 	platform *fakePlatform
+	workmux  *fakeWorkmux
 	out      syncBuffer
 	logger   *log.Logger
 }
@@ -106,6 +107,7 @@ func setup(t *testing.T, p project) *harness {
 	}
 	h := &harness{t: t, cwd: cwd, tasks: taskstest.New(), claude: &fakeClaude{}, git: newFakeWorktrees(t, cwd)}
 	h.platform = &fakePlatform{order: &h.git.order}
+	h.workmux = &fakeWorkmux{git: h.git}
 	h.logger = log.New(&h.out, &h.out)
 	return h
 }
@@ -116,7 +118,7 @@ func (h *harness) deps() Deps {
 		h.t.Fatal(err)
 	}
 	return Deps{Cwd: h.cwd, Config: cfg, Log: h.logger, Tasks: h.tasks, Claude: h.claude, Git: h.git, Platform: h.platform,
-		Now: time.Now, PID: 4242, Host: "test-host", LockTimeout: 10 * time.Second}
+		Workmux: h.workmux, Bin: "vteam", Now: time.Now, PID: 4242, Host: "test-host", LockTimeout: 10 * time.Second}
 }
 
 func (h *harness) run(agentName, focus string) error {

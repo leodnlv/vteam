@@ -30,6 +30,9 @@ type Input struct {
 	FollowUp *model.PRFollowUpContext
 	Focus    string
 	Memory   string
+	// SubmitCommand makes the prompt an interactive one: Claude works with the user and submits its output by
+	// piping it to this command, instead of returning it as its final answer.
+	SubmitCommand string
 }
 
 func readPrompt(path string) (string, error) {
@@ -72,7 +75,11 @@ func Build(in Input) (Parts, error) {
 		sections = append(sections, reviewSection(*in.Review))
 	}
 	replyable := in.FollowUp != nil && len(in.FollowUp.Threads) > 0
-	sections = append(sections, outputInstruction(in.Agent, replyable))
+	if in.SubmitCommand != "" {
+		sections = append(sections, interactiveOutputInstruction(in.Agent, replyable, in.SubmitCommand))
+	} else {
+		sections = append(sections, outputInstruction(in.Agent, replyable))
+	}
 	schema := output.Schema(output.SchemaOptions{
 		TaskContent: in.Agent.Output == config.OutputTask, Memory: in.Agent.Memory != nil, ThreadReplies: replyable,
 	})
@@ -112,8 +119,11 @@ func OnFinish(cfg *config.Subagent, o model.RunOutcome) (Parts, error) {
 	}
 	if c := o.Content; c != nil {
 		body := c.Generic
-		if c.Type == model.ContentTask {
+		switch c.Type {
+		case model.ContentTask:
 			body = indentJSON(c.Task)
+		case model.ContentTasks:
+			body = indentJSON(c.Tasks)
 		}
 		sections = append(sections, "## Content\n\n"+body)
 	}
@@ -207,6 +217,69 @@ func outputInstruction(agent *config.Agent, replyableThreads bool) string {
 
 - "content" is optional. Include it when you have a primary deliverable (finding, review, analysis).
 - "filesChanged" and "commitMessage" are optional. Include them only when you modified files.
+- "blockerReason" is optional. Include it only when status is "blocked" or "failed".` + threadNote
+}
+
+const taskListContentInstruction = `  "content": {
+    "type": "tasks",
+    "body": [
+      {
+        "title": "short descriptive title",
+        "severity": "critical|high|medium|low",
+        "description": "detailed description of the issue and its impact",
+        "suggestedFix": "how to fix it",
+        "files": ["file:line"]
+      }
+    ]
+  }`
+
+// interactiveOutputInstruction replaces outputInstruction in an interactive session, where the output is
+// submitted with a command once the user is done rather than returned as the final answer.
+func interactiveOutputInstruction(agent *config.Agent, replyableThreads bool, submitCommand string) string {
+	memoryField, threadField, threadNote := "", "", ""
+	if agent.Memory != nil {
+		memoryField = ",\n  \"memoryUpdate\": \"optional: brief notes about this session to remember for future runs (patterns noticed, decisions made, areas covered)\""
+	}
+	if replyableThreads {
+		threadField = ",\n  \"threadReplies\": [{ \"thread\": \"T1\", \"body\": \"what you changed to address this thread\" }]"
+		threadNote = "\n- \"threadReplies\" is optional. Add one entry per review thread you addressed, using the thread's label (T1, T2, ...) from \"Open Review Threads\". Do not reply to threads yourself; vteam posts the replies after the change is pushed."
+	}
+	content := genericContentInstruction
+	work := "Do NOT run git commit or git push; vteam commits any uncommitted changes with your commit message and pushes. Commits the user makes themselves are pushed too."
+	contentNote := "- \"content\" is optional. Include it when you have a primary deliverable (review, analysis, report)."
+	if agent.Output == config.OutputTask {
+		content = taskListContentInstruction
+		work = "Do NOT create or modify tasks yourself (no aven commands); vteam creates one task per finding you submit. File changes are not kept."
+		contentNote = "- \"content\" lists every finding the user agreed to report, one entry each. Use `\"type\": \"task\"` with a single object body only if there is exactly one."
+	}
+	return `## Interactive Session
+
+This is an interactive session: the user is here with you. Work on the request above together with them, ask when something is unclear, and let them steer.
+
+Do not submit on your own. When the user tells you they are done (or runs /vteam-submit), submit your result by piping a JSON object to this command:
+
+` + "```" + `
+` + submitCommand + ` <<'VTEAM_OUTPUT'
+{ ...the JSON object below... }
+VTEAM_OUTPUT
+` + "```" + `
+
+If the command reports an error, fix the JSON (or the problem it names) and run it again. When it succeeds, vteam closes this session. ` + work + `
+
+{
+  "status": "completed|partial|blocked|failed",
+  "summary": "what you did",
+` + content + `,
+  "filesChanged": ["path/to/file1.ts"],
+  "commitMessage": {
+    "subject": "vteam: <short subject>",
+    "body": "PR-ready description of the change"
+  },
+  "blockerReason": "only if status is blocked or failed"` + memoryField + threadField + `
+}
+
+` + contentNote + `
+- "filesChanged" and "commitMessage" are optional. Include them only when files were modified.
 - "blockerReason" is optional. Include it only when status is "blocked" or "failed".` + threadNote
 }
 

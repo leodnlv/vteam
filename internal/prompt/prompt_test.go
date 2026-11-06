@@ -235,3 +235,43 @@ func TestThreadRef(t *testing.T) {
 		t.Error("wrong labels")
 	}
 }
+
+func TestBuildInteractive(t *testing.T) {
+	const submit = "vteam submit --project /app --session 20261106-120000-coder"
+	t.Run("asks Claude to work with the user and submit with the command", func(t *testing.T) {
+		p := build(t, Input{Agent: &config.Agent{Name: "coder"}, Task: &model.Task{Title: "Fix it", Severity: "high", Description: "Broken."}, SubmitCommand: submit})
+		requireOrder(t, p.UserPrompt, "## Your Task", "## Interactive Session", submit+" <<'VTEAM_OUTPUT'", `"type": "generic"`, `"commitMessage"`)
+		for _, unwanted := range []string{"## Output Format", "Output ONLY valid JSON", "memoryUpdate", "threadReplies", `"type": "tasks"`} {
+			if strings.Contains(p.UserPrompt, unwanted) {
+				t.Errorf("unexpected %q", unwanted)
+			}
+		}
+	})
+
+	t.Run("offers a task list to task agents, and memory and thread replies when they apply", func(t *testing.T) {
+		agent := &config.Agent{Name: "improver", Output: config.OutputTask, Memory: &config.Subagent{}}
+		followUp := &model.PRFollowUpContext{PR: model.PullRequestInfo{ReviewablePR: model.ReviewablePR{Number: 1, URL: "u"}},
+			Threads: []model.ReviewThread{{ID: "x", Comments: []model.ReviewComment{{Author: "a", Body: "b"}}}}}
+		p := build(t, Input{Agent: agent, FollowUp: followUp, SubmitCommand: submit})
+		requireContains := func(parts ...string) {
+			for _, part := range parts {
+				if !strings.Contains(p.UserPrompt, part) {
+					t.Errorf("missing %q", part)
+				}
+			}
+		}
+		requireContains(`"type": "tasks"`, "one task per finding", `"memoryUpdate"`, `"threadReplies"`, "Do not reply to threads yourself")
+	})
+}
+
+func TestOnFinishRendersTaskListsAsJSON(t *testing.T) {
+	cfg := &config.Subagent{MDPath: writeMD(t, "ON_FINISH.md", "Notify.")}
+	p, err := OnFinish(cfg, model.RunOutcome{Agent: "a", Status: "completed", Content: &model.Content{Type: model.ContentTasks,
+		Tasks: []model.TaskContentBody{{Title: "A", Severity: "low", Description: "d", Files: []string{"x"}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(p.UserPrompt, "## Content\n\n[\n  {\n    \"title\": \"A\"") {
+		t.Errorf("prompt:\n%s", p.UserPrompt)
+	}
+}

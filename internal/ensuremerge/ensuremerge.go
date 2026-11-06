@@ -1,5 +1,6 @@
 // Package ensuremerge moves done tasks through review: it records merges, cancels tasks whose PR was closed,
-// and reopens tasks whose PR has the changes-requested label or conflicts with its base branch.
+// and reopens tasks whose PR has the changes-requested label or conflicts with its base branch. It also marks
+// interactive sessions whose window was closed as abandoned and releases their tasks.
 package ensuremerge
 
 import (
@@ -13,20 +14,25 @@ import (
 	"github.com/leodnlv/vteam/internal/log"
 	"github.com/leodnlv/vteam/internal/model"
 	"github.com/leodnlv/vteam/internal/platform"
+	"github.com/leodnlv/vteam/internal/session"
 	"github.com/leodnlv/vteam/internal/tasks"
+	"github.com/leodnlv/vteam/internal/workmux"
 )
 
 const Name = "merge-ensurer"
 
 type Deps struct {
+	Cwd      string
 	Config   *config.Config
 	Log      *log.Logger
 	Tasks    tasks.Manager
 	Platform platform.Platform
+	Workmux  workmux.Client
 }
 
 type Result struct {
 	Merged, Canceled, Reopened, Waiting, Failed []model.Task
+	Abandoned                                   []session.Session
 }
 
 type outcome int
@@ -40,6 +46,10 @@ const (
 
 func Sweep(ctx context.Context, d Deps) (Result, error) {
 	var res Result
+	res.Abandoned = sweepSessions(ctx, d)
+	if ctx.Err() != nil {
+		return res, nil
+	}
 	done, err := d.Tasks.ListDone(ctx)
 	if err != nil {
 		return res, err
@@ -175,9 +185,98 @@ func addNote(ctx context.Context, d Deps, t model.Task, text string) {
 	}
 }
 
+// sweepSessions marks open interactive sessions whose workmux window is gone as abandoned and returns their tasks
+// to todo. The worktree is left for the user. Failures are logged; they never fail the sweep.
+func sweepSessions(ctx context.Context, d Deps) []session.Session {
+	var open []session.Session
+	for _, s := range session.List(d.Cwd) {
+		if s.Status == session.Open {
+			open = append(open, s)
+		}
+	}
+	if len(open) == 0 || d.Workmux == nil {
+		return nil
+	}
+	d.Log.Section("Interactive sessions")
+	worktrees, err := d.Workmux.List(ctx, d.Cwd)
+	if err != nil {
+		d.Log.Warn("skipped checking interactive sessions: " + err.Error())
+		return nil
+	}
+	windowOpen := map[string]bool{}
+	for _, w := range worktrees {
+		windowOpen[w.Handle] = w.IsOpen
+	}
+	var idx *tasks.Index
+	var abandoned []session.Session
+	for _, s := range open {
+		if ctx.Err() != nil {
+			d.Log.Warn("stopped before checking the remaining sessions")
+			break
+		}
+		if windowOpen[s.Handle] {
+			d.Log.Step(ansi.Bold(s.Handle) + " " + s.Agent + " session open")
+			continue
+		}
+		ctx := context.WithoutCancel(ctx)
+		if s.Task != nil && idx == nil {
+			loaded, err := d.Tasks.GetIndex(ctx)
+			if err != nil {
+				d.Log.Warn("skipped abandoning sessions: " + err.Error())
+				return abandoned
+			}
+			idx = &loaded
+		}
+		if err := abandon(ctx, d, s, idx); err != nil {
+			d.Log.Fail(ansi.Bold(s.Handle) + " " + s.Agent + " session")
+			d.Log.Field("error", err.Error())
+			continue
+		}
+		abandoned = append(abandoned, s)
+	}
+	return abandoned
+}
+
+func abandon(ctx context.Context, d Deps, s session.Session, idx *tasks.Index) error {
+	action := "abandoned"
+	if t := s.Task; t != nil {
+		current, held := heldBy(idx, t.Ref, s.RunID)
+		if held {
+			if err := d.Tasks.Update(ctx, t.Ref, tasks.Update{Status: model.StatusTodo, RemoveMetadata: tasks.SessionClaimKeys}); err != nil {
+				return err
+			}
+			addNote(ctx, d, current, fmt.Sprintf("%s: abandoned\n\nThe interactive session's window was closed without a submit. Its worktree was kept at %s.", s.Agent, s.WorktreePath))
+			action = "abandoned, task " + t.Ref + " moved to todo"
+		} else {
+			action = "abandoned, task " + t.Ref + " no longer held by it"
+		}
+	}
+	s.Status = session.Abandoned
+	if err := session.Save(d.Cwd, s); err != nil {
+		return err
+	}
+	d.Log.Warn(ansi.Bold(s.Handle) + " " + s.Agent + " session window closed")
+	d.Log.Field("worktree", s.WorktreePath)
+	d.Log.Field("action", action)
+	return nil
+}
+
+// heldBy finds the task ref and reports whether it is still active under the session's claim.
+func heldBy(idx *tasks.Index, ref, runID string) (model.Task, bool) {
+	for _, t := range idx.All {
+		if t.Ref == ref {
+			return t, t.Status == model.StatusActive && t.Metadata[model.MetaClaimedSession] == runID
+		}
+	}
+	return model.Task{}, false
+}
+
 func LogSummary(l *log.Logger, r Result) {
 	l.Section("Result")
 	l.OK(fmt.Sprintf("merged %d · canceled %d · reopened %d · waiting %d", len(r.Merged), len(r.Canceled), len(r.Reopened), len(r.Waiting)))
+	if len(r.Abandoned) > 0 {
+		l.Warn(fmt.Sprintf("abandoned %d interactive session(s); remove their worktrees with `workmux remove`", len(r.Abandoned)))
+	}
 	if len(r.Failed) > 0 {
 		l.Fail(fmt.Sprintf("%d task(s) failed", len(r.Failed)))
 	}

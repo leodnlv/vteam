@@ -23,7 +23,7 @@ import (
 
 // TestMain doubles as a stand-in vteam binary for the detached-spawn tests, which re-exec os.Executable.
 func TestMain(m *testing.M) {
-	if len(os.Args) > 1 && (os.Args[1] == "run" || os.Args[1] == "cron") {
+	if len(os.Args) > 1 && (os.Args[1] == "run" || os.Args[1] == "cron" || os.Args[1] == "session") {
 		fakeVteam(os.Args[1:])
 		return
 	}
@@ -63,7 +63,7 @@ func waitForFile(t *testing.T, path, want string) {
 
 func TestSpawnRunStartsADetachedRunWithItsLogPath(t *testing.T) {
 	cwd := t.TempDir()
-	path, err := SpawnRun(cwd, "improver", "", time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC))
+	path, err := SpawnRun(cwd, "improver", "", false, time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,13 +73,22 @@ func TestSpawnRunStartsADetachedRunWithItsLogPath(t *testing.T) {
 	waitForFile(t, path, "run improver sid-leader=true")
 }
 
-func TestSpawnRunPassesTheFocus(t *testing.T) {
+func TestSpawnFinalizeAppendsToTheRunLog(t *testing.T) {
 	cwd := t.TempDir()
-	path, err := SpawnRun(cwd, "improver", "look at\nthe parser", time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC))
+	path := filepath.Join(cwd, "run.log")
+	if err := SpawnFinalize(cwd, "20261106-120000-coder", path); err != nil {
+		t.Fatal(err)
+	}
+	waitForFile(t, path, "session finalize 20261106-120000-coder sid-leader=true")
+}
+
+func TestSpawnRunPassesTheFocusAndInteractive(t *testing.T) {
+	cwd := t.TempDir()
+	path, err := SpawnRun(cwd, "improver", "look at\nthe parser", true, time.Date(2026, 3, 7, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitForFile(t, path, "run improver --focus look at\nthe parser sid-leader=true")
+	waitForFile(t, path, "run improver --focus look at\nthe parser --interactive sid-leader=true")
 }
 
 func TestStartDetachedWritesToTheSchedulerLog(t *testing.T) {

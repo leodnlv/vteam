@@ -34,10 +34,13 @@ func actionsModel(t *testing.T, f *fakeActions) Model {
 	m := newTestModel(t, nil)
 	m.deps.Agents = func(time.Time) []Agent { return slices.Clone(f.agents) }
 	m.deps.SchedulerPID = func() int { return f.pid }
-	m.deps.RunOnce = func(name, focus string) error {
+	m.deps.RunOnce = func(name, focus string, interactive bool) error {
 		call := "run " + name
 		if focus != "" {
 			call += " --focus " + focus
+		}
+		if interactive {
+			call += " --interactive"
 		}
 		f.calls = append(f.calls, call)
 		return f.runErr
@@ -132,6 +135,7 @@ var (
 	keyShiftEnter = tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModShift}
 	keyCtrlJ      = tea.KeyPressMsg{Code: 'j', Mod: tea.ModCtrl}
 	keyEsc        = tea.KeyPressMsg{Code: tea.KeyEscape}
+	keyTab        = tea.KeyPressMsg{Code: tea.KeyTab}
 )
 
 func typeText(t *testing.T, m Model, text string) Model {
@@ -169,6 +173,20 @@ func TestRunOnceAsksForAnOptionalFocus(t *testing.T) {
 	f.runErr = errors.New("no binary")
 	m = update(t, press(t, m, "r"), keyEnter)
 	assertScreen(t, m, "✗ test-writer could not start: no binary")
+}
+
+func TestRunOnceCanOpenAnInteractiveSession(t *testing.T) {
+	f := &fakeActions{agents: testAgents()}
+	m := press(t, actionsModel(t, f), "j", "r")
+	assertScreen(t, m, "[ ] interactive session", "Keeps running after you quit the TUI.")
+	m = update(t, m, keyTab)
+	assertScreen(t, m, "[x] interactive session", "workmux window")
+	m = update(t, typeText(t, m, "pair on it"), keyEnter)
+	assertCalls(t, f, "run test-writer --focus pair on it --interactive")
+	assertScreen(t, m, "● started test-writer interactively with focus")
+
+	update(t, press(t, m, "r"), keyEnter)
+	assertCalls(t, f, "run test-writer --focus pair on it --interactive", "run test-writer")
 }
 
 func TestMergeEnsurerRunsWithoutFocus(t *testing.T) {
@@ -326,4 +344,11 @@ func TestCronInputEditing(t *testing.T) {
 	if got := cronExpr(m.dialog.input); got != "15 * * x *" {
 		t.Errorf("after paste = %q", got)
 	}
+}
+
+func TestSidebarShowsOpenInteractiveSessions(t *testing.T) {
+	agents := testAgents()
+	agents[0].Sessions = []string{"vteam-fix-it-1", "vteam-other-2"}
+	m := actionsModel(t, &fakeActions{agents: agents})
+	assertScreen(t, m, "◆2", "open   ◆ vteam-fix-it-1", "◆ vteam-other-2")
 }

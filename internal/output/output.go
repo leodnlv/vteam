@@ -51,13 +51,23 @@ func extractJSON(text string) string {
 }
 
 func Parse(resultText string) (model.AgentOutput, error) {
+	return parse(resultText, false)
+}
+
+// ParseInteractive is Parse for output submitted from an interactive session, which may also carry a
+// "tasks" content list.
+func ParseInteractive(resultText string) (model.AgentOutput, error) {
+	return parse(resultText, true)
+}
+
+func parse(resultText string, allowTasks bool) (model.AgentOutput, error) {
 	var out model.AgentOutput
 	raw := []byte(extractJSON(resultText))
 	var doc any
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return out, fmt.Errorf("agent output is not valid JSON: %w", err)
 	}
-	if err := validate(doc); err != nil {
+	if err := validate(doc, allowTasks); err != nil {
 		return out, fmt.Errorf("invalid agent output: %w", err)
 	}
 	if err := json.Unmarshal(raw, &out); err != nil {
@@ -143,7 +153,7 @@ func (o object) strings(key, path string, minItems int) error {
 	return nil
 }
 
-func validate(doc any) error {
+func validate(doc any, allowTasks bool) error {
 	root, err := asObject(doc, "(root)")
 	if err != nil {
 		return err
@@ -151,7 +161,7 @@ func validate(doc any) error {
 	return errors.Join(
 		root.enum("status", "status", "completed", "partial", "blocked", "failed"),
 		root.str("summary", "summary", true, 0),
-		validateContent(root),
+		validateContent(root, allowTasks),
 		root.strings("filesChanged", "filesChanged", 0),
 		validateCommitMessage(root),
 		root.str("blockerReason", "blockerReason", false, 0),
@@ -160,7 +170,40 @@ func validate(doc any) error {
 	)
 }
 
-func validateContent(root object) error {
+func validateTaskBody(v any, path string) error {
+	body, err := asObject(v, path)
+	if err != nil {
+		return err
+	}
+	return errors.Join(
+		body.str("title", path+".title", true, 1),
+		body.enum("severity", path+".severity", "critical", "high", "medium", "low"),
+		body.str("description", path+".description", true, 1),
+		body.str("suggestedFix", path+".suggestedFix", false, 0),
+		body.strings("files", path+".files", 1),
+	)
+}
+
+func validateTaskList(content object) error {
+	v, _, err := content.field("body", "content.body", true)
+	if err != nil {
+		return err
+	}
+	items, ok := v.([]any)
+	if !ok {
+		return errors.New("content.body: expected array")
+	}
+	if len(items) == 0 {
+		return errors.New("content.body: expected at least 1 item")
+	}
+	errs := make([]error, len(items))
+	for i, item := range items {
+		errs[i] = validateTaskBody(item, fmt.Sprintf("content.body[%d]", i))
+	}
+	return errors.Join(errs...)
+}
+
+func validateContent(root object, allowTasks bool) error {
 	v, ok, err := root.field("content", "content", false)
 	if err != nil || !ok {
 		return err
@@ -177,18 +220,16 @@ func validateContent(root object) error {
 		if err != nil {
 			return err
 		}
-		body, err := asObject(v, "content.body")
-		if err != nil {
-			return err
+		return validateTaskBody(v, "content.body")
+	case "tasks":
+		if !allowTasks {
+			return errors.New(`content.type: expected "task" or "generic"`)
 		}
-		return errors.Join(
-			body.str("title", "content.body.title", true, 1),
-			body.enum("severity", "content.body.severity", "critical", "high", "medium", "low"),
-			body.str("description", "content.body.description", true, 1),
-			body.str("suggestedFix", "content.body.suggestedFix", false, 0),
-			body.strings("files", "content.body.files", 1),
-		)
+		return validateTaskList(content)
 	default:
+		if allowTasks {
+			return errors.New(`content.type: expected "task", "tasks" or "generic"`)
+		}
 		return errors.New(`content.type: expected "task" or "generic"`)
 	}
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/leodnlv/vteam/internal/claude"
 	"github.com/leodnlv/vteam/internal/config"
+	"github.com/leodnlv/vteam/internal/execx"
 	"github.com/leodnlv/vteam/internal/git"
 	"github.com/leodnlv/vteam/internal/lock"
 	"github.com/leodnlv/vteam/internal/log"
@@ -21,7 +22,10 @@ import (
 	"github.com/leodnlv/vteam/internal/platform"
 	"github.com/leodnlv/vteam/internal/prompt"
 	"github.com/leodnlv/vteam/internal/runstate"
+	"github.com/leodnlv/vteam/internal/session"
+	"github.com/leodnlv/vteam/internal/slugify"
 	"github.com/leodnlv/vteam/internal/tasks"
+	"github.com/leodnlv/vteam/internal/workmux"
 )
 
 // Worktrees is the git work the orchestrator does; *git.Git implements it.
@@ -34,6 +38,8 @@ type Worktrees interface {
 	CommitSHA(ctx context.Context, dir string) (string, error)
 	HasUncommittedChanges(ctx context.Context, dir string) bool
 	CommitAll(ctx context.Context, dir, subject, body string) error
+	CreateBranch(ctx context.Context, repoRoot, branch, remoteBranch string) (string, error)
+	DeleteBranch(ctx context.Context, repoRoot, branch string) error
 }
 
 type Deps struct {
@@ -44,9 +50,14 @@ type Deps struct {
 	Claude   claude.Runner
 	Git      Worktrees
 	Platform platform.Platform
-	Now      func() time.Time
-	PID      int
-	Host     string
+	Workmux  workmux.Client
+	// Bin is the vteam executable an interactive session runs to submit.
+	Bin string
+	// InTmux means vteam runs inside tmux, so an interactive window opens in the user's session and gets focus.
+	InTmux bool
+	Now    func() time.Time
+	PID    int
+	Host   string
 	// LockTimeout bounds the wait for the agent lock and the task claim lock.
 	LockTimeout time.Duration
 }
@@ -60,6 +71,9 @@ func NewDeps(cwd string, cfg *config.Config, logger *log.Logger) Deps {
 		Claude:      claude.New(logger),
 		Git:         git.New(logger),
 		Platform:    platform.New(cfg.Platform, cwd),
+		Workmux:     workmux.New(),
+		Bin:         executable(),
+		InTmux:      os.Getenv("TMUX") != "",
 		Now:         time.Now,
 		PID:         os.Getpid(),
 		Host:        tasks.Hostname(),
@@ -75,6 +89,24 @@ var ErrStopKeepWorktree = errors.New("stopped, keeping the worktree")
 
 type Options struct {
 	Focus string
+	// Interactive hands the prompt to an interactive Claude session in a workmux window instead of running claude -p.
+	Interactive bool
+	// LogPath is the run's log file, which submitting an interactive session appends to.
+	LogPath string
+}
+
+// executable is the running vteam binary, or "vteam" from PATH when it is a `go run` build that will be gone.
+func executable() string {
+	path, err := execx.Self()
+	if err != nil || strings.HasPrefix(path, os.TempDir()) || strings.Contains(path, "go-build") {
+		return "vteam"
+	}
+	return path
+}
+
+// TmuxSession is the tmux session interactive windows open in when vteam runs outside tmux.
+func TmuxSession(cfg *config.Config) string {
+	return "vteam-" + slugify.Slugify(cfg.Tasks.Project)
 }
 
 func RunID(agent string, now time.Time) string {
@@ -95,6 +127,19 @@ type runner struct {
 	stopCtx context.Context
 	agent   *config.Agent
 	focus   string
+	logPath string
+
+	interactive bool
+	// handle is the workmux worktree of an interactive run, localBranch its branch.
+	handle      string
+	localBranch string
+	// startSHA is HEAD when the session was handed off; later commits are the session's own.
+	startSHA string
+	// scratch is an interactive worktree for an agent without worktree: true; nothing is committed from it.
+	scratch bool
+	// handedOff means the session is open, so the task stays claimed and the worktree stays.
+	handedOff      bool
+	sessionCommits bool
 
 	runID      string
 	startedAt  string
@@ -112,7 +157,7 @@ type runner struct {
 
 // Run runs agent once. It returns ErrFailed when the run failed; the failure is already in the output.
 func Run(ctx context.Context, d Deps, agent *config.Agent, opts Options) error {
-	r := &runner{Deps: d, ctx: ctx, stopCtx: ctx, agent: agent, focus: opts.Focus}
+	r := &runner{Deps: d, ctx: ctx, stopCtx: ctx, agent: agent, focus: opts.Focus, interactive: opts.Interactive, logPath: opts.LogPath}
 	r.runID = RunID(agent.Name, d.Now())
 	r.startedAt = model.ISOTime(d.Now())
 	if err := os.MkdirAll(LocksDir(d.Cwd), 0o755); err != nil {
@@ -203,6 +248,13 @@ func (r *runner) execute() (*lock.Lock, error) {
 		r.state.TaskRef = r.task.Ref
 	}
 	r.writeState()
+
+	if r.interactive {
+		if err := r.prepareSession(); err != nil {
+			return agentLock, err
+		}
+		return agentLock, r.handOff()
+	}
 
 	agentDir := r.Cwd
 	if r.agent.Worktree {
@@ -300,15 +352,26 @@ func (r *runner) claimTask() (*model.Task, error) {
 	if !ok {
 		return nil, nil
 	}
-	if err := r.Tasks.Update(r.ctx, task.Ref, tasks.Update{Status: model.StatusActive, Metadata: tasks.ClaimMetadata(r.runID, r.PID, r.Host)}); err != nil {
+	claim := tasks.ClaimMetadata(r.runID, r.PID, r.Host)
+	if r.interactive {
+		claim = tasks.SessionClaimMetadata(r.runID, r.Host)
+	}
+	if err := r.Tasks.Update(r.ctx, task.Ref, tasks.Update{Status: model.StatusActive, Metadata: claim}); err != nil {
 		return nil, err
 	}
 	return &task, nil
 }
 
+func (r *runner) claimKeys() []string {
+	if r.interactive {
+		return tasks.SessionClaimKeys
+	}
+	return tasks.ClaimKeys
+}
+
 func (r *runner) parkTaskWithClosedPR(pr model.PullRequestInfo) error {
 	r.Log.Warn(fmt.Sprintf("PR %s is %s, moving task to backlog", pr.URL, pr.State))
-	if err := r.Tasks.Update(r.ctx, r.task.Ref, tasks.Update{Status: model.StatusBacklog, RemoveMetadata: tasks.ClaimKeys}); err != nil {
+	if err := r.Tasks.Update(r.ctx, r.task.Ref, tasks.Update{Status: model.StatusBacklog, RemoveMetadata: r.claimKeys()}); err != nil {
 		return err
 	}
 	r.settled = true
@@ -337,7 +400,24 @@ func (r *runner) prepareWorktree() error {
 		return err
 	}
 	r.worktree = &session
+	if err := r.mergeBaseIfConflicting(); err != nil {
+		return err
+	}
+	r.worktreeReady()
+	return nil
+}
 
+func (r *runner) worktreeReady() {
+	r.state.WorktreePath = r.worktree.Path
+	r.state.BranchName = r.worktree.Branch
+	r.writeState()
+	r.Log.Step("worktree ready")
+	r.Log.Field("path", relative(r.Cwd, r.worktree.Path))
+	r.Log.Field("branch", r.worktree.Branch)
+}
+
+func (r *runner) mergeBaseIfConflicting() error {
+	session := *r.worktree
 	if r.followUp != nil && r.followUp.PR.Mergeable == model.Conflicting {
 		base := r.followUp.PR.BaseBranch
 		r.Log.Warn(fmt.Sprintf("PR conflicts with %s, merging origin/%s", base, base))
@@ -352,13 +432,6 @@ func (r *runner) prepareWorktree() error {
 			r.Log.OK("merged cleanly")
 		}
 	}
-
-	r.state.WorktreePath = session.Path
-	r.state.BranchName = session.Branch
-	r.writeState()
-	r.Log.Step("worktree ready")
-	r.Log.Field("path", relative(r.Cwd, session.Path))
-	r.Log.Field("branch", session.Branch)
 	return nil
 }
 
@@ -440,19 +513,29 @@ func (r *runner) commitsAgentChanges(out model.AgentOutput, unresolved []string)
 		r.Git.HasUncommittedChanges(r.ctx, r.worktree.Path)
 }
 
+// committedInSession reports whether an interactive session committed on its own (the user, typically) since hand-off.
+func (r *runner) committedInSession(out model.AgentOutput) bool {
+	if r.startSHA == "" || (out.Status != model.OutputCompleted && out.Status != model.OutputPartial) {
+		return false
+	}
+	head, err := r.Git.CommitSHA(r.ctx, r.worktree.Path)
+	return err == nil && head != r.startSHA
+}
+
 func (r *runner) mergedBaseCleanly() bool {
 	return r.followUp != nil && r.followUp.BaseMerge != nil && len(r.followUp.BaseMerge.ConflictedFiles) == 0
 }
 
 func (r *runner) applyOutput(out model.AgentOutput) error {
-	if out.Content != nil && out.Content.Type == model.ContentTask {
-		body := *out.Content.Task
-		ref, err := r.Tasks.Create(r.ctx, body, r.agent.Name, tasks.LabelsOnCreate(r.Config.Tasks, r.agent.Name))
-		if err != nil {
-			return err
+	if out.Content != nil {
+		for _, body := range out.Content.Findings() {
+			ref, err := r.Tasks.Create(r.ctx, body, r.agent.Name, tasks.LabelsOnCreate(r.Config.Tasks, r.agent.Name))
+			if err != nil {
+				return err
+			}
+			r.state.TasksCreated = append(r.state.TasksCreated, ref)
+			r.Log.OK(fmt.Sprintf("created task %s: %s (%s)", ref, body.Title, body.Severity))
 		}
-		r.state.TasksCreated = []string{ref}
-		r.Log.OK(fmt.Sprintf("created task %s: %s (%s)", ref, body.Title, body.Severity))
 	}
 
 	var unresolved []string
@@ -467,13 +550,16 @@ func (r *runner) applyOutput(out model.AgentOutput) error {
 		commitMessage = out.CommitMessage
 	}
 
+	r.sessionCommits = r.worktree != nil && len(unresolved) == 0 && r.committedInSession(out)
 	switch {
+	case r.worktree != nil && r.scratch && !r.agent.ReadOnly:
+		r.Log.Step("agent without a worktree, nothing committed")
 	case r.worktree != nil && r.agent.ReadOnly:
 		r.Log.Step("read-only agent, nothing committed")
 		if r.review != nil {
 			r.removeTriggerLabel(r.review.PR.Number)
 		}
-	case r.worktree != nil && (commitMessage != nil || r.mergedBaseCleanly()):
+	case r.worktree != nil && (commitMessage != nil || r.mergedBaseCleanly() || r.sessionCommits):
 		if err := r.publish(out, commitMessage); err != nil {
 			return err
 		}
@@ -507,6 +593,8 @@ func (r *runner) publish(out model.AgentOutput, commitMessage *model.CommitMessa
 			return err
 		}
 		r.Log.OK("committed " + commitMessage.Subject)
+	} else if r.sessionCommits {
+		r.Log.Step("pushing the commits made in the session")
 	} else {
 		r.Log.Step("no changes, pushing the merge of " + r.followUp.BaseMerge.BaseBranch)
 	}
@@ -547,7 +635,7 @@ func (r *runner) publish(out model.AgentOutput, commitMessage *model.CommitMessa
 		err := r.Tasks.Update(r.ctx, r.task.Ref, tasks.Update{
 			Status:         model.StatusDone,
 			Metadata:       map[string]string{model.MetaCompleted: model.ISOTime(r.Now()), model.MetaBranch: wt.Branch, model.MetaPRURL: r.prURL},
-			RemoveMetadata: tasks.ClaimKeys,
+			RemoveMetadata: r.claimKeys(),
 			AddLabels:      tasks.LabelsOnDone(r.Config.Tasks, r.agent.Name),
 		})
 		if err != nil {
@@ -614,7 +702,7 @@ func (r *runner) recordNoChanges(out model.AgentOutput, unresolved []string) err
 	err := r.Tasks.Update(r.ctx, r.task.Ref, tasks.Update{
 		Status:         model.StatusTodo,
 		Metadata:       map[string]string{model.MetaRetryCount: fmt.Sprint(retries)},
-		RemoveMetadata: tasks.ClaimKeys,
+		RemoveMetadata: r.claimKeys(),
 	})
 	if err != nil {
 		return err
@@ -730,12 +818,27 @@ func (r *runner) addNote(ref, text string) {
 
 // finish releases an unsettled task, runs the hooks, and removes the worktree, whatever happened before.
 // It still cleans up after a stop; the hooks are skipped once a stop was asked for.
+func (r *runner) releaseTask() {
+	if r.task == nil || r.settled {
+		return
+	}
+	if err := r.Tasks.Update(r.ctx, r.task.Ref, tasks.Update{Status: model.StatusTodo, RemoveMetadata: r.claimKeys()}); err != nil {
+		r.Log.Warn(fmt.Sprintf("failed to return task %s to todo: %s", r.task.Ref, err))
+	}
+	r.settled = true
+}
+
 func (r *runner) finish(stopped bool) {
 	r.ctx = context.WithoutCancel(r.stopCtx)
+	if r.handedOff {
+		r.Log.HandedOff(r.agent.Name)
+		return
+	}
+	if r.interactive {
+		_ = os.RemoveAll(session.Dir(r.Cwd, r.runID))
+	}
 	if r.task != nil && !r.settled {
-		if err := r.Tasks.Update(r.ctx, r.task.Ref, tasks.Update{Status: model.StatusTodo, RemoveMetadata: tasks.ClaimKeys}); err != nil {
-			r.Log.Warn(fmt.Sprintf("failed to return task %s to todo: %s", r.task.Ref, err))
-		}
+		r.releaseTask()
 		if stopped {
 			r.addNote(r.task.Ref, r.agent.Name+": stopped\n\nThe run was stopped before it finished.")
 		}
@@ -746,10 +849,20 @@ func (r *runner) finish(stopped bool) {
 	}
 	if r.worktree != nil {
 		r.Log.Section("Cleanup")
-		if r.keepWorktree() {
+		switch {
+		case r.keepWorktree() && r.handle != "":
+			r.Log.Step("worktree kept, remove it with `workmux remove " + r.handle + "`")
+			r.Log.Field("path", r.worktree.Path)
+		case r.keepWorktree():
 			r.Log.Step("worktree kept, `vteam clean` removes it")
 			r.Log.Field("path", r.worktree.Path)
-		} else {
+		case r.handle != "":
+			if err := r.Workmux.Remove(r.ctx, r.Cwd, r.handle); err != nil {
+				r.Log.Warn("failed to remove the worktree: " + err.Error())
+			} else {
+				r.Log.Step("worktree removed")
+			}
+		default:
 			r.Git.RemoveWorktree(r.ctx, r.Cwd, r.worktree.Path)
 			r.Log.Step("worktree removed")
 		}

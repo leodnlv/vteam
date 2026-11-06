@@ -286,3 +286,17 @@ func TestRunReportsAMissingBinary(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 }
+
+func TestInteractiveCommand(t *testing.T) {
+	got := InteractiveCommand("/a b/system-prompt.md", Options{
+		Model: "sonnet", AllowedTools: []string{"Read", "Bash(git *)"}, DisallowedTools: []string{"Bash(rm *)"},
+		JSONSchema: `{"ignored":true}`,
+	})
+	want := `claude --append-system-prompt-file '/a b/system-prompt.md' --model sonnet --allowedTools Read 'Bash(git *)' --tools Read,Bash --disallowedTools 'Bash(rm *)'`
+	if got != want {
+		t.Errorf("got  %s\nwant %s", got, want)
+	}
+	if got := ShellQuote("it's"); got != `'it'\''s'` {
+		t.Errorf("quote = %s", got)
+	}
+}
