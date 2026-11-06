@@ -195,6 +195,25 @@ func TestHelpOverlayTogglesAndSwallowsKeys(t *testing.T) {
 	}
 }
 
+func TestHelpOverlayScrollsWhenTallerThanTheBody(t *testing.T) {
+	m := press(t, newTestModel(t, nil), "?")
+	if out := screen(m); !strings.Contains(out, "▍ Global") || strings.Contains(out, "press ? or esc to close") {
+		t.Fatalf("a 20-row terminal should show the top of the help and cut the rest:\n%s", out)
+	}
+	m = press(t, m, "G")
+	if out := screen(m); !strings.Contains(out, "press ? or esc to close") || strings.Contains(out, "▍ Global") {
+		t.Fatalf("G should scroll the help to its end:\n%s", out)
+	}
+	m = press(t, m, "g", "g", "j")
+	if m.helpView.YOffset() != 1 || !m.help {
+		t.Fatalf("gg j offset = %d, help open = %v", m.helpView.YOffset(), m.help)
+	}
+	m = press(t, m, "?", "?")
+	if m.helpView.YOffset() != 0 {
+		t.Fatal("reopening help should start at the top")
+	}
+}
+
 func TestQuitKeys(t *testing.T) {
 	for _, key := range []string{"q", "ctrl+c"} {
 		_, cmd := newTestModel(t, nil).Update(keyPress(key))

@@ -77,6 +77,7 @@ type Model struct {
 	agents   agentsState
 	info     infoState
 	about    viewport.Model
+	helpView viewport.Model
 	dialog   dialog
 	toast    toast
 }
@@ -85,6 +86,7 @@ func New(ctx context.Context, deps Deps) Model {
 	m := Model{
 		ctx: ctx, deps: deps, width: 80, height: 24, agents: newAgentsState(),
 		overview: overviewState{view: newScrollView()}, info: infoState{view: newScrollView()}, about: newScrollView(),
+		helpView: newScrollView(),
 	}
 	m.agents = m.agents.reload(deps.Agents(deps.Now()))
 	m.info = m.refreshInfo()
@@ -161,12 +163,13 @@ func (m Model) bodyHeight() int {
 }
 
 func (m Model) View() tea.View {
+	m = m.syncViewport()
 	body := m.renderBody()
 	if m.tab == TabAgents && m.dialog.kind != dialogNone {
 		body = m.renderDialog(body)
 	}
 	if m.help {
-		body = overlay(body, helpBox(), m.width, m.bodyHeight())
+		body = overlay(body, m.helpBox(), m.width, m.bodyHeight())
 	}
 	lines := append(m.renderHeader(), body...)
 	lines = append(lines, m.renderFooter()...)
@@ -176,7 +179,6 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) renderBody() []string {
-	m = m.syncViewport()
 	switch m.tab {
 	case TabAgents:
 		return m.renderAgents()
@@ -192,6 +194,9 @@ func (m Model) renderBody() []string {
 // syncViewport sizes the active tab's scrollable pane to the window and refills it, so scrolling and
 // rendering both see the current content. A following log pane stays at the bottom.
 func (m Model) syncViewport() Model {
+	if m.help {
+		m = m.syncHelp()
+	}
 	switch m.tab {
 	case TabAgents:
 		fill(&m.agents.view, m.logRows(), m.logPaneWidth(), m.logBodyHeight())

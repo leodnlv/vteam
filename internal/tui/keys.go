@@ -102,11 +102,15 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if key.Matches(msg, keys.Help) {
 		m.help = !m.help
+		m.helpView.SetYOffset(0)
 		return m, nil
 	}
 	if m.help {
-		if key.Matches(msg, keys.Cancel, keys.Quit) {
+		switch {
+		case key.Matches(msg, keys.Cancel, keys.Quit):
 			m.help = false
+		case !scroll(&m.helpView, msg, pendingG):
+			m.pendingG = key.Matches(msg, keys.GG)
 		}
 		return m, nil
 	}

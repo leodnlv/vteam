@@ -143,8 +143,8 @@ var helpGroups = []struct {
 	}},
 }
 
-// helpBox renders every group's bindings with bubbles/help, with the key column the same width in all groups.
-func helpBox() string {
+// helpLines renders every group's bindings with bubbles/help, with the key column the same width in all groups.
+func helpLines() []string {
 	keyWidth := 0
 	for _, g := range helpGroups {
 		for _, b := range g.bindings {
@@ -166,6 +166,21 @@ func helpBox() string {
 			lines = append(lines, "  "+line)
 		}
 	}
-	lines = append(lines, "", styleMuted.Render("press ? or esc to close"))
-	return styleHelpBox.Render(strings.Join(lines, "\n"))
+	return append(lines, "", styleMuted.Render("press ? or esc to close"))
+}
+
+// syncHelp sizes the help overlay's viewport to its content, capped so the box fits the body; j/k scroll the rest.
+func (m Model) syncHelp() Model {
+	lines := helpLines()
+	width := 0
+	for _, line := range lines {
+		width = max(width, lipgloss.Width(line))
+	}
+	height := min(len(lines), max(1, m.bodyHeight()-styleHelpBox.GetVerticalFrameSize()))
+	fill(&m.helpView, lines, width, height)
+	return m
+}
+
+func (m Model) helpBox() string {
+	return styleHelpBox.Render(m.helpView.View())
 }
