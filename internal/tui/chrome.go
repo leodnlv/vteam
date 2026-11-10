@@ -75,7 +75,11 @@ func (m Model) hints() []key.Binding {
 		}
 		return append(append(focus, relabel(keys.PrevRun, "p/n", "prev/next run"), relabel(keys.Wrap, "w", "wrap")), global...)
 	}
-	return append([]key.Binding{scrollKeys, relabel(keys.GG, "gg/G", "top/bottom")}, global...)
+	scrolling := []key.Binding{scrollKeys, relabel(keys.GG, "gg/G", "top/bottom")}
+	if m.tab == TabOverview {
+		scrolling = append(scrolling, relabel(keys.Window, "t", "24h/7d"))
+	}
+	return append(scrolling, global...)
 }
 
 // newHelp renders key bindings in the footer's colors. Its width stays unset because help.Model's own
@@ -143,6 +147,7 @@ var helpGroups = []struct {
 		relabel(keys.HalfPageDown, "ctrl+d ctrl+u", "half page down / up"),
 		relabel(keys.GG, "gg  G", "top / bottom"),
 	}},
+	{"Overview tab", []key.Binding{keys.Window}},
 	{"Agents tab", []key.Binding{
 		relabel(keys.Down, "j k", "select agent (sidebar) or scroll log"),
 		keys.SwitchPane, keys.FocusLog, keys.FocusSidebar,

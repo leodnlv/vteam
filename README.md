@@ -256,7 +256,7 @@ Shows what is happening now and what will happen next. It reads local state and 
 - **Scheduler** — whether the scheduler is running, and each enabled cron with its next fire time.
 - **Up next** — for each `input: "task"` agent, the task it would pick if it ran now (same routing, retry limit, and ordering as `vteam run`), marked `(PR follow-up)` when it would continue an existing PR. `input: "pr"` agents show the PR label they watch.
 - **Awaiting merge** — `done` tasks whose PR has not been recorded as merged.
-- **Needs attention** — tasks in `inbox` awaiting triage (listed with ref, severity, and title), `todo` tasks no agent's `taskFilter` matches, `todo` tasks at `maxRetries`, `active` tasks whose claiming process on this machine is dead or that have no vteam claim, and worktrees no running agent is using.
+- **Waiting on you** — what needs a human. First what's broken: agents whose `agent.json` fails to load, `todo` tasks no agent's `taskFilter` matches, `todo` tasks at `maxRetries`, `active` tasks whose claiming process on this machine is dead or that have no vteam claim, and worktrees no running agent is using. Then the 5 oldest tasks to triage (in `inbox`) and PRs to review (open, not yet merged), each with how long it has waited, flagged `!` after a day.
 
 For the full task list, use aven (`aven list --label vteam`).
 
@@ -270,7 +270,13 @@ Running `vteam` with no arguments inside a project opens a full-screen, keyboard
     - **Stop run** asks before stopping the selected agent's run (see [Stopping a run](#stopping-a-run)). For an agent with a worktree, choose with `j` / `k` between removing the worktree and keeping it for inspection.
     - **Run on cron** opens a dialog prefilled with the enabled pattern, or else the `agent.json` default. As you type it shows the schedule in words, the next three fire times, or the parse error. `tab` toggles saving the pattern as the default in `agent.json` (`vteam.config.json` for the merge ensurer). Confirming enables the cron and, if no scheduler is running, starts one in the background (see [Running on a schedule](#running-on-a-schedule)).
     - **Cron markers** — an agent on cron shows `◷` in the sidebar, its pattern and next run in the details, and a line above its log. All three turn yellow with "paused" when the scheduler is not running.
-- **Overview** — the `vteam status` view, refreshed every 2 seconds. A refresh starts only after the previous one finishes, so a large aven project refreshes less often instead of piling up work. If a refresh fails, the last good view stays and the error appears in the footer.
+- **Overview** — the `vteam status` view, refreshed every 2 seconds. A refresh starts only after the previous one finishes, so a large aven project refreshes less often instead of piling up work. If a refresh fails, the last good view stays and the error appears in the footer. Below the status, pipeline stats cover the last 7 days (`t` switches to 24 hours):
+  - **Tasks created**: where the window's tasks are now (merged, PR open, todo, inbox, PR closed, …), one bar per agent that found them.
+  - **Activity**: tasks created, picked, PRs opened, PRs sent back or closed, and interactive sessions, with a sparkline over the window.
+  - **Lead time**: median and p90 from a task's creation to its first PR and from a pick to the push, plus how long inbox tasks and open PRs have been waiting.
+  - **Queue**: tasks per status, how many are ready, and retry counts.
+
+  vteam records no triage or merge times, so those don't appear.
 - **Info** — the project, `vteam.config.json`, whether the scheduler is running, and each agent's settings, including the tools it is allowed.
 - **About** — what vteam is, its philosophy, the author, and the license.
 

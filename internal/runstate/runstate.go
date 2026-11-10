@@ -101,3 +101,21 @@ func read(path string) (model.RunState, bool) {
 	}
 	return state, json.Unmarshal(data, &state) == nil
 }
+
+// List reads every run state under vteam/.runs, skipping files that do not parse.
+func List(cwd string) []model.RunState {
+	entries, err := os.ReadDir(RunsDir(cwd))
+	if err != nil {
+		return nil
+	}
+	var states []model.RunState
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		if state, ok := read(filepath.Join(RunsDir(cwd), e.Name())); ok {
+			states = append(states, state)
+		}
+	}
+	return states
+}

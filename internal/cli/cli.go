@@ -233,12 +233,14 @@ func statusDeps(dir string, cfg *config.Config) status.Deps {
 	}
 }
 
-func renderStatus(ctx context.Context, dir string) ([]string, error) {
+func renderStatus(ctx context.Context, dir string, pipeline time.Duration) ([]string, error) {
 	cfg, err := config.Load(dir)
 	if err != nil {
 		return nil, err
 	}
-	return status.Render(ctx, statusDeps(dir, cfg))
+	deps := statusDeps(dir, cfg)
+	deps.Pipeline = pipeline
+	return status.Render(ctx, deps)
 }
 
 // runTUI opens the TUI in a terminal inside a vteam project, and prints help everywhere else.
@@ -258,8 +260,10 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 		return cmd.Help()
 	}
 	return tui.Run(cmd.Context(), tui.Deps{
-		Project:      loadProject(cmd.Context(), dir),
-		RenderStatus: func(ctx context.Context) ([]string, error) { return renderStatus(ctx, dir) },
+		Project: loadProject(cmd.Context(), dir),
+		RenderStatus: func(ctx context.Context, window time.Duration) ([]string, error) {
+			return renderStatus(ctx, dir, window)
+		},
 		Agents:       func(now time.Time) []tui.Agent { return tui.LoadAgents(dir, now) },
 		LoadConfig:   func() (*config.Config, error) { return config.Load(dir) },
 		SchedulerPID: func() int { return schedule.ReadPID(dir) },
@@ -314,7 +318,7 @@ func statusCmd() *cobra.Command {
 			if err := requireVteamDir(dir, cmd.ErrOrStderr()); err != nil {
 				return err
 			}
-			lines, err := renderStatus(cmd.Context(), dir)
+			lines, err := renderStatus(cmd.Context(), dir, 0)
 			if err != nil {
 				return err
 			}

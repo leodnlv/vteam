@@ -102,14 +102,14 @@ func TestRenderEverything(t *testing.T) {
 		"  • reviewer  any open PR with review feedback",
 		log.FormatSection("Awaiting merge (1)"),
 		"  • APP-5 Awaiting  https://github.com/o/r/pull/5",
-		log.FormatSection("Needs attention"),
+		log.FormatSection("Waiting on you"),
 		`  ✗ agent "broken" failed to load: invalid config in broken/agent.json:` + "\n" + `      - (root): Unrecognized key: "bogus"`,
-		"  ! 1 task(s) in inbox awaiting triage\n    APP-7 [low] Inbox one",
 		"  ✗ APP-3 matches no agent's taskFilter and will never be picked",
 		"  ✗ APP-4 hit max retries (3/3) and will not be picked",
 		"  ! APP-8 is active without a vteam claim (reset it by hand if it is stuck)",
 		"  ✗ APP-9 is active but its process (pid 999999) is dead (run 'vteam clean')",
 		"  ! 1 worktree(s) with no running agent (run 'vteam clean')\n    .wt/vteam/idle",
+		"  ! triage  " + log.PadEnd(log.FormatAge(now.Sub(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))), 9) + "APP-7 [low] Inbox one  by hand",
 	}
 	if diff := cmp.Diff(want, lines); diff != "" {
 		t.Errorf("(-want +got):\n%s", diff)
@@ -127,7 +127,7 @@ func TestRenderQuietProject(t *testing.T) {
 	if !strings.Contains(joined, "· nothing running") {
 		t.Errorf("output:\n%s", joined)
 	}
-	for _, absent := range []string{"Up next", "Awaiting merge", "Needs attention"} {
+	for _, absent := range []string{"Up next", "Awaiting merge", "Waiting on you"} {
 		if strings.Contains(joined, absent) {
 			t.Errorf("unexpected %q in:\n%s", absent, joined)
 		}

@@ -2,10 +2,12 @@
 package status
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +32,9 @@ type Deps struct {
 	IsAlive func(pid int) bool
 	// Orphans lists worktrees under worktreeDir that no path in inUse refers to.
 	Orphans func(ctx context.Context, repoRoot, worktreeDir string, inUse []string) ([]string, error)
+	// Pipeline is the window of the pipeline sections (tasks created, activity, lead time, waiting, queue)
+	// added after the rest; zero leaves them out.
+	Pipeline time.Duration
 }
 
 type runningJob struct {
@@ -61,7 +66,11 @@ func Render(ctx context.Context, d Deps) ([]string, error) {
 	lines = append(lines, schedule.RenderScheduler(d.Cwd, now)...)
 	lines = append(lines, renderUpNext(loaded.agents, ready, d.Config)...)
 	lines = append(lines, renderAwaitingMerge(idx)...)
-	lines = append(lines, renderNeedsAttention(ctx, d, loaded, idx, running)...)
+	lines = append(lines, renderWaitingOnYou(ctx, d, loaded, idx, running, now)...)
+	if d.Pipeline > 0 {
+		data := pipelineData{tasks: idx.All, ready: ready, runs: runstate.List(d.Cwd), sessions: session.List(d.Cwd), maxRetries: d.Config.Tasks.MaxRetries}
+		lines = append(lines, renderPipeline(data, d.Pipeline, now)...)
+	}
 	return lines, nil
 }
 
@@ -207,7 +216,9 @@ func renderAwaitingMerge(idx tasks.Index) []string {
 	return lines
 }
 
-func renderNeedsAttention(ctx context.Context, d Deps, loaded loadedAgents, idx tasks.Index, running []runningJob) []string {
+// renderWaitingOnYou lists what needs a human: things that are broken first, then the oldest tasks to triage
+// and PRs to review.
+func renderWaitingOnYou(ctx context.Context, d Deps, loaded loadedAgents, idx tasks.Index, running []runningJob, now time.Time) []string {
 	var items []string
 	warning := func(text string) { items = append(items, log.FormatListItem(ansi.Warn("!"), text)) }
 	failure := func(text string) { items = append(items, log.FormatListItem(ansi.Fail("✗"), text)) }
@@ -215,14 +226,6 @@ func renderNeedsAttention(ctx context.Context, d Deps, loaded loadedAgents, idx 
 	for _, e := range loaded.errors {
 		failure(e)
 	}
-	if inbox := idx.ByStatus[model.StatusInbox]; len(inbox) > 0 {
-		lines := []string{fmt.Sprintf("%d task(s) in inbox awaiting triage", len(inbox))}
-		for _, t := range inbox {
-			lines = append(lines, formatTask(t))
-		}
-		warning(strings.Join(lines, "\n"))
-	}
-
 	var taskAgents []*config.Agent
 	for _, a := range loaded.agents {
 		if a.Input == config.InputTask {
@@ -272,10 +275,50 @@ func renderNeedsAttention(ctx context.Context, d Deps, loaded loadedAgents, idx 
 		warning(strings.Join(lines, "\n"))
 	}
 
+	items = append(items, renderWaitingTasks(idx.All, now)...)
 	if len(items) == 0 {
 		return nil
 	}
-	return append([]string{log.FormatSection("Needs attention")}, items...)
+	return append([]string{log.FormatSection("Waiting on you")}, items...)
+}
+
+const waitingLimit = 5
+
+type waitingTask struct {
+	kind string
+	age  time.Duration
+	task model.Task
+}
+
+// renderWaitingTasks lists the oldest inbox tasks (to triage) and open PRs (to review), flagging those older than a day.
+func renderWaitingTasks(all []model.Task, now time.Time) []string {
+	var waiting []waitingTask
+	for _, t := range all {
+		switch stageOf(t) {
+		case stageInbox:
+			if at, ok := parseTime(t.CreatedAt); ok {
+				waiting = append(waiting, waitingTask{"triage", now.Sub(at), t})
+			}
+		case stagePROpen:
+			if at, ok := firstPR(t); ok {
+				waiting = append(waiting, waitingTask{"review", now.Sub(at), t})
+			}
+		}
+	}
+	slices.SortFunc(waiting, func(a, b waitingTask) int { return cmp.Compare(b.age, a.age) })
+	var lines []string
+	for _, w := range waiting[:min(len(waiting), waitingLimit)] {
+		glyph := ansi.Info("•")
+		if w.age > 24*time.Hour {
+			glyph = ansi.Warn("!")
+		}
+		text := log.PadEnd(w.kind, 8) + log.PadEnd(log.FormatAge(w.age), 9) + formatTask(w.task) + "  " + ansi.Muted(origin(w.task))
+		lines = append(lines, log.FormatListItem(glyph, text))
+	}
+	if more := len(waiting) - waitingLimit; more > 0 {
+		lines = append(lines, log.FormatListItem(ansi.Muted("·"), ansi.Dim(fmt.Sprintf("and %d more", more))))
+	}
+	return lines
 }
 
 var severityColor = map[model.Severity]func(string) string{

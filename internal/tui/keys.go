@@ -15,6 +15,8 @@ type keyMap struct {
 	SwitchPane, FocusLog, FocusSidebar, PrevRun, NextRun                key.Binding
 	Actions, Run, StopRun, Cron, StopCron, StartScheduler, Follow, Wrap key.Binding
 
+	Window key.Binding
+
 	Confirm, Cancel, SaveDefault, Interactive, NewLine, TaskDown, TaskUp key.Binding
 }
 
@@ -50,6 +52,8 @@ var keys = keyMap{
 	StartScheduler: binding([]string{"S"}, "S", "start the scheduler when crons are paused"),
 	Follow:         binding([]string{"f"}, "f", "toggle follow"),
 	Wrap:           binding([]string{"w"}, "w", "toggle line wrap"),
+
+	Window: binding([]string{"t"}, "t", "switch the pipeline window: 24h / 7d"),
 
 	Confirm:     binding([]string{"enter"}, "⏎", "confirm"),
 	Cancel:      binding([]string{"esc"}, "esc", "cancel"),
@@ -128,10 +132,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Refresh):
 		m.agents = m.agents.reload(m.deps.Agents(m.deps.Now()))
 		m.info = m.refreshInfo()
-		return m, m.fetchStatus
+		return m.restartStatus()
 	}
 	if m.tab == TabAgents {
 		return m.handleAgentsKey(msg, pendingG), nil
+	}
+	if m.tab == TabOverview && key.Matches(msg, keys.Window) {
+		m.overview.window = nextWindow(m.overview.window)
+		return m.restartStatus()
 	}
 
 	if !scroll(m.tabView(), msg, pendingG) {

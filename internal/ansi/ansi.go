@@ -97,6 +97,7 @@ var (
 	Claude = role(&palette.Claude)
 	Tool   = role(&palette.Tool)
 	Live   = role(&palette.Live)
+	Cron   = role(&palette.Cron)
 )
 
 // Badge paints text bold in OnBrand on a Brand background.

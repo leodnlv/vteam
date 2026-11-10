@@ -3,6 +3,7 @@ package tui
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"time"
 
@@ -39,8 +40,9 @@ type Project struct {
 }
 
 type Deps struct {
-	Project      Project
-	RenderStatus func(ctx context.Context) ([]string, error)
+	Project Project
+	// RenderStatus renders the Overview: vteam status plus the pipeline sections over the last window.
+	RenderStatus func(ctx context.Context, window time.Duration) ([]string, error)
 	Agents       func(now time.Time) []Agent
 	LoadConfig   func() (*config.Config, error)
 	// SchedulerPID is the pid of a live `vteam cron start`, or 0.
@@ -63,6 +65,9 @@ type Deps struct {
 }
 
 type overviewState struct {
+	window time.Duration
+	// gen counts restarts of the refresh loop (refresh, window switch); results and ticks of an older loop are dropped.
+	gen     int
 	lines   []string
 	err     string
 	updated time.Time
@@ -90,7 +95,7 @@ type Model struct {
 func New(ctx context.Context, deps Deps) Model {
 	m := Model{
 		ctx: ctx, deps: deps, width: 80, height: 24, agents: newAgentsState(),
-		overview: overviewState{view: newScrollView()}, info: infoState{view: newScrollView()}, about: newScrollView(),
+		overview: overviewState{window: pipelineWindows[0], view: newScrollView()}, info: infoState{view: newScrollView()}, about: newScrollView(),
 		helpView: newScrollView(),
 	}
 	m.agents = m.agents.reload(deps.Agents(deps.Now()))
@@ -103,13 +108,21 @@ func Run(ctx context.Context, deps Deps) error {
 	return err
 }
 
+var pipelineWindows = []time.Duration{7 * 24 * time.Hour, 24 * time.Hour}
+
+func nextWindow(w time.Duration) time.Duration {
+	i := slices.Index(pipelineWindows, w)
+	return pipelineWindows[(i+1)%len(pipelineWindows)]
+}
+
 type statusMsg struct {
+	gen     int
 	lines   []string
 	err     error
 	started time.Time
 }
 
-type statusTickMsg struct{}
+type statusTickMsg struct{ gen int }
 
 type agentsTickMsg struct{}
 
@@ -119,8 +132,14 @@ func agentsTick() tea.Cmd {
 
 func (m Model) fetchStatus() tea.Msg {
 	started := m.deps.Now()
-	lines, err := m.deps.RenderStatus(m.ctx)
-	return statusMsg{lines: lines, err: err, started: started}
+	lines, err := m.deps.RenderStatus(m.ctx, m.overview.window)
+	return statusMsg{gen: m.overview.gen, lines: lines, err: err, started: started}
+}
+
+// restartStatus fetches the Overview now and starts a new refresh loop, retiring the old one.
+func (m Model) restartStatus() (Model, tea.Cmd) {
+	m.overview.gen++
+	return m, m.fetchStatus
 }
 
 func (m Model) Init() tea.Cmd {
@@ -148,6 +167,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmd
 	case statusMsg:
+		if msg.gen != m.overview.gen {
+			return m, nil
+		}
 		m.overview.loaded = true
 		m.overview.updated = m.deps.Now()
 		m.overview.err = ""
@@ -157,8 +179,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.overview.lines = dropLeadingBlank(splitLines(msg.lines[min(1, len(msg.lines)):]))
 		}
 		wait := max(0, StatusRefreshInterval-m.deps.Now().Sub(msg.started))
-		return m, tea.Tick(wait, func(time.Time) tea.Msg { return statusTickMsg{} })
+		gen := m.overview.gen
+		return m, tea.Tick(wait, func(time.Time) tea.Msg { return statusTickMsg{gen: gen} })
 	case statusTickMsg:
+		if msg.gen != m.overview.gen {
+			return m, nil
+		}
 		return m, m.fetchStatus
 	case agentsTickMsg:
 		m.agents = m.agents.reload(m.deps.Agents(m.deps.Now()))

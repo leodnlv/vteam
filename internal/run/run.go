@@ -871,13 +871,13 @@ func (r *runner) recordPRTask(out model.AgentOutput) string {
 }
 
 func formatRunNote(agent string, out model.AgentOutput, prURL string, extra []string) string {
-	parts := []string{fmt.Sprintf("%s: %s", agent, out.Status), out.Summary}
+	parts := []string{tasks.NoteHeadline(agent, string(out.Status)), out.Summary}
 	if out.BlockerReason != "" {
 		parts = append(parts, "Blocker: "+out.BlockerReason)
 	}
 	parts = append(parts, extra...)
 	if prURL != "" {
-		parts = append(parts, "PR: "+prURL)
+		parts = append(parts, tasks.PRParagraph(prURL))
 	}
 	var kept []string
 	for _, p := range parts {

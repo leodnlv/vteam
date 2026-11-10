@@ -19,7 +19,7 @@ func newTestModel(t *testing.T, render func(context.Context) ([]string, error)) 
 	t.Helper()
 	m := New(context.Background(), Deps{
 		Project:      Project{Name: "my-app", FromAven: true, Label: "vteam", Branch: "main"},
-		RenderStatus: render,
+		RenderStatus: func(ctx context.Context, _ time.Duration) ([]string, error) { return render(ctx) },
 		Agents:       func(time.Time) []Agent { return nil },
 		LoadConfig:   func() (*config.Config, error) { return nil, errors.New("no config") },
 		SchedulerPID: func() int { return 0 },
@@ -267,5 +267,47 @@ func TestMouseWheelScrollsTheHelpOverlayNotTheTab(t *testing.T) {
 	m = wheel(t, press(t, m, "?"), tea.MouseWheelDown, 1)
 	if m.helpView.YOffset() != 3 || m.overview.view.YOffset() != 0 {
 		t.Fatalf("help offset = %d, overview offset = %d", m.helpView.YOffset(), m.overview.view.YOffset())
+	}
+}
+
+func TestOverviewWindowKeyCyclesThePipelineWindow(t *testing.T) {
+	var windows []time.Duration
+	m := newTestModel(t, nil)
+	m.deps.RenderStatus = func(_ context.Context, w time.Duration) ([]string, error) {
+		windows = append(windows, w)
+		return []string{"banner", fmt.Sprintf("window %s", w)}, nil
+	}
+	m = press(t, m, "2")
+
+	if m.overview.window != 7*24*time.Hour {
+		t.Fatalf("default window = %v, want 7 days", m.overview.window)
+	}
+	for _, want := range []time.Duration{24 * time.Hour, 7 * 24 * time.Hour} {
+		next, cmd := m.Update(keyPress("t"))
+		m = next.(Model)
+		m = update(t, m, cmd())
+		if got := windows[len(windows)-1]; got != want {
+			t.Fatalf("window = %v, want %v", got, want)
+		}
+		if view := screen(m); !strings.Contains(view, fmt.Sprintf("window %s", want)) {
+			t.Errorf("view does not show the %v render:\n%s", want, view)
+		}
+	}
+	if !strings.Contains(screen(m), "t 24h/7d") {
+		t.Errorf("footer should hint the window key:\n%s", screen(m))
+	}
+}
+
+func TestOverviewDropsResultsOfARetiredRefreshLoop(t *testing.T) {
+	m := overviewModel(t, func(context.Context) ([]string, error) { return statusLines(3), nil })
+	stale := m.fetchStatus().(statusMsg)
+	m, _ = m.restartStatus()
+
+	next, cmd := m.Update(statusMsg{gen: stale.gen, lines: []string{"banner", "stale"}, started: fixedNow})
+	if cmd != nil || strings.Contains(screen(next.(Model)), "stale") {
+		t.Error("a result from before the restart should be dropped without scheduling another tick")
+	}
+	if _, cmd := m.Update(statusTickMsg{gen: stale.gen}); cmd != nil {
+		t.Error("a tick from the retired loop should not fetch")
 	}
 }

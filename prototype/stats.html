@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>vteam · Stats tab prototype</title>
+<style>
+  :root {
+    --brand: #6b50ff; --accent: #ff60ff; --onbrand: #fffaf1; --onbright: #1b1a22;
+    --muted: #8a879c; --rule: #4a4660; --info: #8b75ff; --ok: #00ffb2; --warn: #e8fe96;
+    --fail: #ff577d; --tool: #ff985a; --cron: #00a4ff; --surface: #272533; --bg: #16151d; --fg: #e9e6f5;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0e0d13; color: var(--fg); font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 18px; margin: 48px 0 6px; }
+  h2 small { color: var(--muted); font-weight: 400; font-size: 14px; }
+  p.lead, p.desc { color: #bdb9cf; margin: 4px 0 14px; max-width: 900px; }
+  code { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--warn); }
+  nav { display: flex; gap: 8px; margin: 18px 0 0; flex-wrap: wrap; }
+  nav a { color: var(--fg); text-decoration: none; border: 1px solid var(--rule); border-radius: 6px; padding: 4px 10px; }
+  nav a:hover { border-color: var(--brand); }
+  .controls { display: flex; gap: 6px; margin: 8px 0; align-items: center; color: var(--muted); font-size: 13px; }
+  .controls button { background: var(--surface); color: var(--fg); border: 1px solid var(--rule); border-radius: 5px; padding: 3px 12px; cursor: pointer; font: inherit; }
+  .controls button.on { background: var(--brand); border-color: var(--brand); color: var(--onbrand); }
+  .term { background: var(--bg); border: 1px solid #2c2a38; border-radius: 10px; padding: 10px 14px 12px; overflow-x: auto; box-shadow: 0 10px 40px #0008; }
+  .term .dots { display: flex; gap: 6px; margin: 0 0 8px 2px; }
+  .term .dots i { width: 11px; height: 11px; border-radius: 50%; background: #3a3848; display: block; }
+  pre.screen { margin: 0; font: 13px/1.38 "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; white-space: pre; color: var(--fg); }
+  .band { background: var(--surface); display: inline-block; }
+  .brand { color: var(--brand); } .accent { color: var(--accent); } .muted { color: var(--muted); } .rule { color: var(--rule); }
+  .info { color: var(--info); } .ok { color: var(--ok); } .warn { color: var(--warn); } .fail { color: var(--fail); }
+  .tool { color: var(--tool); } .cron { color: var(--cron); } .b { font-weight: 700; }
+  .badge { background: linear-gradient(90deg, var(--brand), var(--accent)); color: var(--onbrand); font-weight: 700; }
+  .tabon { background: var(--brand); color: var(--onbrand); font-weight: 700; }
+  .tab { color: var(--muted); }
+  .grad { background: linear-gradient(90deg, var(--brand), var(--accent), var(--cron)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .keyhint { color: var(--accent); }
+  table.inv { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+  table.inv th, table.inv td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #262433; vertical-align: top; }
+  table.inv th { color: var(--muted); font-weight: 600; }
+  .pill { display: inline-block; border-radius: 4px; padding: 0 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .pill.have { background: #00ffb222; color: var(--ok); }
+  .pill.part { background: #e8fe9622; color: var(--warn); }
+  .pill.gap { background: #ff577d22; color: var(--fail); }
+  ul.notes { color: #bdb9cf; margin: 10px 0 0; padding-left: 20px; }
+  ul.notes li { margin: 3px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>vteam: Stats tab, 3 variations</h1>
+  <p class="lead">A new <code>5 Stats</code> tab in the TUI. Each screen below is rendered at 104 columns using the colors from <code>internal/palette</code>. <code>t</code> switches between the last 24h and the last 7 days (you can also click the buttons). The numbers are mock data shaped like the real <code>vteam/.runs</code>, logs, and aven tasks.</p>
+  <nav>
+    <a href="#inventory">Metrics inventory</a>
+    <a href="#v1">A · Scoreboard</a>
+    <a href="#v2">B · Pipeline</a>
+    <a href="#v2b">B′ · Pipeline (today's data)</a>
+    <a href="#v3">C · Timeline</a>
+  </nav>
+
+  <h2 id="inventory">Metrics inventory <small>what past runs give us today</small></h2>
+  <p class="desc">Collected from this repo's dogfood state: 11 run files in <code>vteam/.runs</code>, 42 log files in <code>vteam/.logs</code>, 3 interactive sessions, and 21 aven tasks.</p>
+  <table class="inv">
+    <tr><th>Metric</th><th>Where it lives</th><th>Status</th></tr>
+    <tr><td>Runs per agent, outcome (completed / failed / stopped / interactive), start and end time</td><td><code>vteam/.runs/&lt;runId&gt;.json</code> (<code>status</code>, <code>startedAt</code>, <code>completedAt</code>)</td><td><span class="pill part">partial</span> failed runs have no <code>completedAt</code>, so their duration is unknown</td></tr>
+    <tr><td>Idle runs ("no eligible tasks, nothing to do")</td><td>log files only; no run JSON is written</td><td><span class="pill gap">gap</span> most coder cron ticks are idle and don't show up in <code>.runs</code></td></tr>
+    <tr><td>Claude spend, turns, Claude wall time</td><td>parsed from the <code>result</code> event (<code>TotalCostUSD</code>, <code>NumTurns</code>, <code>DurationMS</code>), but only printed as the <code>claude exited 0 · 1m56s · 14 turns · $0.58</code> log line</td><td><span class="pill gap">gap</span> not persisted; the same goes for memory curation and on-finish hook calls</td></tr>
+    <tr><td>Model used per run</td><td>current <code>agent.json</code> only</td><td><span class="pill gap">gap</span> changes over time aren't recorded</td></tr>
+    <tr><td>Findings created per run, by agent and severity</td><td><code>tasksCreated</code> in run JSON; aven <code>found-by</code>, <code>priority</code>, <code>created_at</code></td><td><span class="pill have">available</span></td></tr>
+    <tr><td>Commits, files changed</td><td>run JSON <code>commitSha</code>, <code>claudeOutput.filesChanged</code></td><td><span class="pill have">available</span></td></tr>
+    <tr><td>PRs opened</td><td>aven <code>pr-url</code> + <code>completed</code> timestamp; session <code>outcome.prUrl</code></td><td><span class="pill part">partial</span> the run JSON has no <code>prUrl</code></td></tr>
+    <tr><td>PRs merged / closed / reopened</td><td>aven <code>merged=true</code>, status <code>canceled</code>, notes; merge-ensurer log <code>merged 0 · canceled 3 · reopened 0 · waiting 1</code></td><td><span class="pill part">partial</span> no <code>merged-at</code> time, so PR→merge lead time can't be computed; the merge-ensurer writes no run JSON</td></tr>
+    <tr><td>Triage wait (inbox→todo), retries</td><td>aven <code>created_at</code>/<code>updated_at</code>, <code>retry-count</code>, notes timestamps</td><td><span class="pill part">partial</span> aven keeps no status history, so the inbox→todo time isn't known</td></tr>
+    <tr><td>Interactive session time</td><td><code>vteam/.sessions/*/session.json</code> (<code>startedAt</code>, <code>outcome.completedAt</code>, status)</td><td><span class="pill have">available</span></td></tr>
+    <tr><td>Queue right now (inbox, todo, active, PR open, retry-exhausted, unroutable)</td><td>what <code>vteam status</code> already computes</td><td><span class="pill have">available</span></td></tr>
+  </table>
+  <ul class="notes">
+    <li>Smallest change that unblocks every variation: add a <code>usage</code> block (<code>costUsd</code>, <code>turns</code>, <code>claudeMs</code>, <code>model</code>, plus curation/hook cost) and <code>prUrl</code> to <code>model.RunState</code>, always set <code>completedAt</code>, and write a run JSON for idle runs and merge-ensurer sweeps (with their counts).</li>
+    <li>For lead times: write <code>merged-at</code> next to <code>merged=true</code> in the merge ensurer, and <code>triaged-at</code>, which needs a hook vteam doesn't have, or the first time vteam sees the task in <code>todo</code>.</li>
+    <li>Parsing old log files would backfill history, but it's brittle. I'd only use it for a one-off migration, if at all.</li>
+  </ul>
+
+  <h2 id="v1">A · Scoreboard <small>KPI tiles, stacked activity chart, per-agent table</small></h2>
+  <p class="desc">"How much did vteam do and what did it cost?" Each tile has a sparkline and a change against the previous period. Below that, runs per bucket stacked by outcome, then a per-agent breakdown with spend share.</p>
+  <div class="controls" data-for="a">window <button data-w="24">24h</button><button data-w="168">7d</button></div>
+  <div class="term"><div class="dots"><i></i><i></i><i></i></div><pre class="screen" id="a"></pre></div>
+
+  <h2 id="v2">B · Pipeline <small>task flow funnel, lead times, queue, human touchpoints</small></h2>
+  <p class="desc">"Is work flowing from findings to merged PRs, and where does it wait?" Built around the task lifecycle. It also counts the human steps (triage and review), which is where things usually stall.</p>
+  <div class="controls" data-for="b">window <button data-w="24">24h</button><button data-w="168">7d</button></div>
+  <div class="term"><div class="dots"><i></i><i></i><i></i></div><pre class="screen" id="b"></pre></div>
+
+  <h2 id="v2b">B′ · Pipeline, today's data only <small>no new tracking needed</small></h2>
+  <p class="desc">Option B rebuilt from fields vteam already records. Triage time, todo time, and merge time aren't stored, so the funnel becomes "where are this window's findings now" (aven <code>created_at</code> + current status + <code>merged=true</code>). Lead time only shows spans with a timestamp at both ends.</p>
+  <ul class="notes" style="margin-bottom:12px">
+    <li><b>Where are they now</b>: aven <code>created_at</code>, <code>found-by</code>, <code>status</code>, <code>merged=true</code>, plus the merge ensurer's <code>canceled</code> note to tell closed PRs from findings rejected in inbox.</li>
+    <li><b>Activity</b>: found = <code>created_at</code>; picked = run JSON <code>startedAt</code> with a <code>taskRef</code>; PR opened = the first run note with <code>PR: &lt;url&gt;</code>; sent back / closed = merge-ensurer notes.</li>
+    <li><b>Lead time</b>: found → first PR note; picked → PR = run <code>startedAt</code>→<code>completedAt</code>; ages = now − <code>created_at</code> / first PR note.</li>
+    <li><b>Waiting on you</b> and <b>Queue now</b>: what <code>vteam status</code> already computes. <b>Retries</b>: current <code>retry-count</code>.</li>
+  </ul>
+  <div class="controls" data-for="d">window <button data-w="24">24h</button><button data-w="168">7d</button></div>
+  <div class="term"><div class="dots"><i></i><i></i><i></i></div><pre class="screen" id="d"></pre></div>
+
+  <h2 id="v3">C · Timeline <small>agent swimlanes, spend strip, notable runs</small></h2>
+  <p class="desc">"What happened while I was away?" One lane per agent with one glyph per time slot, then a spend strip, the most expensive and longest runs, and every failure with its error.</p>
+  <div class="controls" data-for="c">window <button data-w="24">24h</button><button data-w="168">7d</button></div>
+  <div class="term"><div class="dots"><i></i><i></i><i></i></div><pre class="screen" id="c"></pre></div>
+</main>
+
+<script>
+const W = 104;
+const NOW = new Date(2026, 10, 9, 14, 0, 0);
+const HOUR = 3600e3;
+const AGENTS = ['improver', 'security-analyst', 'test-writer', 'coder'];
+const ALL = [...AGENTS, 'merge-ensurer'];
+
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const rnd = mulberry32(42);
+const between = (a, b) => a + rnd() * (b - a);
+const pick = xs => xs[Math.floor(rnd() * xs.length)];
+const at = ago => new Date(NOW - ago * HOUR);
+
+function awake(ago) {
+  const d = at(ago), h = d.getHours(), wd = d.getDay();
+  let p = h >= 8 && h < 20 ? 0.97 : 0.15;
+  if (wd === 0 || wd === 6) p *= 0.8;
+  return rnd() < p;
+}
+
+const TITLES = [
+  'Replace hand-rolled TUI widgets with bubbles textinput, viewport and help',
+  'Agent lock treated as stale after 30 min even when holder process is alive',
+  'Add macOS notifications on successful run complete',
+  'Merge ensurer reopens task twice when label removal races a push',
+  'add tests for schedule state helpers',
+  'Run log path leaks absolute home dir into PR body',
+  'add tests for tui spread helper',
+  'Status shows orphaned worktree for live interactive session',
+];
+const ERRORS = [
+  "agent output is not valid JSON: invalid character 'W' looking for beginning of value",
+  'push rejected: origin/vteam/… moved during the run (stale lease)',
+  'claude exited 1 after 12m00s: API overloaded',
+  'git worktree add: branch already checked out at .vteam-worktrees/…',
+];
+
+function generate() {
+  const runs = [], ev = [];
+  const add = r => { runs.push(r); return r; };
+  for (let ago = 336; ago > 0; ago -= 0.25) {
+    if (awake(ago)) add({ agent: 'merge-ensurer', ago, outcome: 'ok', dur: Math.floor(between(0, 3)), cost: 0, turns: 0 });
+  }
+  for (let ago = 336; ago > 0; ago -= 1) {
+    if (!awake(ago)) continue;
+    const roll = rnd();
+    let r;
+    if (roll < 0.72) r = { outcome: 'idle', dur: 0.3, cost: 0, turns: 0 };
+    else if (roll < 0.83) r = { outcome: 'ok', dur: between(80, 1100), turns: Math.round(between(6, 42)), pr: rnd() < 0.85 };
+    else if (roll < 0.9) r = { outcome: 'nochange', dur: between(60, 600), turns: Math.round(between(5, 25)) };
+    else if (roll < 0.95) r = { outcome: 'fail', dur: between(20, 720), turns: Math.round(between(1, 20)), error: pick(ERRORS) };
+    else if (roll < 0.97) r = { outcome: 'stopped', dur: between(60, 400), turns: Math.round(between(2, 15)) };
+    else r = { outcome: 'interactive', dur: between(600, 3600), turns: 0 };
+    r.cost ??= r.turns * between(0.03, 0.05);
+    r.title = r.outcome === 'idle' ? '' : pick(TITLES);
+    add({ agent: 'coder', ago: ago - between(0, 0.1), ...r });
+    if (r.outcome !== 'idle') ev.push({ type: 'picked', ago, queued: between(0.2, 6) });
+    if (r.pr) prEvents(ago, 'coder');
+  }
+  const sched = { improver: 2, 'security-analyst': 6, 'test-writer': 4 };
+  for (const [agent, every] of Object.entries(sched)) {
+    for (let ago = 336; ago > 0; ago -= every / 2) {
+      if (!awake(ago) || rnd() < 0.3) continue;
+      const roll = rnd();
+      const outcome = roll < 0.85 ? 'ok' : 'fail';
+      const turns = Math.round(between(4, agent === 'test-writer' ? 14 : 10));
+      const r = add({ agent, ago, outcome, dur: between(20, agent === 'test-writer' ? 300 : 90), turns, cost: turns * between(0.03, 0.06), title: '' });
+      if (outcome === 'fail') { r.error = ERRORS[0]; continue; }
+      if (agent === 'test-writer') { r.title = pick(TITLES.filter(t => t.startsWith('add tests'))); prEvents(ago, agent); continue; }
+      if (rnd() < 0.8) {
+        r.found = 1; r.title = pick(TITLES);
+        ev.push({ type: 'found', ago, agent, severity: pick(['low', 'medium', 'medium', 'high', 'critical']) });
+        const t = rnd();
+        if (t < 0.75) { const delay = between(0.3, 20); if (ago - delay > 0) ev.push({ type: 'triaged', ago: ago - delay, delay }); }
+        else if (t < 0.85) { const d = between(1, 30); if (ago - d > 0) ev.push({ type: 'rejected', ago: ago - d }); }
+      }
+    }
+  }
+  function prEvents(ago, agent) {
+    ev.push({ type: 'pr', ago, agent });
+    const r = rnd();
+    const delay = between(0.5, 30);
+    if (ago - delay <= 0) return;
+    if (r < 0.62) ev.push({ type: 'merged', ago: ago - delay, delay });
+    else if (r < 0.75) ev.push({ type: 'closed', ago: ago - delay });
+    else if (r < 0.88) ev.push({ type: 'reopened', ago: ago - delay });
+  }
+  return { runs, ev };
+}
+const DATA = generate();
+
+const S = (s, c = '') => ({ s: String(s), c });
+const cols = segs => segs.reduce((n, x) => n + [...x.s].length, 0);
+const padTo = (segs, w) => { const n = cols(segs); return n < w ? [...segs, S(' '.repeat(w - n))] : segs; };
+const fit = (s, w) => { s = String(s); return [...s].length > w ? [...s].slice(0, w - 1).join('') + '…' : s.padEnd(w); };
+const rfit = (s, w) => String(s).padStart(w);
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const renderLines = lines => lines.map(segs => {
+  if (segs.band) return `<span class="band">${segs.map(x => x.c ? `<span class="${x.c}">${esc(x.s)}</span>` : esc(x.s)).join('')}</span>`;
+  return segs.map(x => x.c ? `<span class="${x.c}">${esc(x.s)}</span>` : esc(x.s)).join('');
+}).join('\n');
+
+const money = v => '$' + v.toFixed(2);
+function dur(sec) {
+  sec = Math.round(sec);
+  if (sec < 60) return sec + 's';
+  const m = Math.floor(sec / 60), s = sec % 60;
+  if (m < 60) return `${m}m${String(s).padStart(2, '0')}s`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h${String(m % 60).padStart(2, '0')}m`;
+  return `${Math.floor(h / 24)}d${String(h % 24).padStart(2, '0')}h`;
+}
+const hrs = h => dur(h * 3600);
+const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '—';
+const median = xs => quant(xs, 0.5);
+function quant(xs, q) { if (!xs.length) return 0; const s = [...xs].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; }
+const PARTS = ' ▏▎▍▌▋▊▉';
+function hbar(v, max, w) {
+  if (!max) return '';
+  const eighths = Math.round(v / max * w * 8), full = Math.floor(eighths / 8), rem = eighths % 8;
+  return '█'.repeat(full) + (rem && full < w ? PARTS[rem] : '');
+}
+const TICKS = '▁▂▃▄▅▆▇█';
+function spark(vals) {
+  const max = Math.max(...vals);
+  return vals.map(v => v === 0 ? ' ' : TICKS[Math.min(7, Math.floor(v / max * 7.999))]).join('');
+}
+function resample(vals, n) {
+  const out = Array(n).fill(0);
+  vals.forEach((v, i) => { out[Math.min(n - 1, Math.floor(i * n / vals.length))] += v; });
+  return out;
+}
+const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const hhmm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+const dayLabel = d => `${DAY[d.getDay()]} ${d.getDate()}`;
+const stamp = ago => { const d = at(ago); return `${dayLabel(d)} ${hhmm(d)}`; };
+
+function section(title, sub = '') {
+  const head = [S('▍ ', 'accent'), S(title, 'b')];
+  if (sub) head.push(S('  ' + sub, 'muted'));
+  head.push(S('  '));
+  return [...head, S('─'.repeat(Math.max(0, W - cols(head))), 'rule')];
+}
+function header() {
+  const tabs = ['Agents', 'Overview', 'Info', 'About', 'Stats'];
+  const left = [S(' '), S(' vteam ▸ ', 'badge')];
+  tabs.forEach((t, i) => { left.push(S(' ')); left.push(S(` ${i + 1} ${t} `, i === 4 ? 'tabon' : 'tab')); });
+  const right = [S('vteam', 'b'), S(' (aven)', 'muted'), S(' · ', 'muted'), S('label vteam', 'muted'), S(' · ', 'muted'), S('⎇', 'cron'), S(' main ')];
+  const line = [...left, S(' '.repeat(W - cols(left) - cols(right))), ...right];
+  line.band = true;
+  return [line, [S('━'.repeat(W), 'grad')]];
+}
+function footer(extra = []) {
+  const hints = [['t', '24h/7d'], ...extra, ['j/k', 'scroll'], ['1-5', 'tabs'], ['?', 'help'], ['q', 'quit']];
+  const segs = [S(' ')];
+  hints.forEach(([k, d], i) => { if (i) segs.push(S(' · ', 'rule')); segs.push(S(k, 'keyhint'), S(' ' + d, 'muted')); });
+  return [[], [S('─'.repeat(W), 'rule')], segs];
+}
+function windowLine(win) {
+  const from = at(win), to = NOW;
+  const segs = [S('  window '), win === 24 ? S(' 24h ', 'tabon') : S(' 24h ', 'tab'), S(' '), win === 168 ? S(' 7d ', 'tabon') : S(' 7d ', 'tab')];
+  segs.push(S(`   ${dayLabel(from)} ${hhmm(from)} → ${dayLabel(to)} ${hhmm(to)}`, 'muted'));
+  segs.push(S(`  ·  compared with the ${win === 24 ? 'previous 24h' : 'previous 7 days'}`, 'muted'));
+  return segs;
+}
+
+function slice(win, offset = 0) {
+  const inWin = x => x.ago >= offset && x.ago < offset + win;
+  return { runs: DATA.runs.filter(inWin), ev: DATA.ev.filter(inWin) };
+}
+function agentStats(runs, agent) {
+  const rs = runs.filter(r => r.agent === agent);
+  const by = o => rs.filter(r => r.outcome === o).length;
+  const worked = rs.filter(r => r.outcome !== 'idle');
+  return {
+    agent, runs: rs.length, ok: by('ok'), idle: by('idle') + by('nochange'), fail: by('fail'), stopped: by('stopped'), interactive: by('interactive'),
+    avgDur: worked.length ? worked.reduce((n, r) => n + r.dur, 0) / worked.length : 0,
+    turns: rs.reduce((n, r) => n + r.turns, 0), cost: rs.reduce((n, r) => n + r.cost, 0),
+  };
+}
+function totals(win, offset = 0) {
+  const { runs, ev } = slice(win, offset);
+  const agentRuns = runs.filter(r => r.agent !== 'merge-ensurer');
+  const settled = agentRuns.filter(r => ['ok', 'fail', 'stopped', 'nochange'].includes(r.outcome));
+  const count = t => ev.filter(e => e.type === t).length;
+  return {
+    runs: agentRuns.length, sweeps: runs.length - agentRuns.length,
+    success: settled.length ? agentRuns.filter(r => r.outcome === 'ok').length / settled.length : 0,
+    cost: agentRuns.reduce((n, r) => n + r.cost, 0), turns: agentRuns.reduce((n, r) => n + r.turns, 0),
+    prs: count('pr'), merged: count('merged'), found: count('found'),
+  };
+}
+function bucketize(win, n, items, val = () => 1) {
+  const out = Array(n).fill(0);
+  for (const x of items) {
+    if (x.ago >= win) continue;
+    out[Math.min(n - 1, Math.floor((win - x.ago) / win * n))] += val(x);
+  }
+  return out;
+}
+function axisLabels(win, n, cell, every, prefix) {
+  let line = '';
+  for (let i = 0; i < n; i += every) {
+    const d = at(win - i * win / n);
+    const label = win === 24 ? String(d.getHours()).padStart(2, '0') : DAY[d.getDay()];
+    line = line.padEnd(i * cell) + label;
+  }
+  return [S(prefix), S(line, 'muted')];
+}
+
+function renderA(win) {
+  const cur = totals(win), prev = totals(win, win);
+  const { runs, ev } = slice(win);
+  const agentRuns = runs.filter(r => r.agent !== 'merge-ensurer');
+  const nb = win === 24 ? 24 : 28;
+  const L = [...header(), [], windowLine(win), []];
+
+  L.push(section('At a glance', `${cur.runs} agent runs · ${cur.sweeps} merge sweeps`), []);
+  const tile = (label, value, cls, series, delta, text = String(Math.abs(delta)), goodUp = true) => {
+    const inner = 14;
+    let dl;
+    if (delta === 0) dl = S(fit('= same as prev', inner), 'muted');
+    else { const t = `${delta > 0 ? '▲' : '▼'} ${text}`; dl = S(fit(t.length + 8 <= inner ? t + ' vs prev' : t, inner), (delta > 0) === goodUp ? 'ok' : 'fail'); }
+    return [
+      [S('╭' + '─'.repeat(inner) + '╮', 'rule')],
+      [S('│', 'rule'), S(fit(label, inner), 'muted'), S('│', 'rule')],
+      [S('│', 'rule'), S(fit(value, inner), cls + ' b'), S('│', 'rule')],
+      [S('│', 'rule'), S(fit(spark(resample(series, inner)), inner), cls), S('│', 'rule')],
+      [S('│', 'rule'), dl, S('│', 'rule')],
+      [S('╰' + '─'.repeat(inner) + '╯', 'rule')],
+    ];
+  };
+  const evSeries = t => bucketize(win, nb, ev.filter(e => e.type === t));
+  const settledSeries = bucketize(win, nb, agentRuns.filter(r => r.outcome === 'ok'));
+  const dCost = cur.cost - prev.cost;
+  const tiles = [
+    tile('RUNS', String(cur.runs), 'info', bucketize(win, nb, agentRuns), cur.runs - prev.runs),
+    tile('SUCCESS', Math.round(cur.success * 100) + '%', 'ok', settledSeries, Math.round((cur.success - prev.success) * 100), Math.abs(Math.round((cur.success - prev.success) * 100)) + 'pt'),
+    tile('SPEND', money(cur.cost), 'tool', bucketize(win, nb, agentRuns, r => r.cost), Math.abs(dCost) < 0.005 ? 0 : Math.sign(dCost), money(Math.abs(dCost)), false),
+    tile('PRS OPENED', String(cur.prs), 'cron', evSeries('pr'), cur.prs - prev.prs),
+    tile('PRS MERGED', String(cur.merged), 'ok', evSeries('merged'), cur.merged - prev.merged),
+    tile('FINDINGS', String(cur.found), 'accent', evSeries('found'), cur.found - prev.found),
+  ];
+  for (let row = 0; row < 6; row++) {
+    const segs = [S('  ')];
+    tiles.forEach((t, i) => { if (i) segs.push(S(' ')); segs.push(...t[row]); });
+    L.push(segs);
+  }
+  L.push([S(`  ${cur.turns} turns · ${money(cur.runs ? cur.cost / Math.max(1, cur.prs) : 0)} per PR · ${money(cur.cost / Math.max(1, agentRuns.filter(r => r.outcome !== 'idle').length))} per working run`, 'muted')]);
+  L.push([]);
+
+  L.push(section('Activity', `agent runs per ${win === 24 ? 'hour' : '6 hours'}`), []);
+  const order = [['ok', 'ok'], ['nochange', 'info'], ['interactive', 'accent'], ['stopped', 'warn'], ['fail', 'fail'], ['idle', 'rule']];
+  const stacks = Array.from({ length: nb }, () => Object.fromEntries(order.map(([o]) => [o, 0])));
+  for (const r of agentRuns) stacks[Math.min(nb - 1, Math.floor((win - r.ago) / win * nb))][r.outcome]++;
+  const H = 7, max = Math.max(...stacks.map(s => Object.values(s).reduce((a, b) => a + b, 0)));
+  for (let y = H; y >= 1; y--) {
+    const label = y === H ? String(max) : y === 1 ? '0' : y === Math.ceil(H / 2) ? String(Math.round(max / 2)) : '';
+    const segs = [S(rfit(label, 5) + ' ', 'muted'), S(y === 1 ? '┼' : '┤', 'rule')];
+    for (const st of stacks) {
+      let cum = 0, cls = null;
+      for (const [o, c] of order) {
+        cum += st[o];
+        if (cum / max * H >= y - 0.5) { cls = c; break; }
+      }
+      segs.push(cls ? S(cls === 'rule' ? '░░' : '██', cls) : S('  '), S(' '));
+    }
+    L.push(segs);
+  }
+  L.push([S('      └', 'rule'), S('─'.repeat(nb * 3), 'rule')]);
+  L.push(axisLabels(win, nb, 3, win === 24 ? 3 : 4, '       '));
+  L.push([S('       '), S('██', 'ok'), S(' changes  ', 'muted'), S('██', 'info'), S(' no changes  ', 'muted'), S('██', 'accent'), S(' interactive  ', 'muted'), S('██', 'warn'), S(' stopped  ', 'muted'), S('██', 'fail'), S(' failed  ', 'muted'), S('░░', 'rule'), S(' idle (no task)', 'muted')]);
+  L.push([]);
+
+  L.push(section('By agent'), []);
+  L.push([S('  ' + fit('agent', 18) + rfit('runs', 5) + rfit('ok', 5) + rfit('idle', 6) + rfit('fail', 6) + rfit('ok%', 6) + rfit('avg time', 10) + rfit('turns', 7) + rfit('spend', 9) + '   share', 'muted')]);
+  const rows = AGENTS.map(a => agentStats(runs, a));
+  const total = rows.reduce((n, r) => n + r.cost, 0);
+  for (const r of rows) {
+    const settled = r.ok + r.fail + r.stopped;
+    L.push([
+      S('  '), S(fit(r.agent, 18), 'b'), S(rfit(r.runs, 5)), S(rfit(r.ok, 5), 'ok'), S(rfit(r.idle, 6), 'muted'),
+      S(rfit(r.fail, 6), r.fail ? 'fail' : 'muted'), S(rfit(pct(r.ok, settled), 6)), S(rfit(r.avgDur ? dur(r.avgDur) : '—', 10)),
+      S(rfit(r.turns, 7)), S(rfit(money(r.cost), 9), 'tool'), S('   '), S(fit(hbar(r.cost, total, 24), 24), 'tool'), S(rfit(pct(r.cost, total), 5), 'muted'),
+    ]);
+  }
+  const me = agentStats(runs, 'merge-ensurer');
+  L.push([S('  '), S(fit('merge-ensurer', 18), 'b'), S(rfit(me.runs, 5)), S(`   sweeps · no Claude spend`, 'muted')]);
+  L.push(...footer([['p', 'agent filter']]));
+  return L;
+}
+
+function renderB(win) {
+  const { runs, ev } = slice(win);
+  const count = t => ev.filter(e => e.type === t).length;
+  const L = [...header(), [], windowLine(win), []];
+  const found = ev.filter(e => e.type === 'found');
+  const byAgent = a => found.filter(e => e.agent === a).length;
+  const stages = [
+    ['found', found.length, 'accent', `improver ${byAgent('improver')} · security-analyst ${byAgent('security-analyst')}`],
+    ['triaged', count('triaged'), 'info', `${count('rejected')} canceled in inbox (stay in dedup)`],
+    ['picked', count('picked'), 'cron', `by coder · ${runs.filter(r => r.agent === 'coder' && r.outcome === 'nochange').length} came back with no changes`],
+    ['PR opened', ev.filter(e => e.type === 'pr' && e.agent === 'coder').length, 'cron', `+ ${ev.filter(e => e.type === 'pr' && e.agent === 'test-writer').length} test-writer PRs outside the flow`],
+    ['merged', count('merged'), 'ok', `${count('closed')} closed unmerged · ${count('reopened')} sent back for changes`],
+  ];
+  const max = Math.max(...stages.map(s => s[1]));
+  L.push(section('Task flow', 'events in this window'), []);
+  stages.forEach(([name, n, cls, note], i) => {
+    const conv = i === 0 || n > stages[i - 1][1] ? '' : pct(n, stages[i - 1][1]);
+    L.push([S('  '), S(fit(name, 11), 'b'), S(rfit(n, 4) + '  '), S(fit(hbar(n, max, 34), 35), cls), S(rfit(conv, 5), 'muted'), S('   '), S(note, 'muted')]);
+  });
+  L.push([]);
+
+  L.push(section('Lead time', 'median · p90'), []);
+  const triage = ev.filter(e => e.type === 'triaged').map(e => e.delay);
+  const queued = ev.filter(e => e.type === 'picked').map(e => e.queued);
+  const coderWork = runs.filter(r => r.agent === 'coder' && r.outcome === 'ok').map(r => r.dur / 3600);
+  const review = ev.filter(e => e.type === 'merged').map(e => e.delay);
+  const leadRow = (name, xs, who, cls) => {
+    const bins = Array(10).fill(0);
+    const hi = Math.max(...xs, 0.01);
+    xs.forEach(x => bins[Math.min(9, Math.floor(x / hi * 10))]++);
+    return [S('  '), S(fit(name, 22)), S(rfit(xs.length ? hrs(median(xs)) : '—', 8), 'b'), S('  ·  ', 'rule'), S(rfit(xs.length ? hrs(quant(xs, 0.9)) : '—', 8)), S('   '), S(fit(xs.length ? spark(bins) : '', 10), cls), S('   '), S(who, who.includes('human') ? 'warn' : 'muted')];
+  };
+  L.push(leadRow('inbox → todo', triage, 'human triage', 'info'));
+  L.push(leadRow('todo → picked', queued, 'waits for coder cron', 'cron'));
+  L.push(leadRow('picked → PR', coderWork, 'coder run', 'cron'));
+  L.push(leadRow('PR → merged', review, 'human review', 'ok'));
+  L.push([S(`  retries per picked task ${(1 + count('reopened') / Math.max(1, count('picked')) + 0.2).toFixed(1)} · `, 'muted'), S('1', 'warn'), S(' task hit maxRetries (3)', 'muted')]);
+  L.push([]);
+
+  L.push(section('Queue now'), []);
+  const q = [['inbox', 5, 'accent'], ['todo', 2, 'info'], ['active', 1, 'cron'], ['PR open', 3, 'cron'], ['exhausted', 1, 'warn'], ['unroutable', 0, 'muted']];
+  const qline = [S('  ')], qlabels = [S('  ')];
+  for (const [name, n, cls] of q) {
+    const w = Math.max(name.length, 3) + 3;
+    qline.push(S(fit('■'.repeat(n) || '·', w), n ? cls : 'muted'));
+    qlabels.push(S(fit(`${name} ${n}`, w), n ? '' : 'muted'));
+  }
+  L.push(qline, qlabels);
+  L.push([S('  oldest in inbox: ', 'muted'), S('2d04h', 'warn'), S(' "Run log path leaks absolute home dir into PR body"', 'muted')]);
+  L.push([]);
+
+  const nb = win === 24 ? 8 : 7;
+  L.push(section(win === 24 ? 'Every 3 hours' : 'Daily', 'found vs merged'), []);
+  const fb = bucketize(win, nb, found), mb = bucketize(win, nb, ev.filter(e => e.type === 'merged')), pb = bucketize(win, nb, ev.filter(e => e.type === 'pr'));
+  const m = Math.max(...fb, ...mb, ...pb, 1);
+  for (let i = 0; i < nb; i++) {
+    const d = at(win - i * win / nb);
+    const label = win === 24 ? `${hhmm(d)}` : dayLabel(d);
+    L.push([S('  '), S(fit(label, 8), 'muted'), S('found '), S(fit(hbar(fb[i], m, 14), 14), 'accent'), S(rfit(fb[i], 3)), S('   PRs '), S(fit(hbar(pb[i], m, 14), 14), 'cron'), S(rfit(pb[i], 3)), S('   merged '), S(fit(hbar(mb[i], m, 14), 14), 'ok'), S(rfit(mb[i], 3))]);
+  }
+  L.push([]);
+
+  L.push(section('Human touchpoints'), []);
+  L.push([S('  '), S(String(count('triaged') + count('rejected')), 'b'), S(' triage decisions   ', 'muted'), S(String(count('reopened')), 'b'), S(' change requests (vteam:changes-requested)   ', 'muted'), S(String(count('merged') + count('closed')), 'b'), S(' PR reviews closed   ', 'muted'), S(String(runs.filter(r => r.outcome === 'interactive').length), 'b'), S(' interactive sessions', 'muted')]);
+  L.push(...footer([['⏎', 'open stage in Overview']]));
+  return L;
+}
+
+function renderC(win) {
+  const { runs } = slice(win);
+  const { ev } = slice(win);
+  const L = [...header(), [], windowLine(win), []];
+  const nb = win === 24 ? 72 : 84;
+  const name = 18;
+  const rank = { fail: 6, stopped: 5, interactive: 4, ok: 3, nochange: 2, idle: 1 };
+  const glyph = { fail: ['✗', 'fail'], stopped: ['■', 'warn'], interactive: ['◆', 'accent'], ok: ['█', 'ok'], nochange: ['▒', 'info'], idle: ['·', 'rule'] };
+  L.push(section('Timeline', `one cell = ${win === 24 ? '20 min' : '2 hours'}`), []);
+  L.push(axisLabels(win, nb, 1, win === 24 ? 6 : 12, ' '.repeat(name + 2)));
+  const ticks = [S(' '.repeat(name + 2))];
+  for (let i = 0; i < nb; i++) ticks.push(S(i % (win === 24 ? 6 : 12) === 0 ? '╷' : ' ', 'rule'));
+  L.push(ticks);
+  for (const agent of AGENTS) {
+    const cells = Array(nb).fill(null);
+    for (const r of runs.filter(r => r.agent === agent)) {
+      const i = Math.min(nb - 1, Math.floor((win - r.ago) / win * nb));
+      if (!cells[i] || rank[r.outcome] > rank[cells[i]]) cells[i] = r.outcome;
+    }
+    const s = agentStats(runs, agent);
+    const segs = [S('  '), S(fit(agent, name), 'b')];
+    for (const c of cells) segs.push(c ? S(glyph[c][0], glyph[c][1]) : S(' '));
+    segs.push(S(rfit(money(s.cost), 8), 'tool'));
+    L.push(segs);
+  }
+  const mcells = Array(nb).fill(null);
+  const mrank = { sweep: 1, closed: 2, reopened: 3, merged: 4 };
+  for (const r of runs.filter(r => r.agent === 'merge-ensurer')) {
+    const i = Math.min(nb - 1, Math.floor((win - r.ago) / win * nb));
+    mcells[i] ??= 'sweep';
+  }
+  for (const e of ev.filter(e => ['merged', 'reopened', 'closed'].includes(e.type))) {
+    const i = Math.min(nb - 1, Math.floor((win - e.ago) / win * nb));
+    if (!mcells[i] || mrank[e.type] > mrank[mcells[i]]) mcells[i] = e.type;
+  }
+  const mg = { sweep: ['·', 'rule'], merged: ['●', 'ok'], reopened: ['↺', 'cron'], closed: ['✕', 'fail'] };
+  const mseg = [S('  '), S(fit('merge-ensurer', name), 'b')];
+  for (const c of mcells) mseg.push(c ? S(mg[c][0], mg[c][1]) : S(' '));
+  L.push(mseg);
+  const costs = bucketize(win, nb, runs, r => r.cost);
+  L.push([S('  '), S(fit('spend', name), 'muted'), S(spark(costs), 'tool'), S(rfit(money(costs.reduce((a, b) => a + b, 0)), 8), 'tool b')]);
+  L.push([]);
+  L.push([S(' '.repeat(name + 2)), S('█', 'ok'), S(' changes  ', 'muted'), S('▒', 'info'), S(' no changes  ', 'muted'), S('·', 'rule'), S(' idle  ', 'muted'), S('◆', 'accent'), S(' interactive  ', 'muted'), S('■', 'warn'), S(' stopped  ', 'muted'), S('✗', 'fail'), S(' failed  ', 'muted'), S('●', 'ok'), S(' merged  ', 'muted'), S('↺', 'cron'), S(' reopened  ', 'muted'), S('✕', 'fail'), S(' closed', 'muted')]);
+  L.push([]);
+
+  L.push(section('Notable runs'), []);
+  const worked = runs.filter(r => r.agent !== 'merge-ensurer' && r.outcome !== 'idle');
+  const priciest = [...worked].sort((a, b) => b.cost - a.cost)[0];
+  const longest = [...worked].sort((a, b) => b.dur - a.dur)[0];
+  const runLine = (label, r, cls) => [S('  '), S(fit(label, 16), 'muted'), S(fit(stamp(r.ago), 14), 'muted'), S(fit(r.agent, 14), 'b'), S(rfit(money(r.cost), 7), 'tool'), S(rfit(r.turns + ' turns', 10)), S(rfit(dur(r.dur), 8), cls), S('  '), S(fit(r.title || '', 30), 'muted')];
+  if (priciest) L.push(runLine('most expensive', priciest, ''));
+  if (longest) L.push(runLine('longest', longest, 'warn'));
+  const fails = worked.filter(r => r.outcome === 'fail').sort((a, b) => a.ago - b.ago);
+  const stopped = worked.filter(r => r.outcome === 'stopped').length;
+  L.push([]);
+  L.push([S('  '), S(`failures ${fails.length}`, fails.length ? 'fail b' : 'muted'), S(`  ·  stopped ${stopped}  ·  showing the newest 4`, 'muted')]);
+  for (const r of fails.slice(0, 4)) {
+    L.push([S('  '), S(fit(stamp(r.ago), 13), 'muted'), S('│ ', 'rule'), S('✗ ', 'fail'), S(fit(r.agent, 17), 'b'), S(fit(r.error, W - 36), 'fail')]);
+  }
+  L.push([]);
+  L.push(section('Right now'), []);
+  L.push([S('  '), S('●', 'ok'), S(' coder', 'b'), S(' running 3m12s on ', 'muted'), S('"Merge ensurer reopens task twice when label removal races a push"')]);
+  L.push([S('  '), S('◷', 'cron'), S(' scheduler running · next ', 'muted'), S('improver', 'b'), S(' 14:42', 'cron'), S(' · ', 'muted'), S('coder', 'b'), S(' 15:00', 'cron'), S(' · ', 'muted'), S('merge-ensurer', 'b'), S(' 14:15', 'cron')]);
+  L.push(...footer([['h/l', 'pan'], ['⏎', 'open run log']]));
+  return L;
+}
+
+
+function generateTasks() {
+  const r = mulberry32(7);
+  const btw = (a, b) => a + r() * (b - a);
+  const tasks = [];
+  let n = 0;
+  const ref = () => 'VTM-' + (0x4A21 + n * 7919).toString(36).toUpperCase().slice(-4);
+  const review = (t, prAt, canReopen) => {
+    const rv = btw(0.5, 40);
+    if (prAt - rv <= 0) { t.status = 'pr-open'; return; }
+    const roll = r();
+    if (roll < 0.62) t.status = 'merged';
+    else if (roll < 0.76) { t.status = 'closed'; t.events.push({ type: 'closed', ago: prAt - rv }); }
+    else if (canReopen) {
+      t.events.push({ type: 'reopened', ago: prAt - rv });
+      const pick = prAt - rv - btw(0.2, 3);
+      if (pick <= 0) { t.status = 'todo'; return; }
+      const dur = btw(0.05, 0.3);
+      t.events.push({ type: 'picked', ago: pick, dur, followUp: true });
+      if (pick - dur <= 0) { t.status = 'active'; return; }
+      review(t, pick - dur, false);
+    } else t.status = 'merged';
+  };
+  for (let ago = 336; ago > 0; ago -= btw(0.8, 3.2)) {
+    n++;
+    const testWriter = r() < 0.22;
+    const fixes = TITLES.filter(x => !x.startsWith('add tests'));
+    const t = { ref: ref(), title: fixes[n % fixes.length], agent: testWriter ? 'test-writer' : r() < 0.72 ? 'improver' : 'security-analyst', created: ago, events: [{ type: 'found', ago }], retries: 0 };
+    tasks.push(t);
+    if (testWriter) { const tests = TITLES.filter(x => x.startsWith('add tests')); t.title = tests[n % tests.length]; t.events.push({ type: 'pr', ago, first: true }); t.firstPR = ago; review(t, ago, false); continue; }
+    if (r() < 0.1) { t.status = 'rejected'; continue; }
+    const triagedAt = ago - btw(0.5, 30);
+    if (triagedAt <= 0) { t.status = 'inbox'; continue; }
+    let pick = triagedAt - btw(0.2, 5);
+    for (;;) {
+      if (pick <= 0) { t.status = 'todo'; break; }
+      const dur = btw(0.05, 0.4);
+      t.events.push({ type: 'picked', ago: pick, dur });
+      if (pick - dur <= 0) { t.status = 'active'; break; }
+      if (r() < 0.18) {
+        t.retries++;
+        if (t.retries >= 3) { t.status = 'todo'; t.exhausted = true; break; }
+        pick = pick - dur - btw(1, 4);
+        continue;
+      }
+      t.events.push({ type: 'pr', ago: pick - dur, first: true, work: dur });
+      t.firstPR = pick - dur;
+      review(t, pick - dur, true);
+      break;
+    }
+  }
+  return tasks;
+}
+const TASKS = generateTasks();
+
+function renderD(win) {
+  const L = [...header(), [], windowLine(win), []];
+  const findings = TASKS.filter(t => t.agent !== 'test-writer');
+  const cohort = findings.filter(t => t.created < win);
+  const order = [
+    ['merged', 'merged', 'ok'], ['pr-open', 'PR open', 'cron'], ['active', 'in progress', 'info'], ['todo', 'todo', 'info'],
+    ['inbox', 'in inbox', 'accent'], ['closed', 'PR closed', 'fail'], ['rejected', 'rejected', 'muted'],
+  ];
+  const glyph = { todo: '▒', rejected: '░' };
+  L.push(section('Findings from this window', 'where they are now'), []);
+  const stackRow = (label, ts, w) => {
+    const segs = [S('  '), S(fit(label, 18), 'b'), S(rfit(ts.length, 4) + '  ')];
+    let used = 0;
+    order.forEach(([st, , cls], i) => {
+      const c = ts.filter(t => t.status === st).length;
+      let cells = Math.round(c / Math.max(1, cohort.length) * w);
+      if (c && !cells) cells = 1;
+      if (i === order.length - 1) cells = Math.min(cells, w - used);
+      used += cells;
+      if (cells) segs.push(S((glyph[st] || '█').repeat(cells), cls));
+    });
+    return segs;
+  };
+  const BW = 64;
+  L.push(stackRow('all findings', cohort, BW));
+  for (const a of ['improver', 'security-analyst']) {
+    const ts = cohort.filter(t => t.agent === a);
+    if (ts.length) L.push(stackRow('  ' + a, ts, BW).map((x, i) => i === 1 ? S(x.s, '') : x));
+  }
+  const legend = [S('  ' + ' '.repeat(24))];
+  order.forEach(([st, label, cls]) => {
+    const c = cohort.filter(t => t.status === st).length;
+    legend.push(S(glyph[st] || '█', cls), S(` ${label} `, 'muted'), S(String(c), 'b'), S('   '));
+  });
+  L.push([]);
+  L.push(legend.slice(0, 13));
+  L.push([S(' '.repeat(26)), ...legend.slice(13)]);
+  const done = cohort.filter(t => ['merged', 'pr-open', 'closed'].includes(t.status)).length;
+  L.push([S(`  ${pct(done, cohort.length)} of this window's findings already reached a PR · ${pct(cohort.filter(t => t.status === 'merged').length, cohort.length)} merged`, 'muted')]);
+  L.push([]);
+
+  const ev = TASKS.flatMap(t => t.events.map(e => ({ ...e, task: t }))).filter(e => e.ago < win);
+  const nb = win === 24 ? 12 : 14;
+  L.push(section('Activity', `per ${win === 24 ? '2 hours' : '12 hours'}`), []);
+  const acts = [
+    ['found', ev.filter(e => e.type === 'found' && e.task.agent !== 'test-writer'), 'accent', 'improver + security-analyst findings'],
+    ['picked', ev.filter(e => e.type === 'picked'), 'info', ''],
+    ['PR opened', ev.filter(e => e.type === 'pr'), 'cron', ''],
+    ['sent back', ev.filter(e => e.type === 'reopened'), 'warn', 'changes requested or conflicting'],
+    ['PR closed', ev.filter(e => e.type === 'closed'), 'fail', 'closed without merging'],
+  ];
+  const amax = Math.max(...acts.map(a => a[1].length), 1);
+  for (const [name, items, cls, note] of acts) {
+    let extra = note;
+    if (name === 'picked') extra = `${items.filter(e => e.followUp).length} PR follow-ups`;
+    if (name === 'PR opened') extra = `coder ${items.filter(e => e.task.agent !== 'test-writer').length} · test-writer ${items.filter(e => e.task.agent === 'test-writer').length}`;
+    L.push([S('  '), S(fit(name, 11), 'b'), S(rfit(items.length, 4) + '  '), S(fit(hbar(items.length, amax, 28), 29), cls), S(fit(spark(bucketize(win, nb, items)), nb + 3), cls), S(extra, 'muted')]);
+  }
+  L.push([]);
+
+  L.push(section('Lead time', 'median · p90 · spread'), []);
+  const leadRow = (name, xs, note, cls) => {
+    const bins = Array(10).fill(0), hi = Math.max(...xs, 0.01);
+    xs.forEach(x => bins[Math.min(9, Math.floor(x / hi * 10))]++);
+    return [S('  '), S(fit(name, 24)), S(rfit(xs.length ? hrs(median(xs)) : '—', 8), 'b'), S('  ·  ', 'rule'), S(rfit(xs.length ? hrs(quant(xs, 0.9)) : '—', 8)), S('   '), S(fit(xs.length ? spark(bins) : '', 10), cls), S('   '), S(note, 'muted')];
+  };
+  const prs = ev.filter(e => e.type === 'pr' && e.task.agent !== 'test-writer');
+  L.push(leadRow('found → first PR', prs.map(e => e.task.created - e.ago), `${prs.length} PRs · triage + queue + work`, 'cron'));
+  L.push(leadRow('picked → PR', ev.filter(e => e.type === 'picked').map(e => e.dur), 'one coder run', 'info'));
+  const inbox = findings.filter(t => t.status === 'inbox');
+  const openPRs = TASKS.filter(t => t.status === 'pr-open');
+  L.push(leadRow('age in inbox (now)', inbox.map(t => t.created), `${inbox.length} waiting for triage`, 'accent'));
+  L.push(leadRow('age of open PRs (now)', openPRs.map(t => t.firstPR), `${openPRs.length} waiting for review`, 'cron'));
+  L.push([]);
+
+  L.push(section('Waiting on you', 'oldest first'), []);
+  const waiting = [
+    ...inbox.map(t => ({ t, age: t.created, what: 'triage', cls: 'accent' })),
+    ...openPRs.map(t => ({ t, age: t.firstPR, what: 'review', cls: 'cron' })),
+  ].sort((a, b) => b.age - a.age).slice(0, 5);
+  for (const w of waiting) {
+    L.push([S('  '), S(fit(w.what, 8), w.cls), S(rfit(hrs(w.age), 7), w.age > 24 ? 'warn' : ''), S('  '), S(fit(w.t.ref, 10), 'muted'), S(fit(w.t.title, 54)), S(' '), S(w.t.agent, 'muted')]);
+  }
+  L.push([]);
+
+  L.push(section('Queue now'), []);
+  const ready = findings.filter(t => t.status === 'todo' && !t.exhausted).length;
+  const q = [
+    ['inbox', inbox.length, 'accent'], ['todo', findings.filter(t => t.status === 'todo').length, 'info'], ['active', TASKS.filter(t => t.status === 'active').length, 'cron'],
+    ['PR open', openPRs.length, 'cron'], ['exhausted', findings.filter(t => t.exhausted).length, 'warn'], ['unroutable', 0, 'muted'],
+  ];
+  const qline = [S('  ')], qlabels = [S('  ')];
+  for (const [name, c, cls] of q) {
+    const w = Math.max(name.length + 5, c + 2, 8);
+    qline.push(S(fit('■'.repeat(c) || '·', w), c ? cls : 'muted'));
+    qlabels.push(S(fit(`${name} ${c}`, w), c ? '' : 'muted'));
+  }
+  L.push(qline, qlabels);
+  const retryHist = [0, 1, 2].map(k => findings.filter(t => t.status === 'todo' && !t.exhausted && t.retries === k).length);
+  L.push([S(`  ${ready} ready · retries on todo tasks: `, 'muted'), S(`0×${retryHist[0]}  1×${retryHist[1]}  2×${retryHist[2]}`), S('  ·  ', 'muted'), S(`${q[4][1]} at maxRetries (3)`, q[4][1] ? 'warn' : 'muted')]);
+  L.push([]);
+
+  L.push(section('Human touchpoints', 'with a timestamp'), []);
+  L.push([S('  '), S(String(acts[3][1].length), 'b'), S(' change requests   ', 'muted'), S(String(acts[4][1].length), 'b'), S(' PRs closed   ', 'muted'), S(String(slice(win).runs.filter(r => r.outcome === 'interactive').length), 'b'), S(' interactive sessions', 'muted')]);
+  L.push(...footer([['⏎', 'open in Overview']]));
+  return L;
+}
+const RENDER = { a: renderA, b: renderB, c: renderC, d: renderD };
+const state = { a: 24, b: 24, c: 24, d: 24 };
+function draw(id) {
+  document.getElementById(id).innerHTML = renderLines(RENDER[id](state[id]));
+  document.querySelectorAll(`.controls[data-for="${id}"] button`).forEach(b => b.classList.toggle('on', Number(b.dataset.w) === state[id]));
+}
+document.querySelectorAll('.controls').forEach(c => c.addEventListener('click', e => {
+  if (!e.target.dataset.w) return;
+  state[c.dataset.for] = Number(e.target.dataset.w);
+  draw(c.dataset.for);
+}));
+document.addEventListener('keydown', e => {
+  if (e.key !== 't') return;
+  for (const id of Object.keys(state)) { state[id] = state[id] === 24 ? 168 : 24; draw(id); }
+});
+Object.keys(RENDER).forEach(draw);
+</script>
+</body>
+</html>

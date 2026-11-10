@@ -24,7 +24,7 @@ vteam is a Go CLI that orchestrates AI agents powered by `claude -p` (Claude Cod
 ## CLI commands
 
 ```
-vteam                                   # interactive TUI, opens on Agents: Agents (live run logs, p/n through runs; space for actions: run once with an optional multiline --focus and, for input: task agents, a task picker (--task), stop a running agent (x), run on cron, stop cron), Overview (status), Info (config + agent settings); ? for keys
+vteam                                   # interactive TUI, opens on Agents: Agents (live run logs, p/n through runs; space for actions: run once with an optional multiline --focus and, for input: task agents, a task picker (--task), stop a running agent (x), run on cron, stop cron), Overview (status, then pipeline stats for the last 7d; t toggles 24h), Info (config + agent settings); ? for keys
 vteam init                              # scaffold vteam/ directory in the current project
 vteam run <agent>                       # run a specific agent (hidden from --help, still works)
 vteam run <agent> --focus "..."         # run with priority context injected into the prompt

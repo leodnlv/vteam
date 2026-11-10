@@ -126,7 +126,7 @@ func ensure(ctx context.Context, d Deps, t model.Task) (outcome, error) {
 		if err := d.Tasks.Update(ctx, t.Ref, tasks.Update{Status: model.StatusCanceled}); err != nil {
 			return 0, err
 		}
-		addNote(ctx, d, t, fmt.Sprintf("%s: canceled\n\nPR %s was closed without merging.", Name, pr.URL))
+		addNote(ctx, d, t, tasks.NoteHeadline(Name, "canceled")+fmt.Sprintf("\n\nPR %s was closed without merging.", pr.URL))
 		report(d.Log.Warn, d.Log, t, pr, "closed without merging", "task canceled")
 		return canceled, nil
 	}
@@ -169,7 +169,7 @@ func report(headline func(string), l *log.Logger, t model.Task, pr model.PullReq
 }
 
 func reopenNote(pr model.PullRequestInfo, label string, changesRequested, conflicting bool) string {
-	parts := []string{Name + ": reopened"}
+	parts := []string{tasks.NoteHeadline(Name, "reopened")}
 	if changesRequested {
 		parts = append(parts, fmt.Sprintf("PR %s has the %q label: apply its open review threads.", pr.URL, label))
 	}

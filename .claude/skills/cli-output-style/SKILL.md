@@ -16,7 +16,7 @@ All vteam terminal output goes through `internal/log` (layout: the `Logger` meth
 | Helper | Output | Use for |
 | --- | --- | --- |
 | `Banner(title, detail)` / `FormatBanner` | `vteam ▸ <title>   <muted detail>` (in color, `vteam` is a Brand badge) | First line of every command. `title` is the command or agent name. `detail` is the log path (`log: vteam/.logs/...`), pid, or scope (`aven: <project> · label: <label>`). |
-| `Section(title)` / `FormatSection` | blank line + `▍ Title  ────` (Brand marker, bold title, Rule-colored rule, up to 72 cols; the TUI redraws it to the full pane width) | Phases of a streaming command (`Setup`, `Agent: <name>`, `Result`, `Cleanup`) or groups in a snapshot (`Running`, `Up next`, `Needs attention`). Title Case. A count goes in parentheses: `Awaiting merge (3)`. |
+| `Section(title)` / `FormatSection` | blank line + `▍ Title  ────` (Brand marker, bold title, Rule-colored rule, up to 72 cols; the TUI redraws it to the full pane width) | Phases of a streaming command (`Setup`, `Agent: <name>`, `Result`, `Cleanup`) or groups in a snapshot (`Running`, `Up next`, `Waiting on you`). Title Case. A count goes in parentheses: `Awaiting merge (3)`. |
 | `Step(text)` | ` 00:12 │ • text` | A neutral progress step or a decision ("lock acquired", "picked task …", "nothing to do"). |
 | `OK(text)` | ` 00:12 │ ✓ text` | Something succeeded or changed state as intended. |
 | `Warn(text)` | ` 00:12 │ ! text` (whole line in the warn color, stderr) | Not fatal but worth noticing: a fallback, a skipped item, a non-fatal failure. |
@@ -123,7 +123,7 @@ func RenderFoo(dir string) []string {
 }
 ```
 
-Leave out a section that would only say "nothing" when its absence is informative (`Awaiting merge`, `Needs attention`). Keep it with a `·` placeholder when the reader expects to see it (`Running`, `Scheduler`).
+Leave out a section that would only say "nothing" when its absence is informative (`Awaiting merge`, `Waiting on you`). Keep it with a `·` placeholder when the reader expects to see it (`Running`, `Scheduler`).
 
 ## Tests
 
