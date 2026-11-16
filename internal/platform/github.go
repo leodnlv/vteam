@@ -79,11 +79,11 @@ func (g *GitHub) ReviewComments(ctx context.Context, number int) ([]model.Review
 	if err != nil {
 		return nil, err
 	}
-	out, err = g.gh(ctx, "api", fmt.Sprintf("repos/%s/pulls/%d/comments", slug, number))
+	out, err = g.gh(ctx, "api", "--paginate", "--slurp", fmt.Sprintf("repos/%s/pulls/%d/comments?per_page=100", slug, number))
 	if err != nil {
 		return nil, err
 	}
-	var inline []struct {
+	type inlineComment struct {
 		User         ghAuthor `json:"user"`
 		Body         string   `json:"body"`
 		Path         string   `json:"path"`
@@ -91,9 +91,11 @@ func (g *GitHub) ReviewComments(ctx context.Context, number int) ([]model.Review
 		OriginalLine *int     `json:"original_line"`
 		CreatedAt    string   `json:"created_at"`
 	}
-	if err := decode(out, "gh api pull comments", &inline); err != nil {
+	var pages [][]inlineComment
+	if err := decode(out, "gh api pull comments", &pages); err != nil {
 		return nil, err
 	}
+	inline := slices.Concat(pages...)
 
 	var comments []model.ReviewComment
 	for _, r := range pr.Reviews {
@@ -175,10 +177,11 @@ func GitHubReviewStatus(decision string, latestReviewStates []string) model.PRRe
 }
 
 const reviewThreadsQuery = `
-query($owner: String!, $name: String!, $number: Int!) {
+query($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      reviewThreads(first: 100) {
+      reviewThreads(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
         nodes {
           id
           isResolved
@@ -218,40 +221,58 @@ func (g *GitHub) OpenReviewThreads(ctx context.Context, number int) ([]model.Rev
 		return nil, err
 	}
 	owner, name, _ := strings.Cut(slug, "/")
-	out, err := g.graphQL(ctx, reviewThreadsQuery,
-		gqlVar{key: "owner", value: owner}, gqlVar{key: "name", value: name}, gqlVar{key: "number", value: strconv.Itoa(number), raw: true})
-	if err != nil {
-		return nil, err
+	type threadNode struct {
+		ID           string `json:"id"`
+		IsResolved   bool   `json:"isResolved"`
+		Path         string `json:"path"`
+		Line         *int   `json:"line"`
+		OriginalLine *int   `json:"originalLine"`
+		Comments     struct {
+			Nodes []struct {
+				Author    *ghAuthor `json:"author"`
+				Body      string    `json:"body"`
+				CreatedAt string    `json:"createdAt"`
+			} `json:"nodes"`
+		} `json:"comments"`
 	}
-	var data struct {
-		Data struct {
-			Repository struct {
-				PullRequest struct {
-					ReviewThreads struct {
-						Nodes []struct {
-							ID           string `json:"id"`
-							IsResolved   bool   `json:"isResolved"`
-							Path         string `json:"path"`
-							Line         *int   `json:"line"`
-							OriginalLine *int   `json:"originalLine"`
-							Comments     struct {
-								Nodes []struct {
-									Author    *ghAuthor `json:"author"`
-									Body      string    `json:"body"`
-									CreatedAt string    `json:"createdAt"`
-								} `json:"nodes"`
-							} `json:"comments"`
-						} `json:"nodes"`
-					} `json:"reviewThreads"`
-				} `json:"pullRequest"`
-			} `json:"repository"`
-		} `json:"data"`
-	}
-	if err := decode(out, "review threads", &data); err != nil {
-		return nil, err
+	var nodes []threadNode
+	cursor := ""
+	for {
+		vars := []gqlVar{{key: "owner", value: owner}, {key: "name", value: name}, {key: "number", value: strconv.Itoa(number), raw: true}}
+		if cursor != "" {
+			vars = append(vars, gqlVar{key: "after", value: cursor})
+		}
+		out, err := g.graphQL(ctx, reviewThreadsQuery, vars...)
+		if err != nil {
+			return nil, err
+		}
+		var data struct {
+			Data struct {
+				Repository struct {
+					PullRequest struct {
+						ReviewThreads struct {
+							PageInfo struct {
+								HasNextPage bool   `json:"hasNextPage"`
+								EndCursor   string `json:"endCursor"`
+							} `json:"pageInfo"`
+							Nodes []threadNode `json:"nodes"`
+						} `json:"reviewThreads"`
+					} `json:"pullRequest"`
+				} `json:"repository"`
+			} `json:"data"`
+		}
+		if err := decode(out, "review threads", &data); err != nil {
+			return nil, err
+		}
+		page := data.Data.Repository.PullRequest.ReviewThreads
+		nodes = append(nodes, page.Nodes...)
+		if !page.PageInfo.HasNextPage || page.PageInfo.EndCursor == "" {
+			break
+		}
+		cursor = page.PageInfo.EndCursor
 	}
 	threads := []model.ReviewThread{}
-	for _, n := range data.Data.Repository.PullRequest.ReviewThreads.Nodes {
+	for _, n := range nodes {
 		if n.IsResolved {
 			continue
 		}
