@@ -3,6 +3,7 @@ package platform
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -120,8 +121,8 @@ func TestGitHubReviewComments(t *testing.T) {
 		"gh pr view 5": `{"reviews":[{"author":{"login":"rev"},"body":"Overall fine","submittedAt":"2026-01-02"},{"author":{"login":"rev"},"body":"  ","submittedAt":"2026-01-01"}],
 			"comments":[{"author":{"login":"bob"},"body":"top level","createdAt":"2026-01-04"}]}`,
 		"gh repo view": "o/r\n",
-		"gh api repos/o/r/pulls/5/comments": `[{"user":{"login":"amy"},"body":"inline","path":"a.ts","line":null,"original_line":9,"created_at":"2026-01-03"},
-			{"user":{"login":"amy"},"body":"first","path":"b.ts","line":2,"created_at":"2026-01-01"}]`,
+		"gh api --paginate --slurp repos/o/r/pulls/5/comments": `[[{"user":{"login":"amy"},"body":"inline","path":"a.ts","line":null,"original_line":9,"created_at":"2026-01-03"},
+			{"user":{"login":"amy"},"body":"first","path":"b.ts","line":2,"created_at":"2026-01-01"}],[]]`,
 	})
 	comments, err := (&GitHub{Exec: fake}).ReviewComments(ctx, 5)
 	if err != nil {
@@ -135,6 +136,44 @@ func TestGitHubReviewComments(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, comments); diff != "" {
 		t.Error(diff)
+	}
+}
+
+func TestGitHubReviewCommentsAcrossPages(t *testing.T) {
+	fake := responder(map[string]string{
+		"gh pr view 5":              `{"reviews":[],"comments":[]}`,
+		"gh repo view":              "o/r\n",
+		"gh api --paginate --slurp": `[[{"user":{"login":"a"},"body":"p1","path":"a.ts","line":1,"created_at":"1"}],[{"user":{"login":"b"},"body":"p2","path":"b.ts","line":2,"created_at":"2"}]]`,
+	})
+	comments, err := (&GitHub{Exec: fake}).ReviewComments(ctx, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(comments) != 2 || comments[0].Body != "p1" || comments[1].Body != "p2" {
+		t.Errorf("comments = %+v", comments)
+	}
+}
+
+func TestGitHubOpenReviewThreadsAcrossPages(t *testing.T) {
+	page := func(id string, next bool, cursor string) string {
+		return fmt.Sprintf(`{"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":%t,"endCursor":%q},"nodes":[{"id":%q,"isResolved":false,"path":"a.ts","line":1,"comments":{"nodes":[]}}]}}}}}`, next, cursor, id)
+	}
+	fake := &execx.Fake{Handler: func(c execx.Cmd) (string, error) {
+		line := strings.Join(c.Args, " ")
+		switch {
+		case c.Name == "gh" && c.Args[0] == "repo":
+			return "o/r\n", nil
+		case strings.Contains(line, "after=C1"):
+			return page("T_2", false, ""), nil
+		}
+		return page("T_1", true, "C1"), nil
+	}}
+	threads, err := (&GitHub{Exec: fake}).OpenReviewThreads(ctx, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(threads) != 2 || threads[0].ID != "T_1" || threads[1].ID != "T_2" {
+		t.Errorf("threads = %+v", threads)
 	}
 }
 
