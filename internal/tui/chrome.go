@@ -57,11 +57,17 @@ func (m Model) hints() []key.Binding {
 		case dialogConfirm:
 			return []key.Binding{relabel(keys.Confirm, "⏎", "run"), keys.Cancel}
 		case dialogRun:
+			switch m.dialog.runView {
+			case runPickTask:
+				return []key.Binding{relabel(keys.Confirm, "⏎", "choose"), relabel(keys.TaskDown, "↑/↓", "move"), relabel(keys.Cancel, "esc", "back")}
+			case runEditFocus:
+				return []key.Binding{relabel(keys.Confirm, "⏎", "save"), keys.NewLine, relabel(keys.Cancel, "esc", "discard")}
+			}
 			run := []key.Binding{relabel(keys.Confirm, "⏎", "run")}
 			if m.dialog.picker.enabled {
-				run = append(run, relabel(keys.TaskDown, "↑/↓", "task"))
+				run = append(run, keys.PickTask)
 			}
-			return append(run, keys.NewLine, keys.Interactive, keys.Cancel)
+			return append(run, keys.EditFocus, keys.Interactive, keys.Cancel)
 		case dialogStop:
 			return []key.Binding{relabel(keys.Confirm, "⏎", "stop"), relabel(keys.Down, "j/k", "choose"), keys.Cancel}
 		default:

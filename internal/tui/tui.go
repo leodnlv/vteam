@@ -158,14 +158,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseWheelMsg:
 		return m.handleWheel(msg), nil
 	case tea.PasteMsg:
-		var cmd tea.Cmd
-		switch m.dialog.kind {
-		case dialogRun:
-			m.dialog.focus, cmd = m.dialog.focus.Update(msg)
-		case dialogCron:
-			m.dialog.input, cmd = m.dialog.input.Update(msg)
-		}
-		return m, cmd
+		return m.pasteIntoDialog(msg)
 	case statusMsg:
 		if msg.gen != m.overview.gen {
 			return m, nil

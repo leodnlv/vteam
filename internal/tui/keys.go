@@ -17,7 +17,7 @@ type keyMap struct {
 
 	Window key.Binding
 
-	Confirm, Cancel, SaveDefault, Interactive, NewLine, TaskDown, TaskUp key.Binding
+	Confirm, Cancel, SaveDefault, Interactive, PickTask, EditFocus, NewLine, TaskDown, TaskUp key.Binding
 }
 
 func binding(keys []string, help, desc string) key.Binding {
@@ -58,7 +58,9 @@ var keys = keyMap{
 	Confirm:     binding([]string{"enter"}, "⏎", "confirm"),
 	Cancel:      binding([]string{"esc"}, "esc", "cancel"),
 	SaveDefault: binding([]string{"tab"}, "tab", "save as default"),
-	Interactive: binding([]string{"tab"}, "tab", "interactive session"),
+	Interactive: binding([]string{"i"}, "i", "interactive session"),
+	PickTask:    binding([]string{"t"}, "t", "task"),
+	EditFocus:   binding([]string{"f"}, "f", "focus"),
 	NewLine:     binding([]string{"shift+enter", "alt+enter", "ctrl+j"}, "shift+⏎/ctrl+j", "new line"),
 	TaskDown:    binding([]string{"down", "ctrl+n"}, "↓", "next task"),
 	TaskUp:      binding([]string{"up", "ctrl+p"}, "↑", "previous task"),

@@ -139,7 +139,6 @@ var (
 	keyShiftEnter = tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModShift}
 	keyCtrlJ      = tea.KeyPressMsg{Code: 'j', Mod: tea.ModCtrl}
 	keyEsc        = tea.KeyPressMsg{Code: tea.KeyEscape}
-	keyTab        = tea.KeyPressMsg{Code: tea.KeyTab}
 )
 
 func typeText(t *testing.T, m Model, text string) Model {
@@ -153,8 +152,10 @@ func typeText(t *testing.T, m Model, text string) Model {
 func TestRunOnceAsksForAnOptionalFocus(t *testing.T) {
 	f := &fakeActions{agents: testAgents()}
 	m := press(t, actionsModel(t, f), "j", "r")
-	assertScreen(t, m, "Run test-writer once", "passed as --focus", "run now", "new line", "cancel")
-	m = typeText(t, m, "xq")
+	assertScreen(t, m, "Run test-writer once", "f  focus   none", "i  mode    headless", "⏎ run", "esc cancel")
+	if strings.Contains(screen(m), "t  task") {
+		t.Error("an agent without input: task has no task row")
+	}
 	m = update(t, m, keyEsc)
 	assertCalls(t, f)
 	if m.dialog.kind != dialogNone {
@@ -165,11 +166,15 @@ func TestRunOnceAsksForAnOptionalFocus(t *testing.T) {
 	assertCalls(t, f, "run test-writer")
 	assertScreen(t, m, "● started test-writer")
 
-	m = typeText(t, press(t, m, "r"), "  the parser")
+	m = press(t, m, "r", "f")
+	assertScreen(t, m, "Run test-writer once › focus", "Passed as --focus", "⏎ save", "new line", "esc discard")
+	m = typeText(t, m, "  the parser")
 	m = typeText(t, update(t, m, keyShiftEnter), "and q")
 	m = typeText(t, update(t, m, keyCtrlJ), "x")
 	m = update(t, m, tea.PasteMsg{Content: "  pasted\n"})
-	assertScreen(t, m, "the parser", "and q", "x  pasted")
+	m = update(t, m, keyEnter)
+	assertCalls(t, f, "run test-writer")
+	assertScreen(t, m, "f  focus   ┃ the parser", "┃ and q", "┃ x  pasted")
 	m = update(t, m, keyEnter)
 	assertCalls(t, f, "run test-writer", "run test-writer --focus the parser\nand q\nx  pasted")
 	assertScreen(t, m, "● started test-writer with focus")
@@ -179,13 +184,39 @@ func TestRunOnceAsksForAnOptionalFocus(t *testing.T) {
 	assertScreen(t, m, "✗ test-writer could not start: no binary")
 }
 
+func TestRunFocusEditorDiscardsOnEsc(t *testing.T) {
+	f := &fakeActions{agents: testAgents()}
+	m := update(t, typeText(t, press(t, actionsModel(t, f), "j", "r", "f"), "keep"), keyEnter)
+	m = update(t, typeText(t, press(t, m, "f"), " and drop"), keyEsc)
+	assertScreen(t, m, "┃ keep")
+	m = press(t, m, "f")
+	assertScreen(t, m, "keep")
+	if strings.Contains(screen(m), "drop") {
+		t.Error("esc should discard the edit")
+	}
+	update(t, update(t, m, keyEsc), keyEnter)
+	assertCalls(t, f, "run test-writer --focus keep")
+}
+
+func TestRunFocusPreviewIsCut(t *testing.T) {
+	f := &fakeActions{agents: testAgents()}
+	m := press(t, actionsModel(t, f), "j", "r", "f")
+	m = update(t, m, tea.PasteMsg{Content: "one\ntwo\nthree\nfour"})
+	m = update(t, m, keyEnter)
+	assertScreen(t, m, "┃ one", "┃ two", "┃ three …")
+	if strings.Contains(screen(m), "four") {
+		t.Error("the summary shows more than three lines of focus")
+	}
+}
+
 func TestRunOnceCanOpenAnInteractiveSession(t *testing.T) {
 	f := &fakeActions{agents: testAgents()}
 	m := press(t, actionsModel(t, f), "j", "r")
-	assertScreen(t, m, "[ ] interactive session", "Keeps running after you quit the TUI.")
-	m = update(t, m, keyTab)
-	assertScreen(t, m, "[x] interactive session", "workmux window")
-	m = update(t, typeText(t, m, "pair on it"), keyEnter)
+	assertScreen(t, m, "i  mode    headless", "Keeps running after you quit the TUI.")
+	m = press(t, m, "i")
+	assertScreen(t, m, "i  mode    interactive", "workmux window")
+	m = update(t, typeText(t, press(t, m, "f"), "pair on it"), keyEnter)
+	m = update(t, m, keyEnter)
 	assertCalls(t, f, "run test-writer --focus pair on it --interactive")
 	assertScreen(t, m, "● started test-writer interactively with focus")
 

@@ -66,49 +66,91 @@ func tallActionsModel(t *testing.T, f *fakeActions) Model {
 	return update(t, actionsModel(t, f), tea.WindowSizeMsg{Width: 100, Height: 40})
 }
 
+func TestRunDialogSummarizesTheAutoPick(t *testing.T) {
+	f := &fakeActions{agents: taskAgents()}
+	m := openTaskRunDialog(t, tallActionsModel(t, f), testChoices(), nil)
+	assertScreen(t, m, "t  task    Auto · next by priority", "high    Fix the parser", "PR follow-up · APP-HIGH", "t task")
+	update(t, m, keyEnter)
+	assertCalls(t, f, "run coder")
+}
+
 func TestRunDialogPicksATask(t *testing.T) {
 	f := &fakeActions{agents: taskAgents()}
 	m := openTaskRunDialog(t, tallActionsModel(t, f), testChoices(), nil)
-	assertScreen(t, m, "3 ready", "Auto · next by priority (APP-HIGH)", "critical", "Retry storm", "retries 3 · APP-SPNT",
-		"Fix the parser", "PR follow-up · APP-HIGH", "Rename a helper")
+	m = press(t, m, "t")
+	assertScreen(t, m, "Run coder once › choose task", "3 of 3 ready", "Auto · next by priority (APP-HIGH)", "critical",
+		"Retry storm", "retries 3 · APP-SPNT", "Fix the parser", "PR follow-up · APP-HIGH", "Rename a helper",
+		"Right now that is APP-HIGH: Fix the parser")
 
-	m = update(t, press(t, m, "down", "down", "down", "down", "up"), keyEnter)
+	m = press(t, m, "down")
+	assertScreen(t, m, "retries 3, only a picked run takes it")
+	m = update(t, press(t, m, "down", "down", "down", "up"), keyEnter)
+	assertScreen(t, m, "APP-HIGH picked", "Fix the parser", "PR follow-up")
+	m = update(t, m, keyEnter)
 	assertCalls(t, f, "run coder --task APP-HIGH")
 	assertScreen(t, m, "● started coder on APP-HIGH")
 }
 
-func TestRunDialogDefaultsToAuto(t *testing.T) {
+func TestRunDialogFiltersTasks(t *testing.T) {
 	f := &fakeActions{agents: taskAgents()}
 	m := openTaskRunDialog(t, tallActionsModel(t, f), testChoices(), nil)
-	m = typeText(t, m, "jk")
-	update(t, press(t, m, "down", "up", "up"), keyEnter)
-	assertCalls(t, f, "run coder --focus jk")
+	m = typeText(t, press(t, m, "t"), "rena")
+	assertScreen(t, m, "1 of 3 ready", "Rename a helper")
+	if strings.Contains(screen(m), "Retry storm") {
+		t.Error("the filter should hide tasks that don't match")
+	}
+	m = typeText(t, m, "zz")
+	assertScreen(t, m, "0 of 3 ready", "no tasks match")
+	m = update(t, update(t, m, tea.KeyPressMsg{Code: tea.KeyBackspace}), tea.KeyPressMsg{Code: tea.KeyBackspace})
+	update(t, update(t, m, keyEnter), keyEnter)
+	assertCalls(t, f, "run coder --task APP-LOW1")
+}
+
+func TestRunDialogEscKeepsTheChosenTask(t *testing.T) {
+	f := &fakeActions{agents: taskAgents()}
+	m := openTaskRunDialog(t, tallActionsModel(t, f), testChoices(), nil)
+	m = update(t, press(t, m, "t", "down", "down"), keyEnter)
+	m = update(t, press(t, m, "t", "up", "up"), keyEsc)
+	assertScreen(t, m, "APP-HIGH picked")
+	m = update(t, press(t, m, "t", "up", "up"), keyEnter)
+	assertScreen(t, m, "Auto · next by priority")
+	update(t, m, keyEnter)
+	assertCalls(t, f, "run coder")
 }
 
 func TestRunDialogStillRunsWhenTasksCannotBeListed(t *testing.T) {
 	f := &fakeActions{agents: taskAgents()}
 	m := openTaskRunDialog(t, tallActionsModel(t, f), nil, errors.New("aven: not found"))
 	assertScreen(t, m, "✗ could not list tasks: aven: not found", "Auto · next by priority")
-	update(t, press(t, m, "down"), keyEnter)
+	update(t, m, keyEnter)
 	assertCalls(t, f, "run coder")
 }
 
 func TestRunDialogSaysWhenNoTaskIsRouted(t *testing.T) {
 	f := &fakeActions{agents: taskAgents()}
 	m := openTaskRunDialog(t, tallActionsModel(t, f), nil, nil)
-	assertScreen(t, m, "Auto · next by priority (nothing eligible)", "no ready tasks routed to coder")
+	assertScreen(t, m, "no ready tasks routed to coder")
+	assertScreen(t, press(t, m, "t"), "Auto · next by priority (nothing eligible)", "no ready tasks routed to coder")
+}
+
+func TestRunDialogSaysWhenEveryTaskIsExhausted(t *testing.T) {
+	f := &fakeActions{agents: taskAgents()}
+	m := openTaskRunDialog(t, tallActionsModel(t, f), testChoices()[:1], nil)
+	assertScreen(t, m, "nothing eligible, all at the retry limit")
 }
 
 func TestRunDialogScrollsLongTaskLists(t *testing.T) {
 	var choices []TaskChoice
-	for _, ref := range []string{"A", "B", "C", "D", "E", "F", "G", "H"} {
+	for _, ref := range []string{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"} {
 		choices = append(choices, TaskChoice{Task: model.Task{Ref: "APP-" + ref, Title: "task " + ref, Severity: "low"}})
 	}
 	f := &fakeActions{agents: taskAgents()}
-	m := openTaskRunDialog(t, tallActionsModel(t, f), choices, nil)
+	m := press(t, openTaskRunDialog(t, tallActionsModel(t, f), choices, nil), "t")
 	assertScreen(t, m, "↓ 2 more")
-	m = press(t, m, "down", "down", "down", "down", "down", "down", "down", "down")
-	assertScreen(t, m, "↑ 2 more", "task H")
+	for range 10 {
+		m = press(t, m, "down")
+	}
+	assertScreen(t, m, "↑ 2 more", "task J")
 	if strings.Contains(screen(m), "task A") {
 		t.Error("the first task should have scrolled out of view")
 	}
@@ -123,8 +165,12 @@ func TestRunDialogHasNoPickerForAgentsWithoutTaskInput(t *testing.T) {
 	}
 	next, cmd := press(t, m, "j").Update(keyPress("r"))
 	runCmd(cmd)
-	if strings.Contains(screen(next.(Model)), "Auto") {
-		t.Error("the run dialog shows a task picker")
+	m = next.(Model)
+	if strings.Contains(screen(m), "Auto") {
+		t.Error("the run dialog shows a task row")
+	}
+	if press(t, m, "t").dialog.runView != runSummary {
+		t.Error("t opened a task dialog")
 	}
 }
 

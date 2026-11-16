@@ -11,6 +11,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	xansi "github.com/charmbracelet/x/ansi"
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/cron"
 	"github.com/leodnlv/vteam/internal/log"
@@ -23,12 +24,18 @@ const (
 	cronDialogWidth  = 52
 	stopDialogWidth  = 56
 	runDialogWidth   = 64
-	focusMinRows     = 3
+	focusMinRows     = 5
+	runKeyWidth      = 3
+	runLabelWidth    = 8
+	runIndentWidth   = runKeyWidth + runLabelWidth
+	focusPreviewRows = 3
 	focusMaxRows     = 10
 	menuLabelWidth   = 20
 	cronLabelWidth   = 9
 	nextFiresInPopup = 3
 )
+
+var runIndent = spaces(runIndentWidth)
 
 type dialogKind int
 
@@ -41,6 +48,15 @@ const (
 	dialogStop
 )
 
+// runView is the part of the run dialog on screen: the summary of the run, or the dialog that changes its task or focus.
+type runView int
+
+const (
+	runSummary runView = iota
+	runPickTask
+	runEditFocus
+)
+
 // dialog is the popup open on the Agents tab: the action menu, the run dialog (dialogConfirm for the
 // merge ensurer, which takes no focus), the cron editor, or the stop dialog.
 type dialog struct {
@@ -49,7 +65,10 @@ type dialog struct {
 	cursor int
 	input  textinput.Model
 	save   bool
-	focus  textarea.Model
+	// focus is the run dialog's focus editor; focusText is what the run passes as --focus.
+	focus     textarea.Model
+	focusText string
+	runView   runView
 	// interactive opens the run in an interactive Claude session (vteam run --interactive).
 	interactive bool
 	picker      taskPicker
@@ -329,32 +348,85 @@ func (m Model) runDialogWidth() int {
 	return max(24, min(runDialogWidth, m.width-4))
 }
 
-// handleRunKey edits the focus text and moves the task picker; enter runs the agent, shift+enter (or alt+enter,
-// ctrl+j) adds a line.
+// handleRunKey handles the run dialog's summary: each part of the run has its own key, and enter runs the agent.
 func (m Model) handleRunKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch m.dialog.runView {
+	case runPickTask:
+		return m.handlePickTaskKey(msg)
+	case runEditFocus:
+		return m.handleEditFocusKey(msg)
+	}
 	switch {
-	case key.Matches(msg, keys.Cancel):
+	case key.Matches(msg, keys.Cancel, keys.Quit):
 		m.dialog = dialog{}
-		return m, nil
 	case key.Matches(msg, keys.Interactive):
 		m.dialog.interactive = !m.dialog.interactive
-		return m, nil
-	case m.dialog.picker.enabled && key.Matches(msg, keys.TaskDown):
-		m.dialog.picker = m.dialog.picker.move(1)
-		return m, nil
-	case m.dialog.picker.enabled && key.Matches(msg, keys.TaskUp):
-		m.dialog.picker = m.dialog.picker.move(-1)
-		return m, nil
+	case m.dialog.picker.enabled && key.Matches(msg, keys.PickTask):
+		m.dialog.picker = m.dialog.picker.open(m.pickerDialogWidth() - styleBox.GetHorizontalFrameSize() - 20)
+		m.dialog.runView = runPickTask
+	case key.Matches(msg, keys.EditFocus):
+		m.dialog.focus.SetValue(m.dialog.focusText)
+		m.dialog.focus.MoveToEnd()
+		m.dialog.runView = runEditFocus
 	case key.Matches(msg, keys.Confirm):
 		name := m.dialog.agent
 		opts := schedule.RunOptions{
-			Focus: strings.TrimSpace(m.dialog.focus.Value()), Task: m.dialog.picker.selected(), Interactive: m.dialog.interactive,
+			Focus: strings.TrimSpace(m.dialog.focusText), Task: m.dialog.picker.chosen, Interactive: m.dialog.interactive,
 		}
 		m.dialog = dialog{}
 		return m.runOnce(name, opts), nil
 	}
+	return m, nil
+}
+
+// handlePickTaskKey filters and moves the task dialog's list; enter chooses the highlighted row, esc keeps the old choice.
+func (m Model) handlePickTaskKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	p := &m.dialog.picker
+	switch {
+	case key.Matches(msg, keys.Cancel):
+		m.dialog.runView = runSummary
+	case key.Matches(msg, keys.Confirm):
+		p.chosen = p.highlighted()
+		m.dialog.runView = runSummary
+	case key.Matches(msg, keys.TaskDown):
+		*p = p.move(1)
+	case key.Matches(msg, keys.TaskUp):
+		*p = p.move(-1)
+	default:
+		var cmd tea.Cmd
+		*p, cmd = p.updateFilter(msg)
+		return m, cmd
+	}
+	return m, nil
+}
+
+// handleEditFocusKey edits the focus text; enter saves it, shift+enter (or alt+enter, ctrl+j) adds a line, esc discards.
+func (m Model) handleEditFocusKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, keys.Cancel):
+		m.dialog.runView = runSummary
+	case key.Matches(msg, keys.Confirm):
+		m.dialog.focusText = m.dialog.focus.Value()
+		m.dialog.runView = runSummary
+	default:
+		var cmd tea.Cmd
+		m.dialog.focus, cmd = m.dialog.focus.Update(msg)
+		return m, cmd
+	}
+	return m, nil
+}
+
+// pasteIntoDialog sends pasted text to the dialog's text field on screen, if it has one.
+func (m Model) pasteIntoDialog(msg tea.PasteMsg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
-	m.dialog.focus, cmd = m.dialog.focus.Update(msg)
+	switch {
+	case m.dialog.kind == dialogRun && m.dialog.runView == runEditFocus:
+		m.dialog.focus, cmd = m.dialog.focus.Update(msg)
+	case m.dialog.kind == dialogRun && m.dialog.runView == runPickTask:
+		m.dialog.picker, cmd = m.dialog.picker.updateFilter(msg)
+	case m.dialog.kind == dialogCron:
+		m.dialog.input, cmd = m.dialog.input.Update(msg)
+	}
 	return m, cmd
 }
 
@@ -440,6 +512,12 @@ func (m Model) renderDialog(body []string) []string {
 	case dialogConfirm:
 		return overlay(body, m.confirmBox(), m.width, height)
 	case dialogRun:
+		switch m.dialog.runView {
+		case runPickTask:
+			return overlay(body, m.pickerBox(), m.width, height)
+		case runEditFocus:
+			return overlay(body, m.focusBox(), m.width, height)
+		}
 		return overlay(body, m.runBox(), m.width, height)
 	case dialogCron:
 		return overlay(body, m.cronBox(), m.width, height)
@@ -508,27 +586,81 @@ func (m Model) stopBox() string {
 	return styleBox.Width(stopDialogWidth).Render(strings.Join(lines, "\n"))
 }
 
+// runBox is the run dialog's summary: one row per part of the run, each led by the key that changes it.
 func (m Model) runBox() string {
-	interactiveBox, interactiveHint := styleMuted.Render("[ ]"), "Keeps running after you quit the TUI."
-	if m.dialog.interactive {
-		interactiveBox = styleOK.Render("[x]")
-		interactiveHint = "Opens Claude in a workmux window and switches to it."
-	}
-	lines := []string{styleBoxHead.Render("Run ") + styleBold.Render(m.dialog.agent) + styleBoxHead.Render(" once"), ""}
+	width := m.runDialogWidth() - styleBox.GetHorizontalFrameSize()
+	lines := []string{m.runTitle(""), ""}
 	if m.dialog.picker.enabled {
-		lines = append(append(lines, m.pickerLines(m.runDialogWidth()-styleBox.GetHorizontalFrameSize())...), "")
+		lines = append(append(lines, m.taskSummaryLines(width)...), "")
+	}
+	lines = append(append(lines, m.focusSummaryLines(width)...), "")
+	mode, hint := styleBold.Render("headless"), "Keeps running after you quit the TUI."
+	if m.dialog.interactive {
+		mode, hint = styleFinishedOK.Render("interactive"), "Opens Claude in a workmux window."
 	}
 	lines = append(lines,
-		styleMuted.Render("focus")+styleMuted.Render(" (optional, passed as --focus)"),
+		runRow(keys.Interactive, "mode", mode),
+		runIndent+styleMuted.Render(log.Truncate(hint, width-runIndentWidth)),
+		"",
+	)
+	hints := styleKey.Render("⏎") + styleMuted.Render(" run   ")
+	if m.dialog.picker.enabled {
+		hints += styleKey.Render("t") + styleMuted.Render(" task   ")
+	}
+	hints += styleKey.Render("f") + styleMuted.Render(" focus   ") + styleKey.Render("i") + styleMuted.Render(" interactive   ") +
+		styleKey.Render("esc") + styleMuted.Render(" cancel")
+	lines = append(lines, hints)
+	return styleBox.Width(m.runDialogWidth()).Render(strings.Join(lines, "\n"))
+}
+
+// runTitle is the run dialog's heading, followed by the sub-dialog's name when one is open.
+func (m Model) runTitle(sub string) string {
+	title := styleBoxHead.Render("Run ") + styleBold.Render(m.dialog.agent) + styleBoxHead.Render(" once")
+	if sub != "" {
+		title += styleMuted.Render(" › " + sub)
+	}
+	return title
+}
+
+// runRow is a row of the run dialog's summary: the key, the label, then the value.
+func runRow(b key.Binding, label, value string) string {
+	return styleKey.Render(log.PadEnd(b.Help().Key, runKeyWidth)) + styleMuted.Render(log.PadEnd(label, runLabelWidth)) + value
+}
+
+// focusSummaryLines show the first lines of the focus text, or "none".
+func (m Model) focusSummaryLines(width int) []string {
+	text := strings.TrimSpace(m.dialog.focusText)
+	if text == "" {
+		return []string{runRow(keys.EditFocus, "focus", styleMuted.Render("none"))}
+	}
+	textWidth := width - runIndentWidth - 2
+	wrapped := strings.Split(xansi.Wrap(text, textWidth, ""), "\n")
+	if len(wrapped) > focusPreviewRows {
+		wrapped = append(wrapped[:focusPreviewRows-1], log.Truncate(wrapped[focusPreviewRows-1], textWidth-2)+" …")
+	}
+	lines := make([]string, len(wrapped))
+	for i, l := range wrapped {
+		lines[i] = runIndent + styleMuted.Render("┃ ") + l
+	}
+	lines[0] = runRow(keys.EditFocus, "focus", styleMuted.Render("┃ ")+wrapped[0])
+	return lines
+}
+
+// focusBox is the run dialog's focus editor.
+func (m Model) focusBox() string {
+	width := m.runDialogWidth() - styleBox.GetHorizontalFrameSize()
+	about := xansi.Wrap("Passed as --focus, a priority section in the prompt.\nLeave it empty for a normal run.", width, "")
+	lines := []string{
+		m.runTitle("focus"),
+		"",
+		styleMuted.Render(about),
+		"",
 		m.dialog.focus.View(),
 		"",
-		interactiveBox+" interactive session"+styleMuted.Render("  tab"),
-		styleMuted.Render(interactiveHint),
-		"",
-		styleKey.Render("⏎")+styleMuted.Render(" run now   ")+
-			styleKey.Render("shift+⏎")+styleMuted.Render("/")+styleKey.Render("ctrl+j")+styleMuted.Render(" new line   ")+
-			styleKey.Render("esc")+styleMuted.Render(" cancel"),
-	)
+		styleKey.Render("⏎") + styleMuted.Render(" save   ") +
+			styleKey.Render("shift+⏎") + styleMuted.Render("/") + styleKey.Render("ctrl+j") + styleMuted.Render(" new line   ") +
+			styleKey.Render("esc") + styleMuted.Render(" discard"),
+	}
 	return styleBox.Width(m.runDialogWidth()).Render(strings.Join(lines, "\n"))
 }
 
