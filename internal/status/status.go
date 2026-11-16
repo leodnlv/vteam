@@ -32,7 +32,7 @@ type Deps struct {
 	IsAlive func(pid int) bool
 	// Orphans lists worktrees under worktreeDir that no path in inUse refers to.
 	Orphans func(ctx context.Context, repoRoot, worktreeDir string, inUse []string) ([]string, error)
-	// Pipeline is the window of the pipeline sections (tasks created, activity, lead time, waiting, queue)
+	// Pipeline is the window of the pipeline sections (tasks created, activity, lead time)
 	// added after the rest; zero leaves them out.
 	Pipeline time.Duration
 }
@@ -68,7 +68,7 @@ func Render(ctx context.Context, d Deps) ([]string, error) {
 	lines = append(lines, renderAwaitingMerge(idx)...)
 	lines = append(lines, renderWaitingOnYou(ctx, d, loaded, idx, running, now)...)
 	if d.Pipeline > 0 {
-		data := pipelineData{tasks: idx.All, ready: ready, runs: runstate.List(d.Cwd), sessions: session.List(d.Cwd), maxRetries: d.Config.Tasks.MaxRetries}
+		data := pipelineData{tasks: idx.All, runs: runstate.List(d.Cwd), sessions: session.List(d.Cwd)}
 		lines = append(lines, renderPipeline(data, d.Pipeline, now)...)
 	}
 	return lines, nil

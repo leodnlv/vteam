@@ -31,7 +31,6 @@ func note(body string, at time.Duration) model.TaskNote {
 func pipelineFixture() pipelineData {
 	const pr = "https://github.com/o/r/pull/"
 	return pipelineData{
-		maxRetries: 3,
 		tasks: []model.Task{
 			{Ref: "T-INBOX", Title: "fresh finding", Status: model.StatusInbox, CreatedAt: ago(2 * time.Hour),
 				Metadata: map[string]string{model.MetaFoundBy: "improver"}},
@@ -57,7 +56,6 @@ func pipelineFixture() pipelineData {
 			{Ref: "T-STUCK", Title: "keeps failing", Status: model.StatusTodo, RetryCount: 3, CreatedAt: ago(30 * time.Hour)},
 			{Ref: "T-TODO", Title: "queued", Status: model.StatusTodo, RetryCount: 1, CreatedAt: ago(30 * time.Hour)},
 		},
-		ready: []model.Task{{Ref: "T-STUCK", RetryCount: 3}, {Ref: "T-TODO", RetryCount: 1}},
 		runs: []model.RunState{
 			{TaskRef: "T-OPEN", Status: model.RunCompleted, CommitSHA: "a", StartedAt: ago(5*time.Hour + 20*time.Minute), CompletedAt: ago(5 * time.Hour)},
 			{TaskRef: "T-OPEN", Status: model.RunCompleted, CommitSHA: "b", StartedAt: ago(time.Hour + 10*time.Minute), CompletedAt: ago(time.Hour)},
@@ -128,22 +126,6 @@ func TestPipelineLeadTimes(t *testing.T) {
 	}
 }
 
-func TestPipelineWaitingAndQueue(t *testing.T) {
-	out := strings.Join(renderPipeline(pipelineFixture(), 24*time.Hour, pipelineNow), "\n")
-
-	for _, want := range []string{
-		"inbox 1 · todo 2 (1 ready) · active 0 · PR open 1 · at max retries 1",
-		"retries 0×0 · 1×1 · 2×0",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("missing %q in:\n%s", want, out)
-		}
-	}
-	if strings.Contains(out, "Waiting on you") {
-		t.Errorf("Waiting on you belongs to the status sections, not the pipeline:\n%s", out)
-	}
-}
-
 func TestWaitingTasksAreOldestFirstAndCapped(t *testing.T) {
 	all := pipelineFixture().tasks
 	for i := range 5 {
@@ -183,7 +165,7 @@ func TestPipelineSevenDays(t *testing.T) {
 }
 
 func TestPipelineWithNoTasks(t *testing.T) {
-	out := strings.Join(renderPipeline(pipelineData{maxRetries: 3}, 24*time.Hour, pipelineNow), "\n")
+	out := strings.Join(renderPipeline(pipelineData{}, 24*time.Hour, pipelineNow), "\n")
 
 	if !strings.Contains(out, "no tasks created") {
 		t.Errorf("want a placeholder:\n%s", out)

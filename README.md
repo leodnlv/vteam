@@ -274,7 +274,6 @@ Running `vteam` with no arguments inside a project opens a full-screen, keyboard
   - **Tasks created**: where the window's tasks are now (merged, PR open, todo, inbox, PR closed, …), one bar per agent that found them.
   - **Activity**: tasks created, picked, PRs opened, PRs sent back or closed, and interactive sessions, with a sparkline over the window.
   - **Lead time**: median and p90 from a task's creation to its first PR and from a pick to the push, plus how long inbox tasks and open PRs have been waiting.
-  - **Queue**: tasks per status, how many are ready, and retry counts.
 
   vteam records no triage or merge times, so those don't appear.
 - **Info** — the project, `vteam.config.json`, whether the scheduler is running, and each agent's settings, including the tools it is allowed.

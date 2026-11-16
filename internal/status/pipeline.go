@@ -19,11 +19,9 @@ import (
 // pipelineData is everything the pipeline sections read. Only recorded timestamps are used: aven keeps no
 // status history and the merge ensurer records no merge time, so triage and merge times are never shown.
 type pipelineData struct {
-	tasks      []model.Task
-	ready      []model.Task
-	runs       []model.RunState
-	sessions   []session.Session
-	maxRetries int
+	tasks    []model.Task
+	runs     []model.RunState
+	sessions []session.Session
 }
 
 type stage struct {
@@ -93,8 +91,7 @@ func renderPipeline(p pipelineData, window time.Duration, now time.Time) []strin
 	label := "last " + windowLabel(window)
 	lines := renderCreated(p, in, label)
 	lines = append(lines, renderActivity(p, since, window, label)...)
-	lines = append(lines, renderLeadTime(p, in, label, now)...)
-	return append(lines, renderQueue(p)...)
+	return append(lines, renderLeadTime(p, in, label, now)...)
 }
 
 func windowLabel(window time.Duration) string {
@@ -394,48 +391,6 @@ func quantile(ds []time.Duration, q float64) time.Duration {
 	sorted := slices.Clone(ds)
 	slices.Sort(sorted)
 	return sorted[min(len(sorted)-1, int(q*float64(len(sorted))))]
-}
-
-func renderQueue(p pipelineData) []string {
-	count := make([]int, len(stages))
-	exhausted := 0
-	retries := make([]int, max(1, p.maxRetries))
-	for _, t := range p.tasks {
-		s := stageOf(t)
-		count[s]++
-		if s != stageTodo {
-			continue
-		}
-		if t.RetryCount >= p.maxRetries {
-			exhausted++
-		} else {
-			retries[max(0, t.RetryCount)]++
-		}
-	}
-	ready := 0
-	for _, t := range p.ready {
-		if t.RetryCount < p.maxRetries {
-			ready++
-		}
-	}
-	parts := []string{
-		fmt.Sprintf("inbox %s", ansi.Bold(fmt.Sprint(count[stageInbox]))),
-		fmt.Sprintf("todo %s %s", ansi.Bold(fmt.Sprint(count[stageTodo])), ansi.Muted(fmt.Sprintf("(%d ready)", ready))),
-		fmt.Sprintf("active %s", ansi.Bold(fmt.Sprint(count[stageActive]))),
-		fmt.Sprintf("PR open %s", ansi.Bold(fmt.Sprint(count[stagePROpen]))),
-	}
-	if exhausted > 0 {
-		parts = append(parts, ansi.Warn(fmt.Sprintf("at max retries %d", exhausted)))
-	}
-	lines := []string{log.FormatSection("Queue"), log.FormatListItem(ansi.Info("•"), strings.Join(parts, ansi.Muted(" · ")))}
-	if count[stageTodo] > exhausted {
-		var hist []string
-		for k, c := range retries {
-			hist = append(hist, fmt.Sprintf("%d×%d", k, c))
-		}
-		lines = append(lines, log.FormatListDetail("retries", strings.Join(hist, ansi.Muted(" · "))+ansi.Muted("  (tasks in todo by retry count)")))
-	}
-	return lines
 }
 
 // wrapJoined joins items with sep into lines no wider than width visible columns.
