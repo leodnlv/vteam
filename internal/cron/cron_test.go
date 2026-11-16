@@ -90,3 +90,16 @@ func TestNextIsStrictlyAfter(t *testing.T) {
 		t.Errorf("next = %v", next)
 	}
 }
+
+func TestNextIsZeroWhenTheDayNeverOccurs(t *testing.T) {
+	at := time.Date(2026, 3, 7, 10, 30, 0, 0, time.UTC)
+	for _, expr := range []string{"0 0 31 2 *", "0 0 30 2 *", "0 0 31 4 *"} {
+		s, err := Parse(expr)
+		if err != nil {
+			t.Fatalf("Parse(%q): %v", expr, err)
+		}
+		if next := s.Next(at); !next.IsZero() {
+			t.Errorf("Next(%q) = %v", expr, next)
+		}
+	}
+}

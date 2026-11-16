@@ -218,6 +218,9 @@ func (s *Scheduler) Run(ctx context.Context) error {
 		}
 		wait := s.Poll
 		for _, t := range timers {
+			if t.next.IsZero() {
+				continue
+			}
 			if !now.Before(t.next) {
 				s.tick(t.job, running, &children)
 				t.next = t.schedule.Next(now)
@@ -265,6 +268,10 @@ func (s *Scheduler) syncTimers(timers map[string]*jobTimer, jobs []Job, now time
 		_, changed := timers[job.Name]
 		t := &jobTimer{job: job, schedule: schedule, next: schedule.Next(now)}
 		timers[job.Name] = t
+		if t.next.IsZero() {
+			s.Log.Warn(ansi.Bold(job.Name) + " cron " + job.Cron + " never fires, skipping")
+			continue
+		}
 		if quiet {
 			continue
 		}

@@ -168,6 +168,11 @@ func TestEnableAndDisable(t *testing.T) {
 	if err := Enable(cwd, "ghost", "* * * * *"); err == nil {
 		t.Error("unknown agent enabled")
 	}
+	for _, expr := range []string{"0 0 31 2 *", "0 0 30 2 *", "0 0 31 4 *"} {
+		if err := Enable(cwd, "coder", expr); err == nil || !strings.Contains(err.Error(), "never fires") {
+			t.Errorf("Enable(%q) = %v", expr, err)
+		}
+	}
 	enable(t, cwd, "coder", "* * * * *")
 	enable(t, cwd, "coder", "*/5 * * * *")
 	if got, _ := Enabled(cwd); !cmp.Equal(map[string]string{"coder": "*/5 * * * *"}, got) {
@@ -470,6 +475,25 @@ func TestSchedulerPicksUpCronChangesAndStopsWhenNoneAreLeft(t *testing.T) {
 	}
 	if _, err := os.Stat(PIDPath(h.cwd)); !os.IsNotExist(err) {
 		t.Error("pid file left behind")
+	}
+}
+
+func TestSchedulerNeverStartsAJobWhoseCronNeverFires(t *testing.T) {
+	h := newHarness(t, map[string]string{"coder": "exit 0"})
+	writeAgent(t, h.cwd, "improver", ``)
+	stop, _ := h.start(t)
+	if err := writeState(h.cwd, map[string]string{"coder": "* * * * *", "improver": "0 0 31 2 *"}); err != nil {
+		t.Fatal(err)
+	}
+	h.ticks <- "tick"
+	h.waitFor(t, "improver cron 0 0 31 2 * never fires, skipping")
+	h.ticks <- "tick"
+	h.ticks <- "tick"
+	if err := stop(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(h.out.String(), "improver started") {
+		t.Errorf("never-firing job started:\n%s", h.out.String())
 	}
 }
 

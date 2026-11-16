@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/cron"
@@ -51,8 +52,12 @@ func Enabled(cwd string) (map[string]string, error) {
 
 // Enable turns on the cron of an agent or the merge ensurer, replacing its pattern if already on.
 func Enable(cwd, name, expr string) error {
-	if _, err := cron.Parse(expr); err != nil {
+	schedule, err := cron.Parse(expr)
+	if err != nil {
 		return fmt.Errorf("invalid cron expression: %w", err)
+	}
+	if schedule.Next(time.Now()).IsZero() {
+		return fmt.Errorf("invalid cron expression: %q never fires", expr)
 	}
 	if err := checkJobName(cwd, name); err != nil {
 		return err
