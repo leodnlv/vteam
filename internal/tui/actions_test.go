@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	xansi "github.com/charmbracelet/x/ansi"
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/lock"
 	"github.com/leodnlv/vteam/internal/schedule"
@@ -386,4 +387,28 @@ func TestSidebarShowsOpenInteractiveSessions(t *testing.T) {
 	agents[0].Sessions = []string{"vteam-fix-it-1", "vteam-other-2"}
 	m := actionsModel(t, &fakeActions{agents: agents})
 	assertScreen(t, m, "◆2", "open   ◆ vteam-fix-it-1", "◆ vteam-other-2")
+}
+
+func TestSidebarDetailsExplainCronAndShowConfig(t *testing.T) {
+	m := actionsModel(t, &fakeActions{agents: testAgents()})
+	a := Agent{
+		Name:        "coder",
+		DefaultCron: "*/15 * * * *",
+		Config: &config.Agent{
+			Model: "sonnet", Input: "task", Worktree: true, AutoPR: true,
+			AllowedTools: []string{"Read", "Bash(git *)"},
+			TaskFilter:   config.TaskFilter{"found-by": {"improver"}},
+		},
+	}
+	out := xansi.Strip(strings.Join(m.agentDetails(a), "\n"))
+	for _, want := range []string{"off (*/15 * * * *)", "every 15 minutes", "sonnet", "task", "generic", "worktree", "found-by: improver", "Read, Bash(git *)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("details are missing %q:\n%s", want, out)
+		}
+	}
+	for _, row := range m.agentDetails(a) {
+		if w := xansi.StringWidth(row); w > sidebarWidth-2 {
+			t.Errorf("row %q is %d wide, sidebar fits %d", xansi.Strip(row), w, sidebarWidth-2)
+		}
+	}
 }
