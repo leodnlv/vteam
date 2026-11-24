@@ -18,6 +18,7 @@ import (
 	"github.com/leodnlv/vteam/internal/claude"
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/log"
+	"github.com/leodnlv/vteam/internal/memory"
 	"github.com/leodnlv/vteam/internal/model"
 	"github.com/leodnlv/vteam/internal/tasks"
 	"github.com/leodnlv/vteam/internal/tasks/taskstest"
@@ -104,7 +105,7 @@ func setup(t *testing.T, p project) *harness {
 	}
 	writeAgent(t, cwd, "test-agent", cfg, "You are a test agent.")
 	if p.existingMemory != "" {
-		writeFile(t, MemoryPath(cwd, "test-agent"), p.existingMemory)
+		writeFile(t, memory.LogPath(cwd, "test-agent"), p.existingMemory)
 	}
 	h := &harness{t: t, cwd: cwd, tasks: taskstest.New(), claude: &fakeClaude{}, git: newFakeWorktrees(t, cwd)}
 	h.platform = &fakePlatform{order: &h.git.order}
@@ -255,7 +256,7 @@ func TestAgentOutputToMemory(t *testing.T) {
 		h := setup(t, project{memory: true})
 		h.claude.thenText(jsonText(obj{"status": "completed", "summary": "Done.", "memoryUpdate": "New info."})).thenText("  - Scanned auth module\n- Found singleton pattern\n\n")
 		h.mustRun()
-		data, err := os.ReadFile(MemoryPath(h.cwd, "test-agent"))
+		data, err := os.ReadFile(memory.LogPath(h.cwd, "test-agent"))
 		if err != nil || string(data) != "- Scanned auth module\n- Found singleton pattern\n" {
 			t.Errorf("store = %q err %v", data, err)
 		}
@@ -272,7 +273,7 @@ func TestAgentOutputToMemory(t *testing.T) {
 		h := setup(t, project{memory: true, existingMemory: "kept"})
 		h.claude.thenText(jsonText(obj{"status": "completed", "summary": "Done.", "memoryUpdate": "x"})).then(func(claude.Options) claude.Result { return result("", 1) })
 		h.mustRun()
-		if data, _ := os.ReadFile(MemoryPath(h.cwd, "test-agent")); string(data) != "kept" {
+		if data, _ := os.ReadFile(memory.LogPath(h.cwd, "test-agent")); string(data) != "kept" {
 			t.Errorf("store = %q", data)
 		}
 		requireContains(t, h.out.String(), "memory curation produced no output or failed")
@@ -310,6 +311,35 @@ func TestAgentOutputToMemory(t *testing.T) {
 		h.claude.thenText(jsonText(obj{"status": "completed", "summary": "Done."}))
 		h.mustRun()
 		requireContains(t, h.prompt(0).UserPrompt, "Previous run: scanned auth/", "Agent Memory")
+	})
+
+	t.Run("appends memoryFacts to facts.md without curation", func(t *testing.T) {
+		h := setup(t, project{memory: true})
+		writeFile(t, memory.FactsPath(h.cwd, "test-agent"), "- Tests run with just test\n")
+		h.claude.thenText(jsonText(obj{"status": "completed", "summary": "Done.",
+			"memoryFacts": []string{"Tests run with just test", "cron.go rejects Feb 31\non purpose", " "}}))
+		h.mustRun()
+		if n := len(h.claude.Calls()); n != 1 {
+			t.Errorf("%d calls, want no curation", n)
+		}
+		data, _ := os.ReadFile(memory.FactsPath(h.cwd, "test-agent"))
+		if want := "- Tests run with just test\n- cron.go rejects Feb 31 on purpose\n"; string(data) != want {
+			t.Errorf("facts = %q, want %q", data, want)
+		}
+		requireContains(t, h.out.String(), "1 memory fact(s) recorded")
+	})
+
+	t.Run("never shows facts to the curation agent", func(t *testing.T) {
+		h := setup(t, project{memory: true, existingMemory: "log entry"})
+		writeFile(t, memory.FactsPath(h.cwd, "test-agent"), "- durable\n")
+		h.claude.thenText(jsonText(obj{"status": "completed", "summary": "Done.", "memoryUpdate": "x", "memoryFacts": []string{"new fact"}})).thenText("curated")
+		h.mustRun()
+		requireContains(t, h.prompt(0).UserPrompt, "### Durable Facts\n\n- durable", "### Recent Runs\n\nlog entry")
+		requireNotContains(t, h.prompt(1).UserPrompt, "durable", "new fact")
+		data, _ := os.ReadFile(memory.FactsPath(h.cwd, "test-agent"))
+		if string(data) != "- durable\n- new fact\n" {
+			t.Errorf("facts = %q", data)
+		}
 	})
 }
 

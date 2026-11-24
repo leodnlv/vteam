@@ -40,6 +40,7 @@ func TestBuildGolden(t *testing.T) {
 		Review        json.RawMessage
 		Focus         string
 		MemoryContent string
+		MemoryFacts   string
 		Expected      Parts
 	}
 	golden.Load(t, "prompt", &cases)
@@ -50,7 +51,7 @@ func TestBuildGolden(t *testing.T) {
 			if c.Agent.Memory {
 				agent.Memory = &config.Subagent{MDPath: "MEMORY.md"}
 			}
-			in := Input{Agent: agent, Existing: c.ExistingTasks, Task: c.Task, Focus: c.Focus, Memory: c.MemoryContent}
+			in := Input{Agent: agent, Existing: c.ExistingTasks, Task: c.Task, Focus: c.Focus, MemoryFacts: c.MemoryFacts, MemoryLog: c.MemoryContent}
 			if len(c.Review) > 0 {
 				var probe map[string]json.RawMessage
 				_ = json.Unmarshal(c.Review, &probe)
@@ -157,15 +158,24 @@ func TestBuild(t *testing.T) {
 	t.Run("orders focus, memory, existing tasks, task, notes, and output format", func(t *testing.T) {
 		agent := &config.Agent{Name: "coder", Memory: &config.Subagent{}}
 		task := &model.Task{Title: "Fix", Severity: "high", Description: "Body", Notes: []model.TaskNote{{Body: "first", CreatedAt: "t1"}, {Body: "second", CreatedAt: "t2"}}}
-		p := build(t, Input{Agent: agent, Existing: []model.Task{{Status: "canceled", Severity: "low", Title: "Old"}}, Task: task, Focus: "auth", Memory: "remembered"})
-		requireOrder(t, p.UserPrompt, "## Priority Focus", "auth", "## Agent Memory", "remembered",
+		p := build(t, Input{Agent: agent, Existing: []model.Task{{Status: "canceled", Severity: "low", Title: "Old"}}, Task: task, Focus: "auth", MemoryFacts: "- kept", MemoryLog: "remembered"})
+		requireOrder(t, p.UserPrompt, "## Priority Focus", "auth", "## Agent Memory", "### Durable Facts\n\n- kept", "### Recent Runs\n\nremembered",
 			"## Existing Tasks", "- [canceled] low | Old", "## Your Task", "Title: Fix\nSeverity: high\n\nBody",
-			"## Task Notes", "### t1\n\nfirst", "### t2\n\nsecond", "## Output Format", `"memoryUpdate"`)
+			"## Task Notes", "### t1\n\nfirst", "### t2\n\nsecond", "## Output Format", `"memoryUpdate"`, `"memoryFacts"`)
+	})
+
+	t.Run("shows only the memory parts that exist", func(t *testing.T) {
+		agent := &config.Agent{Name: "coder", Memory: &config.Subagent{}}
+		p := build(t, Input{Agent: agent, MemoryFacts: "- a fact"})
+		requireOrder(t, p.UserPrompt, "### Durable Facts\n\n- a fact")
+		if strings.Contains(p.UserPrompt, "### Recent Runs") {
+			t.Error("empty log rendered")
+		}
 	})
 
 	t.Run("omits sections without content", func(t *testing.T) {
 		p := build(t, Input{Task: &model.Task{Title: "x"}})
-		for _, absent := range []string{"## Priority Focus", "## Agent Memory", "## Existing Tasks", "## Task Notes", "## Pull Request", "## Existing Pull Request", "memoryUpdate", "threadReplies"} {
+		for _, absent := range []string{"## Priority Focus", "## Agent Memory", "## Existing Tasks", "## Task Notes", "## Pull Request", "## Existing Pull Request", "memoryUpdate", "memoryFacts", "threadReplies"} {
 			if strings.Contains(p.UserPrompt, absent) {
 				t.Errorf("unexpected %q", absent)
 			}

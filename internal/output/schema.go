@@ -60,6 +60,7 @@ func Schema(o SchemaOptions) string {
 	}
 	if o.Memory {
 		properties["memoryUpdate"] = stringSchema(0)
+		properties["memoryFacts"] = stringArray(0)
 	}
 	if o.ThreadReplies {
 		properties["threadReplies"] = map[string]any{

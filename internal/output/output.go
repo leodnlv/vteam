@@ -166,6 +166,7 @@ func validate(doc any, allowTasks bool) error {
 		validateCommitMessage(root),
 		root.str("blockerReason", "blockerReason", false, 0),
 		root.str("memoryUpdate", "memoryUpdate", false, 0),
+		root.strings("memoryFacts", "memoryFacts", 0),
 		validateThreadReplies(root),
 	)
 }

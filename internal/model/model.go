@@ -274,6 +274,7 @@ type AgentOutput struct {
 	CommitMessage *CommitMessage `json:"commitMessage,omitempty"`
 	BlockerReason string         `json:"blockerReason,omitempty"`
 	MemoryUpdate  string         `json:"memoryUpdate,omitempty"`
+	MemoryFacts   []string       `json:"memoryFacts,omitempty"`
 	ThreadReplies []ThreadReply  `json:"threadReplies,omitempty"`
 }
 

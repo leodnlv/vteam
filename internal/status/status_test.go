@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/lock"
 	"github.com/leodnlv/vteam/internal/log"
+	"github.com/leodnlv/vteam/internal/memory"
 	"github.com/leodnlv/vteam/internal/model"
 	"github.com/leodnlv/vteam/internal/runstate"
 	"github.com/leodnlv/vteam/internal/session"
@@ -197,5 +199,24 @@ func TestRenderSessions(t *testing.T) {
 		if strings.Contains(text, unwanted) {
 			t.Errorf("unexpected %q in:\n%s", unwanted, text)
 		}
+	}
+}
+
+func TestRenderWarnsAboutLargeMemoryFacts(t *testing.T) {
+	cwd := t.TempDir()
+	for _, name := range []string{"improver", "coder"} {
+		agent(t, cwd, name, `{}`)
+		write(t, filepath.Join(cwd, "vteam", "agents", name, "MEMORY.md"), "curate")
+	}
+	write(t, memory.FactsPath(cwd, "improver"), strings.Repeat("- fact\n\n", memory.FactsWarnLines+1))
+	write(t, memory.FactsPath(cwd, "coder"), strings.Repeat("- fact\n", memory.FactsWarnLines))
+	lines, err := Render(context.Background(), deps(cwd, taskstest.New(), time.Now(), nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(lines, "\n")
+	want := fmt.Sprintf("  ! improver has %d memory facts (prune vteam/.memory/improver/facts.md)", memory.FactsWarnLines+1)
+	if !strings.Contains(joined, want) || strings.Contains(joined, "coder has") {
+		t.Errorf("output:\n%s", joined)
 	}
 }

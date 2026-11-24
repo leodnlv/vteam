@@ -18,6 +18,7 @@ import (
 	"github.com/leodnlv/vteam/internal/git"
 	"github.com/leodnlv/vteam/internal/lock"
 	"github.com/leodnlv/vteam/internal/log"
+	"github.com/leodnlv/vteam/internal/memory"
 	"github.com/leodnlv/vteam/internal/model"
 	"github.com/leodnlv/vteam/internal/notify"
 	"github.com/leodnlv/vteam/internal/output"
@@ -127,10 +128,6 @@ func RunID(agent string, now time.Time) string {
 
 func LocksDir(cwd string) string { return runstate.LocksDir(cwd) }
 
-func MemoryPath(cwd, agent string) string {
-	return filepath.Join(cwd, "vteam", ".memory", agent, "store.md")
-}
-
 type runner struct {
 	Deps
 	// ctx is the context of every external call; it stops being cancellable once Claude has answered.
@@ -165,6 +162,7 @@ type runner struct {
 	extraNotes []string
 	prURL      string
 	memUpdate  string
+	memFacts   []string
 	state      model.RunState
 	outcome    *model.RunOutcome
 }
@@ -475,15 +473,11 @@ func relative(base, path string) string {
 	return path
 }
 
-func (r *runner) readMemory() string {
+func (r *runner) readMemory() (facts, log string) {
 	if r.agent.Memory == nil {
-		return ""
+		return "", ""
 	}
-	data, err := os.ReadFile(MemoryPath(r.Cwd, r.agent.Name))
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
+	return memory.ReadFacts(r.Cwd, r.agent.Name), memory.ReadLog(r.Cwd, r.agent.Name)
 }
 
 func (r *runner) runAgent(dir string) (model.AgentOutput, error) {
@@ -491,9 +485,10 @@ func (r *runner) runAgent(dir string) (model.AgentOutput, error) {
 	if err != nil {
 		return model.AgentOutput{}, err
 	}
+	facts, recent := r.readMemory()
 	parts, err := prompt.Build(prompt.Input{
 		Agent: r.agent, Existing: idx.All, Task: r.task, Review: r.review, FollowUp: r.followUp,
-		Focus: r.focus, Memory: r.readMemory(),
+		Focus: r.focus, MemoryFacts: facts, MemoryLog: recent,
 	})
 	if err != nil {
 		return model.AgentOutput{}, err
@@ -533,7 +528,7 @@ func (r *runner) runAgent(dir string) (model.AgentOutput, error) {
 	if err != nil {
 		return out, err
 	}
-	r.memUpdate = out.MemoryUpdate
+	r.memUpdate, r.memFacts = out.MemoryUpdate, out.MemoryFacts
 	r.state.ClaudeOutput = &out
 	r.state.CommitMessage = out.CommitMessage
 	return out, nil
@@ -923,7 +918,7 @@ func (r *runner) finish(stopped bool) {
 	}
 	if r.outcome != nil && r.stopCtx.Err() == nil {
 		r.runOnFinishHook()
-		r.runMemoryCuration()
+		r.recordMemory()
 	}
 	if r.worktree != nil {
 		r.Log.Section("Cleanup")
@@ -981,15 +976,36 @@ func (r *runner) runOnFinishHook() {
 	}
 }
 
-func (r *runner) runMemoryCuration() {
+// recordMemory appends the run's durable facts to facts.md, then has the curation agent merge its memoryUpdate
+// into the rolling log. The curation agent never sees or rewrites the facts.
+func (r *runner) recordMemory() {
 	mem := r.agent.Memory
-	if mem == nil || r.memUpdate == "" {
+	if mem == nil || (r.memUpdate == "" && len(r.memFacts) == 0) {
 		return
 	}
-	r.Log.Section(sectionTitle("Memory curation", mem.Model))
-	path := MemoryPath(r.Cwd, r.agent.Name)
-	current, _ := os.ReadFile(path)
-	parts, err := prompt.MemoryCuration(mem, string(current), r.memUpdate, r.focus)
+	r.Log.Section(sectionTitle("Memory", mem.Model))
+	if len(r.memFacts) > 0 {
+		r.appendFacts()
+	}
+	if r.memUpdate != "" {
+		r.curateLog(mem)
+	}
+}
+
+func (r *runner) appendFacts() {
+	added, err := memory.AppendFacts(r.Cwd, r.agent.Name, r.memFacts)
+	switch {
+	case err != nil:
+		r.Log.Warn("failed to record memory facts: " + err.Error())
+	case added == 0:
+		r.Log.Step("no new memory facts")
+	default:
+		r.Log.OK(fmt.Sprintf("%d memory fact(s) recorded", added))
+	}
+}
+
+func (r *runner) curateLog(mem *config.Subagent) {
+	parts, err := prompt.MemoryCuration(mem, memory.ReadLog(r.Cwd, r.agent.Name), r.memUpdate, r.focus)
 	if err != nil {
 		r.Log.Warn("memory curation failed: " + err.Error())
 		return
@@ -1004,16 +1020,9 @@ func (r *runner) runMemoryCuration() {
 		r.Log.Warn("memory curation produced no output or failed")
 		return
 	}
-	if err := writeMemory(path, res.ResultText); err != nil {
+	if err := memory.WriteLog(r.Cwd, r.agent.Name, res.ResultText); err != nil {
 		r.Log.Warn("memory curation failed: " + err.Error())
 		return
 	}
 	r.Log.OK("memory updated")
-}
-
-func writeMemory(path, content string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, []byte(strings.TrimSpace(content)+"\n"), 0o644)
 }

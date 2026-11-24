@@ -50,7 +50,7 @@ Let the user choose a preset and customize.
 
 ### Additional questions (ask in a second round if relevant)
 
-**4. Should the agent have memory?** — If the agent runs repeatedly and would benefit from remembering past runs (areas scanned, false positives, patterns observed), offer to create a `MEMORY.md`.
+**4. Should the agent have memory?** — If the agent runs repeatedly and would benefit from remembering past runs, offer to create a `MEMORY.md`. Ask what it should remember in each part: the rolling log of recent runs (areas scanned, task outcomes) and durable facts that never age out (false positives, rejected findings, project conventions).
 
 **5. Should the agent have an ON_FINISH hook?** — If the agent's output should trigger a notification or follow-up action (e.g., post to Slack, comment on a PR), offer to create an `ON_FINISH.md`.
 
@@ -144,12 +144,21 @@ Plain markdown — no frontmatter. Put its model (default `haiku`) in the `memor
 ```markdown
 # <Agent Name> Memory Curation
 
-You maintain the memory for <brief description of the agent>.
+You maintain the rolling log of <brief description of the agent>. vteam keeps the agent's durable facts separately; this log only covers recent runs.
 
 ## Rules
 
-- <3-5 rules about what to remember and how to keep it concise>
+- <3-5 rules about what recent runs to remember and how to keep it concise>
 - Maximum 30 lines. When exceeding the limit, drop the oldest entries first.
+```
+
+MEMORY.md governs only the rolling log (`memoryUpdate`). Durable facts (`memoryFacts`) are appended by vteam and never curated, so when memory is requested, also end AGENT.md with a `## Memory` section telling the agent what goes where:
+
+```markdown
+## Memory
+
+- Put <what this run did, e.g. areas scanned> in `memoryUpdate`.
+- Put things that stay true across runs in `memoryFacts`, one per entry: <e.g. rejected findings with why, project conventions, existing mechanisms>.
 ```
 
 ### ON_FINISH.md (if requested)

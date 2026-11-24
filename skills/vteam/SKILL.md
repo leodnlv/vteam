@@ -52,7 +52,7 @@ vteam/
 │   ├── improver/
 │   │   ├── agent.json              # Optional: agent config (missing = all defaults)
 │   │   ├── AGENT.md                # Required: system prompt only; marks the agent's existence
-│   │   ├── MEMORY.md               # Optional: memory curation prompt; its existence enables memory
+│   │   ├── MEMORY.md               # Optional: rolling-log curation prompt; its existence enables memory
 │   │   └── ON_FINISH.md            # Optional: post-run hook prompt; its existence enables the hook
 │   ├── security-analyst/
 │   ├── coder/
@@ -178,7 +178,8 @@ Claude returns structured JSON matching the unified `AgentOutput` schema:
   "filesChanged": ["path/to/file.ts"],
   "commitMessage": { "subject": "vteam: ...", "body": "..." },
   "blockerReason": "only if blocked/failed",
-  "memoryUpdate": "optional notes for future runs",
+  "memoryUpdate": "optional notes about this run (rolling log)",
+  "memoryFacts": ["optional durable facts, one per entry"],
   "threadReplies": [{ "thread": "T1", "body": "what changed" }]
 }
 ```
@@ -228,15 +229,18 @@ Tasks live in aven, scoped to `tasks.project` + `tasks.label`. Refs look like `A
 
 Place alongside AGENT.md; its content is the curation agent's system prompt and its existence enables memory. The curation agent's `model` / `allowedTools` / `disallowedTools` go in the `memory` section of `agent.json`. The orchestrator:
 
-1. Injects accumulated memory into the agent's prompt before each run
-2. Extracts `memoryUpdate` from the agent's output
-3. Spawns a curation agent that merges new updates into existing memory per the MEMORY.md rules
-4. Writes the curated result to `vteam/.memory/<agent-name>/store.md`
+1. Injects the durable facts (`vteam/.memory/<agent-name>/facts.md`) and the rolling log (`store.md`) into the agent's prompt before each run, as `### Durable Facts` and `### Recent Runs`
+2. Appends the agent's `memoryFacts` to `facts.md` (one `- ` line each, exact duplicates skipped). No LLM rewrites that file; humans prune it, and `vteam status` warns past 50 lines
+3. Spawns a curation agent that merges the agent's `memoryUpdate` into the log per the MEMORY.md rules (it never sees the facts), and writes the result to `store.md`
+
+MEMORY.md only governs the log:
 
 ```markdown
-Keep a running list of areas scanned. Record false positives.
+Keep a running list of areas scanned.
 Maximum 30 lines — drop oldest entries first.
 ```
+
+What counts as a fact belongs in AGENT.md, e.g. a `## Memory` section: "Put rejected findings and false positives (with why) in `memoryFacts`; put the areas you scanned in `memoryUpdate`." 
 
 ```json
 { "memory": { "model": "haiku" } }

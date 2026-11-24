@@ -128,7 +128,7 @@ vteam/
 │   ├── improver/
 │   │   ├── agent.json              # Agent configuration
 │   │   ├── AGENT.md                # Improver prompt/personality
-│   │   └── MEMORY.md               # Memory curation strategy
+│   │   └── MEMORY.md               # Memory curation strategy (rolling log)
 │   ├── security-analyst/
 │   │   ├── agent.json
 │   │   ├── AGENT.md                # Security analyst prompt/personality
@@ -512,22 +512,26 @@ Claude returns findings as structured JSON; the orchestrator creates the actual 
 
 ### Per-agent memory (MEMORY.md)
 
-Agents can maintain persistent memory across runs. Place a `MEMORY.md` file alongside `AGENT.md` to define a memory curation strategy — natural language rules for how the agent's memory should be maintained.
+Agents can maintain persistent memory across runs. Place a `MEMORY.md` file alongside `AGENT.md` to enable it. Memory has two parts:
+
+- **Durable facts** (`vteam/.memory/<agent-name>/facts.md`) — things that stay true across runs: project conventions, rejected findings and why, mechanisms the project already has. The agent returns new ones in `memoryFacts`, and vteam appends them as `- ` lines, skipping exact duplicates. No LLM ever rewrites this file, so a fact stays until you delete it. `vteam status` asks you to prune it once it passes 50 lines.
+- **Rolling log** (`vteam/.memory/<agent-name>/store.md`) — what recent runs did. The agent returns `memoryUpdate`, and a curation agent merges it into the log following the rules in `MEMORY.md`:
 
 ```markdown
 Keep a running list of areas scanned and key patterns observed.
-Record false positives to avoid repeating them.
 Maximum 30 lines — drop oldest entries first.
 ```
+
+Tell the agent what counts as a fact in its `AGENT.md`; the default agents end with a `## Memory` section that does this.
 
 The curation agent's model and tools go in the `memory` section of `agent.json`, e.g. `"memory": { "model": "haiku" }`.
 
 **How it works:**
 
-1. Before each run, the orchestrator reads the agent's memory file (`vteam/.memory/<agent-name>/store.md`) and injects it into the prompt
-2. The agent includes a `memoryUpdate` field in its structured JSON output with observations from the current run
-3. After the run, the orchestrator spawns a small curation agent that merges the new update into existing memory according to the MEMORY.md rules
-4. The orchestrator writes the curated result back to the memory file (full replacement)
+1. Before each run, the orchestrator injects the facts and the log into the prompt (`### Durable Facts`, `### Recent Runs`)
+2. The agent may include `memoryFacts` (a list of strings) and `memoryUpdate` (a string) in its structured JSON output
+3. After the run, the orchestrator appends the new facts to `facts.md`
+4. If there is a `memoryUpdate`, a small curation agent merges it into the log according to the MEMORY.md rules (it never sees the facts), and the orchestrator writes the result back to `store.md` (full replacement)
 
 Memory files are stored in `vteam/.memory/` and are gitignored — they are local workflow state. The curation agent failure is non-fatal and does not affect the agent run's exit status.
 

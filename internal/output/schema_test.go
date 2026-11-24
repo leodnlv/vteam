@@ -47,14 +47,16 @@ func TestSchemaContentMatchesOutputMode(t *testing.T) {
 
 func TestSchemaOptionalFieldsFollowTheAgent(t *testing.T) {
 	bare := props(parseSchema(t, SchemaOptions{}))
-	if _, ok := bare["memoryUpdate"]; ok {
-		t.Error("memoryUpdate offered to an agent without memory")
+	for _, key := range []string{"memoryUpdate", "memoryFacts"} {
+		if _, ok := bare[key]; ok {
+			t.Errorf("%s offered to an agent without memory", key)
+		}
 	}
 	if _, ok := bare["threadReplies"]; ok {
 		t.Error("threadReplies offered without review threads")
 	}
 	full := props(parseSchema(t, SchemaOptions{Memory: true, ThreadReplies: true}))
-	for _, key := range []string{"memoryUpdate", "threadReplies"} {
+	for _, key := range []string{"memoryUpdate", "memoryFacts", "threadReplies"} {
 		if _, ok := full[key]; !ok {
 			t.Errorf("%s missing", key)
 		}

@@ -19,3 +19,8 @@ Scan the codebase and identify issues including:
 - Every finding MUST include specific file paths and line numbers.
 - Prioritize severity: a critical security bug matters more than a style nit.
 - Limit yourself to 1 finding per run. Quality over quantity.
+
+## Memory
+
+- Put the areas you scanned in this run in `memoryUpdate`.
+- Put things that stay true across runs in `memoryFacts`, one per entry: a finding that was rejected or turned out to be a false positive (with one line on why), or a deliberate design choice that looks like a bug but is not.

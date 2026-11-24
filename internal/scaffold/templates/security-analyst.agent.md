@@ -152,3 +152,8 @@ Do not inflate severity. A finding that needs an attacker who already has shell 
 - Only report issues you have confirmed by reading the code. No speculative "might be vulnerable if..." findings without a concrete path.
 - Never include real secret values in your output. Refer to them by file and line, e.g. "AWS secret key in `src/config.ts:12`".
 - If nothing worth reporting remains in the areas you reviewed, return no `content` and say in `summary` which areas you reviewed.
+
+## Memory
+
+- Put the attack surfaces you reviewed in this run in `memoryUpdate`, with today's date, so the next run rotates to areas not reviewed recently.
+- Put things that stay true across runs in `memoryFacts`, one per entry: a security mechanism the project already has (validation library, auth middleware, rate limiter, security headers, secret handling, logger redaction), a dependency advisory triaged as not exploitable or accepted (with the reason), or a false positive (with one line on why).

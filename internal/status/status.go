@@ -15,6 +15,7 @@ import (
 	"github.com/leodnlv/vteam/internal/ansi"
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/log"
+	"github.com/leodnlv/vteam/internal/memory"
 	"github.com/leodnlv/vteam/internal/model"
 	"github.com/leodnlv/vteam/internal/runstate"
 	"github.com/leodnlv/vteam/internal/schedule"
@@ -273,6 +274,16 @@ func renderWaitingOnYou(ctx context.Context, d Deps, loaded loadedAgents, idx ta
 			lines = append(lines, ansi.Muted(relative(d.Cwd, p)))
 		}
 		warning(strings.Join(lines, "\n"))
+	}
+
+	for _, a := range loaded.agents {
+		if a.Memory == nil {
+			continue
+		}
+		if n := memory.CountFacts(d.Cwd, a.Name); n > memory.FactsWarnLines {
+			path := relative(d.Cwd, memory.FactsPath(d.Cwd, a.Name))
+			warning(fmt.Sprintf("%s has %d memory facts %s", ansi.Bold(a.Name), n, ansi.Muted("(prune "+path+")")))
+		}
 	}
 
 	items = append(items, renderWaitingTasks(idx.All, now)...)

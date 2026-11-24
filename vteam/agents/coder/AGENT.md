@@ -20,3 +20,8 @@ You receive a task description and implement the required code changes.
 - If a test suite exists, run it and ensure tests pass.
 - If you cannot complete the task, explain why clearly in your output.
 - Do NOT run git add, git commit, or git push. The orchestrator handles all git operations.
+
+## Memory
+
+- Put the outcome of this task in `memoryUpdate`: done, failed, or blocked, and why.
+- Put things that hold for every task in `memoryFacts`, one per entry: build, test, and lint commands, code conventions the reviewers expect, and environment quirks you had to work around.

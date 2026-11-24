@@ -85,9 +85,10 @@ func (r *runner) handOff() error {
 	if err != nil {
 		return err
 	}
+	facts, recent := r.readMemory()
 	parts, err := prompt.Build(prompt.Input{
 		Agent: r.agent, Existing: idx.All, Task: r.task, Review: r.review, FollowUp: r.followUp,
-		Focus: r.focus, Memory: r.readMemory(), SubmitCommand: r.submitCommand(),
+		Focus: r.focus, MemoryFacts: facts, MemoryLog: recent, SubmitCommand: r.submitCommand(),
 	})
 	if err != nil {
 		return err
@@ -159,7 +160,7 @@ func fromSession(ctx context.Context, d Deps, agent *config.Agent, s session.Ses
 func Submit(ctx context.Context, d Deps, agent *config.Agent, s session.Session, out model.AgentOutput) (session.Session, error) {
 	r := fromSession(ctx, d, agent, s)
 	r.Log.Section("Submit")
-	r.memUpdate = out.MemoryUpdate
+	r.memUpdate, r.memFacts = out.MemoryUpdate, out.MemoryFacts
 	r.state.ClaudeOutput = &out
 	r.state.CommitMessage = out.CommitMessage
 	if err := r.applyOutput(out); err != nil {
@@ -169,7 +170,7 @@ func Submit(ctx context.Context, d Deps, agent *config.Agent, s session.Session,
 	r.releaseTask()
 	s.Status = session.Submitting
 	s.Outcome = r.outcome
-	s.MemoryUpdate = out.MemoryUpdate
+	s.MemoryUpdate, s.MemoryFacts = out.MemoryUpdate, out.MemoryFacts
 	return s, session.Save(d.Cwd, s)
 }
 
@@ -178,10 +179,10 @@ func Submit(ctx context.Context, d Deps, agent *config.Agent, s session.Session,
 // user to close, because killing a session's last window ends the session and detaches whoever is attached.
 func Finalize(ctx context.Context, d Deps, agent *config.Agent, s session.Session) error {
 	r := fromSession(ctx, d, agent, s)
-	r.outcome, r.memUpdate = s.Outcome, s.MemoryUpdate
+	r.outcome, r.memUpdate, r.memFacts = s.Outcome, s.MemoryUpdate, s.MemoryFacts
 	if r.outcome != nil {
 		r.runOnFinishHook()
-		r.runMemoryCuration()
+		r.recordMemory()
 	}
 	r.Log.Section("Cleanup")
 	closed := false

@@ -49,9 +49,10 @@ type Session struct {
 	// InUserSession means the window was opened in the user's own tmux session, so closing it never ends the
 	// session; a window in the dedicated vteam session (vteam ran outside tmux) is left for the user to close.
 	InUserSession bool `json:"inUserSession,omitempty"`
-	// Outcome and MemoryUpdate are set by submit for the detached finalize step.
+	// Outcome, MemoryUpdate, and MemoryFacts are set by submit for the detached finalize step.
 	Outcome      *model.RunOutcome `json:"outcome,omitempty"`
 	MemoryUpdate string            `json:"memoryUpdate,omitempty"`
+	MemoryFacts  []string          `json:"memoryFacts,omitempty"`
 }
 
 func Root(cwd string) string { return filepath.Join(cwd, "vteam", ".sessions") }

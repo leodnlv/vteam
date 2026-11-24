@@ -124,6 +124,21 @@ func TestParseValidShapes(t *testing.T) {
 		}
 	})
 
+	t.Run("parses memoryFacts", func(t *testing.T) {
+		out := mustParse(t, mustJSON(obj{"status": "completed", "summary": "Done.", "memoryFacts": []string{"a", "b"}}))
+		if diff := cmp.Diff([]string{"a", "b"}, out.MemoryFacts); diff != "" {
+			t.Error(diff)
+		}
+	})
+
+	t.Run("rejects memoryFacts that are not a list of strings", func(t *testing.T) {
+		for _, facts := range []any{"a", []any{1}} {
+			if _, err := Parse(mustJSON(obj{"status": "completed", "summary": "Done.", "memoryFacts": facts})); err == nil {
+				t.Errorf("accepted %v", facts)
+			}
+		}
+	})
+
 	t.Run("parses blocked status with blockerReason", func(t *testing.T) {
 		out := mustParse(t, mustJSON(obj{"status": "blocked", "summary": "Cannot proceed.",
 			"blockerReason": "Tests are failing before any changes."}))

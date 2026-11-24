@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/leodnlv/vteam/internal/config"
+	"github.com/leodnlv/vteam/internal/memory"
 	"github.com/leodnlv/vteam/internal/model"
 	"github.com/leodnlv/vteam/internal/output"
 	"github.com/leodnlv/vteam/internal/session"
@@ -344,5 +345,25 @@ func TestInteractiveOpenFailureReleasesEverything(t *testing.T) {
 	}
 	if len(h.workmux.removed) != 1 || len(session.List(h.cwd)) != 0 {
 		t.Errorf("removed %v sessions %+v", h.workmux.removed, session.List(h.cwd))
+	}
+}
+
+func TestInteractiveMemoryFactsAreRecordedOnFinalize(t *testing.T) {
+	h := setup(t, project{memory: true})
+	s := h.mustHandOff()
+	s, err := h.submit(s, jsonText(obj{"status": "completed", "summary": "Done.", "memoryFacts": []string{"uses just"}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, statErr := os.Stat(memory.FactsPath(h.cwd, "test-agent")); !os.IsNotExist(statErr) {
+		t.Error("facts recorded before finalize")
+	}
+	saved, err := session.Load(h.cwd, s.RunID)
+	if err != nil || !cmp.Equal(saved.MemoryFacts, []string{"uses just"}) {
+		t.Fatalf("saved = %+v err %v", saved, err)
+	}
+	h.finalize(saved)
+	if got := readText(t, memory.FactsPath(h.cwd, "test-agent")); got != "- uses just\n" {
+		t.Errorf("facts = %q", got)
 	}
 }

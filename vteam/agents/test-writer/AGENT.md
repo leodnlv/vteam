@@ -52,3 +52,8 @@ If you find multiple untested areas, prioritize the one most critical to the sys
 - Follow existing code style and patterns in the project.
 - If you cannot write meaningful tests (e.g. the function is trivial or purely side-effect-driven with no observable output), explain why in your output instead of writing useless assertions.
 - Do NOT run git add, git commit, or git push. The orchestrator handles all git operations.
+
+## Memory
+
+- Put the files and modules you covered in this run in `memoryUpdate`.
+- Put things that hold for every run in `memoryFacts`, one per entry: the test framework, helpers, fixtures, and mocking approach the project uses, and test infrastructure quirks you had to work around.

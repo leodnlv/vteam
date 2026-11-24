@@ -11,7 +11,7 @@ The user is done with this interactive vteam session. Submit the result now.
    - `status` and `summary` are required. `summary` is what was done, in a sentence or two.
    - Include `commitMessage` (and `filesChanged`) when files were changed and not yet committed. Do not run `git commit` or `git push` yourself; vteam commits uncommitted changes with your message and pushes any commits the user made.
    - For an agent that reports findings, put every finding the user agreed to in `content` as `{ "type": "tasks", "body": [ ... ] }`.
-   - Add `threadReplies` or `memoryUpdate` only when the prompt's shape offers them.
+   - Add `threadReplies`, `memoryUpdate`, or `memoryFacts` only when the prompt's shape offers them.
 3. Run the command with the JSON on stdin, exactly like this:
 
    ```

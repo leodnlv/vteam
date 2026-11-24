@@ -29,7 +29,9 @@ type Input struct {
 	Review   *model.PRReviewContext
 	FollowUp *model.PRFollowUpContext
 	Focus    string
-	Memory   string
+	// MemoryFacts are the agent's durable facts (facts.md); MemoryLog is its curated rolling log (store.md).
+	MemoryFacts string
+	MemoryLog   string
 	// SubmitCommand makes the prompt an interactive one: Claude works with the user and submits its output by
 	// piping it to this command, instead of returning it as its final answer.
 	SubmitCommand string
@@ -52,8 +54,8 @@ func Build(in Input) (Parts, error) {
 	if in.Focus != "" {
 		sections = append(sections, "## Priority Focus\n\nThe user wants you to prioritize the following context above all other considerations:\n\n"+in.Focus)
 	}
-	if in.Memory != "" {
-		sections = append(sections, "## Agent Memory\n\nThe following is your accumulated memory from previous runs. Use it to inform your work and avoid repeating past efforts.\n\n"+in.Memory)
+	if in.MemoryFacts != "" || in.MemoryLog != "" {
+		sections = append(sections, memorySection(in.MemoryFacts, in.MemoryLog))
 	}
 	if len(in.Existing) > 0 {
 		lines := make([]string, len(in.Existing))
@@ -84,6 +86,17 @@ func Build(in Input) (Parts, error) {
 		TaskContent: in.Agent.Output == config.OutputTask, Memory: in.Agent.Memory != nil, ThreadReplies: replyable,
 	})
 	return Parts{SystemPrompt: system, UserPrompt: strings.Join(sections, "\n\n"), OutputSchema: schema}, nil
+}
+
+func memorySection(facts, log string) string {
+	s := "## Agent Memory\n\nThe following is your accumulated memory from previous runs. Use it to inform your work and avoid repeating past efforts."
+	if facts != "" {
+		s += "\n\n### Durable Facts\n\n" + facts
+	}
+	if log != "" {
+		s += "\n\n### Recent Runs\n\n" + log
+	}
+	return s
 }
 
 func OnFinish(cfg *config.Subagent, o model.RunOutcome) (Parts, error) {
@@ -185,9 +198,10 @@ const genericContentInstruction = `  "content": {
   }`
 
 func outputInstruction(agent *config.Agent, replyableThreads bool) string {
-	memoryNote, threadField, threadNote := "", "", ""
+	memoryNote, memoryHint, threadField, threadNote := "", "", "", ""
 	if agent.Memory != nil {
-		memoryNote = ",\n  \"memoryUpdate\": \"optional: brief notes about this run to remember for future runs (patterns noticed, decisions made, areas covered)\""
+		memoryNote = ",\n  \"memoryUpdate\": \"optional: brief notes about this run to remember for future runs (patterns noticed, decisions made, areas covered)\"" + memoryFactsField
+		memoryHint = memoryFactsNote
 	}
 	if replyableThreads {
 		threadField = ",\n  \"threadReplies\": [{ \"thread\": \"T1\", \"body\": \"what you changed to address this thread\" }]"
@@ -217,8 +231,12 @@ func outputInstruction(agent *config.Agent, replyableThreads bool) string {
 
 - "content" is optional. Include it when you have a primary deliverable (finding, review, analysis).
 - "filesChanged" and "commitMessage" are optional. Include them only when you modified files.
-- "blockerReason" is optional. Include it only when status is "blocked" or "failed".` + threadNote
+- "blockerReason" is optional. Include it only when status is "blocked" or "failed".` + memoryHint + threadNote
 }
+
+const memoryFactsField = ",\n  \"memoryFacts\": [\"optional: one durable fact per entry\"]"
+
+const memoryFactsNote = "\n- \"memoryUpdate\" and \"memoryFacts\" are optional. \"memoryUpdate\" goes into a rolling log that is trimmed over time: put what you did in this run there. \"memoryFacts\" are kept until a human removes them: add only things that stay true across runs (a project convention, a finding that was rejected and why, a mechanism the project already has), one per entry, and none already listed under \"Durable Facts\"."
 
 const taskListContentInstruction = `  "content": {
     "type": "tasks",
@@ -236,9 +254,10 @@ const taskListContentInstruction = `  "content": {
 // interactiveOutputInstruction replaces outputInstruction in an interactive session, where the output is
 // submitted with a command once the user is done rather than returned as the final answer.
 func interactiveOutputInstruction(agent *config.Agent, replyableThreads bool, submitCommand string) string {
-	memoryField, threadField, threadNote := "", "", ""
+	memoryField, memoryHint, threadField, threadNote := "", "", "", ""
 	if agent.Memory != nil {
-		memoryField = ",\n  \"memoryUpdate\": \"optional: brief notes about this session to remember for future runs (patterns noticed, decisions made, areas covered)\""
+		memoryField = ",\n  \"memoryUpdate\": \"optional: brief notes about this session to remember for future runs (patterns noticed, decisions made, areas covered)\"" + memoryFactsField
+		memoryHint = memoryFactsNote
 	}
 	if replyableThreads {
 		threadField = ",\n  \"threadReplies\": [{ \"thread\": \"T1\", \"body\": \"what you changed to address this thread\" }]"
@@ -280,7 +299,7 @@ If the command reports an error, fix the JSON (or the problem it names) and run 
 
 ` + contentNote + `
 - "filesChanged" and "commitMessage" are optional. Include them only when files were modified.
-- "blockerReason" is optional. Include it only when status is "blocked" or "failed".` + threadNote
+- "blockerReason" is optional. Include it only when status is "blocked" or "failed".` + memoryHint + threadNote
 }
 
 func taskNotesSection(notes []model.TaskNote) string {
