@@ -13,7 +13,7 @@ import (
 )
 
 // sidebarWidth is the width inside the sidebar pane's border.
-const sidebarWidth = 26
+const sidebarWidth = 32
 
 type agentsState struct {
 	list     []Agent
