@@ -215,8 +215,17 @@ func lastRunAge(a Agent, m Model) string {
 }
 
 func (m Model) agentDetails(a Agent) []string {
+	const labelWidth = 7
+	valueWidth := sidebarWidth - 2 - labelWidth
 	var lines []string
-	field := func(label, value string) { lines = append(lines, styleMuted.Render(log.PadEnd(label, 7))+value) }
+	field := func(label, value string) {
+		for i, row := range strings.Split(xansi.Wrap(value, valueWidth, " /"), "\n") {
+			if i > 0 {
+				label = ""
+			}
+			lines = append(lines, styleMuted.Render(log.PadEnd(label, labelWidth))+row)
+		}
+	}
 	if a.Running != nil {
 		field("status", styleLive.Render("● running"))
 		field("pid", strconv.Itoa(a.Running.PID))
@@ -226,13 +235,22 @@ func (m Model) agentDetails(a Agent) []string {
 	switch {
 	case a.Cron != "" && m.schedulerRunning():
 		field("cron", styleCron.Render(a.Cron))
+		if desc := describeCron(a.Cron); desc != "" {
+			field("", styleMuted.Render(desc))
+		}
 		if !a.NextRun.IsZero() {
 			field("next", styleCron.Render(log.FormatTimeOfDay(a.NextRun.Local(), m.deps.Now().Local())))
 		}
 	case a.Cron != "":
 		field("cron", styleWarn.Render(a.Cron+" paused"))
+		if desc := describeCron(a.Cron); desc != "" {
+			field("", styleMuted.Render(desc))
+		}
 	case a.DefaultCron != "":
 		field("cron", styleMuted.Render("off ("+a.DefaultCron+")"))
+		if desc := describeCron(a.DefaultCron); desc != "" {
+			field("", styleMuted.Render(desc))
+		}
 	case a.Runnable():
 		field("cron", styleMuted.Render("off"))
 	}
@@ -243,11 +261,25 @@ func (m Model) agentDetails(a Agent) []string {
 		}
 		field(label, styleLive.Render("◆ ")+log.Truncate(handle, sidebarWidth-10))
 	}
-	if a.Config != nil && a.Config.Model != "" {
-		field("model", a.Config.Model)
-	}
-	if a.Config != nil && a.Config.Input != "" {
-		field("input", a.Config.Input)
+	if c := a.Config; c != nil {
+		field("model", orDefault(c.Model, "default"))
+		field("input", orDefault(c.Input, "—"))
+		field("output", orDefault(c.Output, "generic"))
+		field("flags", strings.Join([]string{
+			flag(c.Worktree, "worktree"), flag(c.ReadOnly, "readOnly"), flag(c.AutoPR, "autoPR"),
+			flag(c.ResolveThreads, "resolveThreads"), flag(c.Memory != nil, "memory"), flag(c.OnFinish != nil, "onFinish"),
+		}, " "))
+		if len(c.TaskFilter) > 0 {
+			field("filter", formatFilter(c.TaskFilter))
+		}
+		if len(c.AllowedTools) > 0 {
+			field("tools", strings.Join(c.AllowedTools, ", "))
+		} else {
+			field("tools", styleMuted.Render("default set"))
+		}
+		if len(c.DisallowedTools) > 0 {
+			field("denied", strings.Join(c.DisallowedTools, ", "))
+		}
 	}
 	if a.LoadError != "" {
 		lines = append(lines, styleFail.Render(firstLine(a.LoadError)))
