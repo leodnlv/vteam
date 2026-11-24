@@ -71,7 +71,7 @@ func submit(ctx context.Context, project, id string, input io.Reader) error {
 	}
 	switch s.Status {
 	case session.Open:
-	case session.Abandoned:
+	case session.Abandoned, session.Removed:
 		return errors.New("this session was abandoned (its window was closed) and its task was released; it can no longer be submitted")
 	default:
 		return errors.New("this session was already submitted")

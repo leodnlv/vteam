@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/lock"
 	"github.com/leodnlv/vteam/internal/schedule"
+	"github.com/leodnlv/vteam/internal/session"
 )
 
 // fakeActions records what the TUI asked for and keeps the agent list and scheduler pid in step with it.
@@ -386,4 +388,96 @@ func TestSidebarShowsOpenInteractiveSessions(t *testing.T) {
 	agents[0].Sessions = []string{"vteam-fix-it-1", "vteam-other-2"}
 	m := actionsModel(t, &fakeActions{agents: agents})
 	assertScreen(t, m, "◆2", "open   ◆ vteam-fix-it-1", "◆ vteam-other-2")
+}
+
+type fakeSessions struct {
+	leftovers []session.Leftover
+	cleaned   []bool
+	res       session.CleanupResult
+}
+
+func cleanSessionsModel(t *testing.T, f *fakeSessions) Model {
+	t.Helper()
+	m := overviewModel(t, func(context.Context) ([]string, error) { return statusLines(3), nil })
+	m.deps.AbandonedSessions = func(context.Context) []session.Leftover { return f.leftovers }
+	m.deps.CleanSessions = func(_ context.Context, discard bool) session.CleanupResult {
+		f.cleaned = append(f.cleaned, discard)
+		return f.res
+	}
+	return m
+}
+
+// pressRunning presses k and feeds the message of the command it returns back into the model.
+func pressRunning(t *testing.T, m Model, k string) Model {
+	t.Helper()
+	next, cmd := m.Update(keyPress(k))
+	m = next.(Model)
+	if cmd == nil {
+		t.Fatalf("%s returned no command", k)
+	}
+	return update(t, m, cmd())
+}
+
+func leftover(runID string, unsaved bool) session.Leftover {
+	return session.Leftover{
+		Session:     session.Session{RunID: runID, Agent: "coder", Handle: "h-" + runID, StartedAt: "2026-11-24T10:00:00.000Z"},
+		Uncommitted: unsaved,
+	}
+}
+
+func TestCleaningUpAbandonedSessions(t *testing.T) {
+	t.Run("says so when there are none", func(t *testing.T) {
+		f := &fakeSessions{}
+		m := press(t, cleanSessionsModel(t, f), "c")
+		if m.dialog.kind != dialogNone {
+			t.Error("dialog opened")
+		}
+		assertScreen(t, m, "no abandoned interactive sessions to clean up")
+	})
+
+	t.Run("confirms before cleaning up", func(t *testing.T) {
+		f := &fakeSessions{leftovers: []session.Leftover{leftover("a", false), leftover("b", false)}}
+		f.res = session.CleanupResult{Removed: f.leftovers}
+		m := press(t, cleanSessionsModel(t, f), "c")
+		assertScreen(t, m, "Clean up 2 abandoned session(s)?", "h-a", "h-b", "⏎ clean up")
+		if strings.Contains(screen(m), "discarding") {
+			t.Error("offered to discard work none of the sessions has")
+		}
+		m = pressRunning(t, m, "enter")
+		if !slices.Equal(f.cleaned, []bool{false}) {
+			t.Errorf("cleaned = %v", f.cleaned)
+		}
+		assertScreen(t, m, "✓ cleaned up 2 session(s)")
+	})
+
+	t.Run("keeps unsaved work unless chosen", func(t *testing.T) {
+		f := &fakeSessions{leftovers: []session.Leftover{leftover("a", false), leftover("b", true)}}
+		m := press(t, cleanSessionsModel(t, f), "c")
+		assertScreen(t, m, "! uncommitted changes", "› Clean ones only (keep 1 with unsaved work)", "All, discarding unsaved work")
+		f.res = session.CleanupResult{Removed: f.leftovers[:1], Kept: f.leftovers[1:]}
+		m = pressRunning(t, m, "enter")
+		assertScreen(t, m, "✓ cleaned up 1 session(s) · kept 1 with unsaved work")
+
+		m = press(t, m, "c", "j")
+		assertScreen(t, m, "› All, discarding unsaved work")
+		pressRunning(t, m, "enter")
+		if !slices.Equal(f.cleaned, []bool{false, true}) {
+			t.Errorf("cleaned = %v", f.cleaned)
+		}
+	})
+
+	t.Run("esc cancels", func(t *testing.T) {
+		f := &fakeSessions{leftovers: []session.Leftover{leftover("a", false)}}
+		m := press(t, cleanSessionsModel(t, f), "c", "esc")
+		if m.dialog.kind != dialogNone || len(f.cleaned) != 0 {
+			t.Errorf("dialog = %v, cleaned = %v", m.dialog.kind, f.cleaned)
+		}
+	})
+
+	t.Run("shows failures", func(t *testing.T) {
+		f := &fakeSessions{leftovers: []session.Leftover{leftover("a", false)}}
+		f.res = session.CleanupResult{Failed: []session.CleanupFailure{{Leftover: f.leftovers[0], Err: errors.New("busy")}}}
+		m := pressRunning(t, press(t, cleanSessionsModel(t, f), "c"), "enter")
+		assertScreen(t, m, "✗ 1 failed: h-a busy")
+	})
 }

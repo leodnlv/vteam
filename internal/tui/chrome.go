@@ -50,7 +50,7 @@ func (m Model) hints() []key.Binding {
 	if m.help {
 		return []key.Binding{scrollKeys, relabel(keys.Cancel, "?/esc", "close help")}
 	}
-	if m.tab == TabAgents && m.dialog.kind != dialogNone {
+	if m.dialog.kind != dialogNone {
 		switch m.dialog.kind {
 		case dialogMenu:
 			return []key.Binding{relabel(keys.Down, "j/k", "move"), relabel(keys.Confirm, "⏎", "choose"), relabel(keys.Cancel, "esc", "close")}
@@ -70,6 +70,8 @@ func (m Model) hints() []key.Binding {
 			return append(run, keys.EditFocus, keys.Interactive, keys.Cancel)
 		case dialogStop:
 			return []key.Binding{relabel(keys.Confirm, "⏎", "stop"), relabel(keys.Down, "j/k", "choose"), keys.Cancel}
+		case dialogCleanSessions:
+			return []key.Binding{relabel(keys.Confirm, "⏎", "clean up"), relabel(keys.Down, "j/k", "choose"), keys.Cancel}
 		default:
 			return []key.Binding{keys.Confirm, keys.SaveDefault, keys.Cancel}
 		}
@@ -83,7 +85,7 @@ func (m Model) hints() []key.Binding {
 	}
 	scrolling := []key.Binding{scrollKeys, relabel(keys.GG, "gg/G", "top/bottom")}
 	if m.tab == TabOverview {
-		scrolling = append(scrolling, relabel(keys.Window, "t", "24h/7d"))
+		scrolling = append(scrolling, relabel(keys.Window, "t", "24h/7d"), relabel(keys.CleanSessions, "c", "clean sessions"))
 	}
 	return append(scrolling, global...)
 }
@@ -153,7 +155,7 @@ var helpGroups = []struct {
 		relabel(keys.HalfPageDown, "ctrl+d ctrl+u", "half page down / up"),
 		relabel(keys.GG, "gg  G", "top / bottom"),
 	}},
-	{"Overview tab", []key.Binding{keys.Window}},
+	{"Overview tab", []key.Binding{keys.Window, keys.CleanSessions}},
 	{"Agents tab", []key.Binding{
 		relabel(keys.Down, "j k", "select agent (sidebar) or scroll log"),
 		keys.SwitchPane, keys.FocusLog, keys.FocusSidebar,

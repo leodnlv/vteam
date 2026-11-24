@@ -15,7 +15,7 @@ type keyMap struct {
 	SwitchPane, FocusLog, FocusSidebar, PrevRun, NextRun                key.Binding
 	Actions, Run, StopRun, Cron, StopCron, StartScheduler, Follow, Wrap key.Binding
 
-	Window key.Binding
+	Window, CleanSessions key.Binding
 
 	Confirm, Cancel, SaveDefault, Interactive, PickTask, EditFocus, NewLine, TaskDown, TaskUp key.Binding
 }
@@ -53,7 +53,8 @@ var keys = keyMap{
 	Follow:         binding([]string{"f"}, "f", "toggle follow"),
 	Wrap:           binding([]string{"w"}, "w", "toggle line wrap"),
 
-	Window: binding([]string{"t"}, "t", "switch the pipeline window: 24h / 7d"),
+	Window:        binding([]string{"t"}, "t", "switch the pipeline window: 24h / 7d"),
+	CleanSessions: binding([]string{"c"}, "c", "clean up abandoned interactive sessions"),
 
 	Confirm:     binding([]string{"enter"}, "⏎", "confirm"),
 	Cancel:      binding([]string{"esc"}, "esc", "cancel"),
@@ -142,6 +143,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.tab == TabOverview && key.Matches(msg, keys.Window) {
 		m.overview.window = nextWindow(m.overview.window)
 		return m.restartStatus()
+	}
+	if m.tab == TabOverview && key.Matches(msg, keys.CleanSessions) {
+		return m.openCleanSessions(), nil
 	}
 
 	if !scroll(m.tabView(), msg, pendingG) {

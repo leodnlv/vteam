@@ -55,7 +55,7 @@ func Run(ctx context.Context, d Deps) {
 			p("Kept %d worktree(s) in use by a running agent.", len(inUse))
 		}
 		if len(sessions) > 0 {
-			p("Kept %d interactive session worktree(s); remove abandoned ones with `workmux remove`.", len(sessions))
+			p("Kept %d interactive session worktree(s); clean up abandoned ones from the TUI's Overview (c) or with `workmux remove`.", len(sessions))
 		}
 		if len(cleaned) > 0 {
 			p("Removed %d worktree(s):", len(cleaned))

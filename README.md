@@ -173,7 +173,7 @@ vteam run coder --task APP-7KQ9
 1. vteam picks the task (claimed with `claimed-session` metadata instead of a pid), creates the branch, and creates the worktree with `workmux add --headless`. For PR follow-ups it also merges the base branch when the PR conflicts.
 2. It opens the worktree with `workmux open`. Inside tmux (including from the TUI) the window opens in your current session and you are switched to it; outside tmux it goes to a tmux session `vteam-<tasks.project>`, which vteam tells you to attach to. Claude starts with the agent's `AGENT.md` as system prompt, its model and tools, and the usual prompt plus an **Interactive Session** section. `vteam run` exits, and the agent lock is released, so cron runs carry on.
 3. When you are done, run `/vteam-submit` in the session (install it with `vteam skill install`). Claude pipes its `AgentOutput` JSON to `vteam submit`, which validates it (Claude fixes and resubmits on errors), commits any uncommitted changes, pushes (commits you made yourself are pushed too), opens or updates the PR, settles the task, and creates one task per finding for task-producing agents (`"content": {"type": "tasks", "body": [...]}`). Then a detached `vteam session finalize` runs the on-finish hook and memory curation and closes the window with `workmux remove`, which also removes the worktree and its local branch. A window in the `vteam-<tasks.project>` session (run started outside tmux) is not closed, because killing a session's last window would detach you from it; vteam removes the worktree and you close the window. If submit fails (a rejected push, say), the session stays open and you can submit again.
-4. Closing the window without submitting abandons the session. The next `vteam ensure-merge` marks it abandoned and returns its task to `todo` with a note. The worktree is kept; remove it with `workmux remove <handle>`. An abandoned session cannot be submitted.
+4. Closing the window without submitting abandons the session. The next `vteam ensure-merge` marks it abandoned and returns its task to `todo` with a note. The worktree is kept. To remove it, press `c` on the TUI's Overview tab: a confirmation popup lists the abandoned sessions and removes their worktrees and local branches. Sessions with uncommitted changes or unsubmitted commits are kept unless you choose to discard that work. You can also run `workmux remove <handle>` yourself. An abandoned session cannot be submitted.
 
 Agents without `worktree: true` still get a worktree to host the session, but nothing is committed from it. Sessions are recorded in `vteam/.sessions/` (gitignored). `vteam status` lists open sessions and abandoned ones whose worktree still exists, and the TUI sidebar shows `◆N` next to an agent with open sessions.
 
@@ -276,6 +276,8 @@ Running `vteam` with no arguments inside a project opens a full-screen, keyboard
   - **Lead time**: median and p90 from a task's creation to its first PR and from a pick to the push, plus how long inbox tasks and open PRs have been waiting.
 
   vteam records no triage or merge times, so those don't appear.
+
+  Press `c` to clean up abandoned interactive sessions (see [Interactive mode](#interactive-mode---interactive)).
 - **Info** — the project, `vteam.config.json`, whether the scheduler is running, and each agent's settings, including the tools it is allowed.
 - **About** — what vteam is, its philosophy, the author, and the license.
 
@@ -293,6 +295,7 @@ The top-right corner shows the aven project, task label, and git branch.
 | `f` / `w` | Agents tab: toggle follow / line wrap |
 | `space` `a` | Agents tab: action menu for the selected agent |
 | `r` / `x` / `c` / `s` / `S` | Agents tab: run once / stop its run / run on cron or edit its cron / stop its cron / start the scheduler |
+| `t` / `c` | Overview tab: switch the pipeline window (7d / 24h) / clean up abandoned interactive sessions |
 | `ctrl+r` | refresh now |
 | `?` | help |
 | `q` `ctrl+c` | quit |

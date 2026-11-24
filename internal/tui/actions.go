@@ -16,6 +16,7 @@ import (
 	"github.com/leodnlv/vteam/internal/cron"
 	"github.com/leodnlv/vteam/internal/log"
 	"github.com/leodnlv/vteam/internal/schedule"
+	"github.com/leodnlv/vteam/internal/session"
 )
 
 const (
@@ -46,6 +47,7 @@ const (
 	dialogRun
 	dialogCron
 	dialogStop
+	dialogCleanSessions
 )
 
 // runView is the part of the run dialog on screen: the summary of the run, or the dialog that changes its task or focus.
@@ -57,8 +59,9 @@ const (
 	runEditFocus
 )
 
-// dialog is the popup open on the Agents tab: the action menu, the run dialog (dialogConfirm for the
-// merge ensurer, which takes no focus), the cron editor, or the stop dialog.
+// dialog is the open popup: on the Agents tab the action menu, the run dialog (dialogConfirm for the
+// merge ensurer, which takes no focus), the cron editor, or the stop dialog; on the Overview the cleanup of
+// abandoned interactive sessions.
 type dialog struct {
 	kind   dialogKind
 	agent  string
@@ -72,6 +75,7 @@ type dialog struct {
 	// interactive opens the run in an interactive Claude session (vteam run --interactive).
 	interactive bool
 	picker      taskPicker
+	leftovers   []session.Leftover
 }
 
 type toast struct {
@@ -229,6 +233,8 @@ func (m Model) handleDialogKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		return m.handleCronKey(msg)
 	case dialogStop:
 		return m.handleStopKey(msg), nil
+	case dialogCleanSessions:
+		return m.handleCleanSessionsKey(msg)
 	}
 	return m, nil
 }
@@ -501,7 +507,7 @@ func (m Model) startScheduler() Model {
 	return m.refreshAfterAction().withToast(styleOK.Render("✓ ") + fmt.Sprintf("scheduler started (pid %d)", pid))
 }
 
-// renderDialog draws the open dialog over the Agents tab body.
+// renderDialog draws the open dialog over the tab body.
 func (m Model) renderDialog(body []string) []string {
 	height := m.bodyHeight()
 	switch m.dialog.kind {
@@ -523,6 +529,8 @@ func (m Model) renderDialog(body []string) []string {
 		return overlay(body, m.cronBox(), m.width, height)
 	case dialogStop:
 		return overlay(body, m.stopBox(), m.width, height)
+	case dialogCleanSessions:
+		return overlay(body, m.cleanSessionsBox(), m.width, height)
 	}
 	return body
 }

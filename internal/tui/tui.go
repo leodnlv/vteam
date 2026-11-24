@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/leodnlv/vteam/internal/config"
 	"github.com/leodnlv/vteam/internal/schedule"
+	"github.com/leodnlv/vteam/internal/session"
 )
 
 const (
@@ -62,6 +63,10 @@ type Deps struct {
 	SaveCron func(name, expr string) error
 	// StartScheduler starts `vteam cron start` in the background and returns its pid.
 	StartScheduler func() (int, error)
+	// AbandonedSessions lists the abandoned interactive sessions; CleanSessions removes their worktrees and branches,
+	// keeping the ones with unsaved work unless discardUnsaved.
+	AbandonedSessions func(ctx context.Context) []session.Leftover
+	CleanSessions     func(ctx context.Context, discardUnsaved bool) session.CleanupResult
 }
 
 type overviewState struct {
@@ -155,6 +160,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next.(Model).requestTaskChoices(cmd)
 	case taskChoicesMsg:
 		return m.receiveTaskChoices(msg), nil
+	case sessionsCleanedMsg:
+		return m.receiveSessionsCleaned(msg)
 	case tea.MouseWheelMsg:
 		return m.handleWheel(msg), nil
 	case tea.PasteMsg:
@@ -194,7 +201,7 @@ func (m Model) bodyHeight() int {
 func (m Model) View() tea.View {
 	m = m.syncViewport()
 	body := m.renderBody()
-	if m.tab == TabAgents && m.dialog.kind != dialogNone {
+	if m.dialog.kind != dialogNone {
 		body = m.renderDialog(body)
 	}
 	if m.help {

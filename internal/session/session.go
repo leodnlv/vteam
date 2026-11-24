@@ -23,6 +23,8 @@ const (
 	Submitting Status = "submitting"
 	Submitted  Status = "submitted"
 	Abandoned  Status = "abandoned"
+	// Removed is an abandoned session whose worktree and branch were cleaned up; session.json stays for the stats.
+	Removed Status = "removed"
 )
 
 type Session struct {
@@ -144,11 +146,11 @@ func ListOpen(cwd string) []Session {
 	return open
 }
 
-// WorktreePaths are the worktrees of sessions not yet submitted, which `vteam clean` must leave alone.
+// WorktreePaths are the worktrees of sessions not yet submitted or removed, which `vteam clean` must leave alone.
 func WorktreePaths(cwd string) []string {
 	var paths []string
 	for _, s := range List(cwd) {
-		if s.Status != Submitted {
+		if s.Status != Submitted && s.Status != Removed {
 			paths = append(paths, s.WorktreePath)
 		}
 	}

@@ -28,6 +28,7 @@ import (
 	"github.com/leodnlv/vteam/internal/runstate"
 	"github.com/leodnlv/vteam/internal/scaffold"
 	"github.com/leodnlv/vteam/internal/schedule"
+	"github.com/leodnlv/vteam/internal/session"
 	"github.com/leodnlv/vteam/internal/skill"
 	"github.com/leodnlv/vteam/internal/status"
 	"github.com/leodnlv/vteam/internal/tasks"
@@ -291,7 +292,17 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 		DisableCron:    func(name string) error { return schedule.Disable(dir, name) },
 		SaveCron:       func(name, expr string) error { return schedule.SaveDefaultCron(dir, name, expr) },
 		StartScheduler: func() (int, error) { return schedule.StartDetached(dir) },
+		AbandonedSessions: func(ctx context.Context) []session.Leftover {
+			return sessionCleaner(dir).Leftovers(ctx)
+		},
+		CleanSessions: func(ctx context.Context, discardUnsaved bool) session.CleanupResult {
+			return sessionCleaner(dir).Clean(ctx, discardUnsaved)
+		},
 	})
+}
+
+func sessionCleaner(dir string) session.Cleaner {
+	return session.Cleaner{Cwd: dir, Git: git.New(log.Discard()), Workmux: workmux.New()}
 }
 
 func loadProject(ctx context.Context, dir string) tui.Project {
